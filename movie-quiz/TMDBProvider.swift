@@ -84,7 +84,7 @@ struct TMDBProvider: MovieDataProvider {
             MovieCreditsResponse.self,
             path: "movie/\(movie.id)/credits"
         )
-        return credits.cast.map { Person(id: $0.id, name: $0.name) }
+        return credits.cast.map { Person(id: $0.id, name: $0.name, popularity: $0.popularity) }
     }
 
     func filmography(of actor: Person) async throws -> [Movie] {
@@ -92,8 +92,13 @@ struct TMDBProvider: MovieDataProvider {
             PersonCreditsResponse.self,
             path: "person/\(actor.id)/movie_credits"
         )
-        // Acting roles only; drop entries without a title.
-        return credits.cast.map { $0.toMovie() }
+        // Real acting roles only. TMDB's movie credits include behind-the-scenes
+        // featurettes where the person appears as themselves (e.g. "Making of
+        // School of Rock", character "Self") — those aren't film roles and must
+        // not be valid chain links, so drop any credit played as "Self".
+        return credits.cast
+            .filter { !$0.isSelfAppearance }
+            .map { $0.toMovie() }
     }
 }
 
@@ -129,7 +134,7 @@ enum ActorRanking {
             .filter { $0.department == nil || $0.department == "Acting" }
             .filter { $0.popularity > 0 || $0.knownForCount > 0 }
             .sorted { $0.popularity > $1.popularity }
-            .map { Person(id: $0.id, name: $0.name) }
+            .map { Person(id: $0.id, name: $0.name, popularity: $0.popularity) }
     }
 }
 
@@ -157,6 +162,7 @@ private struct MovieCreditsResponse: Decodable {
     struct CastMember: Decodable {
         let id: Int
         let name: String
+        let popularity: Double?
     }
     let cast: [CastMember]
 }
@@ -170,9 +176,21 @@ private struct MovieDTO: Decodable {
     let title: String?
     let release_date: String?
     let popularity: Double?
+    /// Role name, present on person `movie_credits` (nil on movie search results).
+    let character: String?
+
+    /// A credit where the person plays themselves — a making-of / behind-the-
+    /// scenes / documentary appearance, not a film role. TMDB writes these as
+    /// "Self", sometimes decorated ("Self - Host", "Self (archive footage)").
+    var isSelfAppearance: Bool {
+        guard let role = character?
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased() else { return false }
+        return role == "self" || role.hasPrefix("self ") || role.hasPrefix("self-")
+    }
 
     func toMovie() -> Movie {
         let year = release_date.flatMap { Int($0.prefix(4)) }
-        return Movie(id: id, title: title ?? "Untitled", year: year)
+        return Movie(id: id, title: title ?? "Untitled", year: year, popularity: popularity)
     }
 }

@@ -72,4 +72,17 @@ final class FuzzyMatchTests: XCTestCase {
     func testRejectsOffListAnswer() {
         XCTAssertNil(match("the godfather", in: missionImpossible))
     }
+
+    // MARK: Subset ties prefer the closest title (the "Making of" bug)
+
+    func testPrefersClosestTitleOnSubsetTie() {
+        // Both titles contain every typed word, so both hit the same whole-word
+        // boost floor. The winner must be the closer literal match, regardless of
+        // candidate order — not the "making of" featurette just because TMDB
+        // happens to list it first.
+        let candidates = ["Making of School of Rock", "The School of Rock"]
+        XCTAssertEqual(match("school of rock", in: candidates), "The School of Rock")
+        // Order must not decide it.
+        XCTAssertEqual(match("school of rock", in: candidates.reversed()), "The School of Rock")
+    }
 }

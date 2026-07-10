@@ -137,13 +137,20 @@ enum FuzzyMatch {
         let query = normalize(input)
         guard !query.isEmpty else { return nil }
 
-        var best: Result<T>?
+        // Track the raw (pre-boost) similarity alongside the boosted score so
+        // that when two candidates tie on the boosted floor we can break the tie
+        // on the closer literal match. Without this, "school of rock" boosts both
+        // "The School of Rock" and "Making of School of Rock" to 0.9, and the
+        // winner is decided by candidate order — so a "making of" featurette
+        // listed first beats the real film.
+        var best: (item: T, score: Double, base: Double)?
 
         for candidate in candidates {
             let name = normalize(nameOf(candidate))
             guard !name.isEmpty else { continue }
 
-            var score = similarity(name, query)
+            let base = similarity(name, query)
+            var score = base
 
             let nameWords = name.split(separator: " ").map(String.init)
             let nameWordSet = Set(nameWords)
@@ -175,12 +182,18 @@ enum FuzzyMatch {
                 score = max(score, 0.85)
             }
 
-            if best == nil || score > best!.score {
-                best = Result(item: candidate, score: score)
+            // Prefer a strictly higher boosted score; on an exact tie (both hit
+            // the same boost floor) prefer the higher raw similarity — the title
+            // with fewer extra words is the one the player meant.
+            if best == nil || score > best!.score
+                || (score == best!.score && base > best!.base) {
+                best = (candidate, score, base)
             }
         }
 
-        if let best, best.score >= threshold { return best }
+        if let best, best.score >= threshold {
+            return Result(item: best.item, score: best.score)
+        }
         return nil
     }
 }

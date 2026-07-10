@@ -24,7 +24,15 @@ final class GameEngine {
 
     private(set) var phase: Phase = .seed
     private(set) var chain: [ChainNode] = []
+    /// The headline metric: chain length (accepted links). Drives the flame and
+    /// the hero number.
     private(set) var score = 0
+    /// Richer secondary score — base + speed + obscurity, accumulated per link.
+    private(set) var points = 0
+    /// Points awarded for the most recent link (drives the "+N" flourish).
+    private(set) var lastGain = 0
+    /// Whether the last accepted answer beat the "fast" threshold.
+    private(set) var lastAnswerFast = false
     private(set) var secondsRemaining = Config.secondsPerTurn
 
     /// What the current turn expects (actor or movie).
@@ -33,6 +41,23 @@ final class GameEngine {
     /// Transient feedback for a rejected / off-list answer.
     private(set) var feedback: String?
     private(set) var isChecking = false
+
+    // MARK: Records & recap
+
+    /// Best chain length ever, persisted across launches.
+    private(set) var bestChain: Int
+    /// Best point total ever, persisted across launches.
+    private(set) var bestPoints: Int
+    /// Set at game over when this run beat the previous best chain — the trigger
+    /// for the celebration on the game-over screen.
+    private(set) var isNewBest = false
+    /// A valid answer the player *didn't* give on the turn that timed out — the
+    /// "you were one away" near-miss shown at game over. `nil` on a manual quit
+    /// (there was no missed turn — the player chose to stop).
+    private(set) var missedAnswer: ChainNode?
+    /// Whether this run ended because the player tapped Quit (vs. the clock
+    /// running out). Lets the summary avoid a misleading "Time's up".
+    private(set) var endedByQuit = false
 
     /// The kind chosen for the seed search.
     var seedKind: NodeKind = .actor
@@ -44,6 +69,17 @@ final class GameEngine {
     private var candidates: [ChainNode] = []
     private var usedIds: Set<String> = []
     private var countdownTask: Task<Void, Never>?
+    /// Monotonic token identifying the current run/turn's async work. Every
+    /// lifecycle transition (start, end, reset) bumps it; an async candidate load
+    /// captures it before awaiting and drops its result if the token has moved on.
+    /// Without this, a slow `loadCandidates` from a quit/abandoned game can resume
+    /// *after* the player has started a new game and install the previous node's
+    /// cast/filmography into the new round — the `phase == .playing` guard alone
+    /// can't catch it, because the new game is also `.playing`.
+    private var generation = 0
+
+    private static let bestChainKey = "bestChain"
+    private static let bestPointsKey = "bestPoints"
 
     init(provider: MovieDataProvider? = nil) {
         // Resolve the default in the init body (which is @MainActor-isolated),
@@ -51,6 +87,8 @@ final class GameEngine {
         // nonisolated context, and Config.makeProvider() is @MainActor under
         // the project's MainActor-default isolation.
         self.provider = provider ?? Config.makeProvider()
+        self.bestChain = UserDefaults.standard.integer(forKey: Self.bestChainKey)
+        self.bestPoints = UserDefaults.standard.integer(forKey: Self.bestPointsKey)
     }
 
     var current: ChainNode? { chain.last }
@@ -73,13 +111,22 @@ final class GameEngine {
     }
 
     func startGame(with seed: ChainNode) async {
+        generation += 1                            // invalidate any prior run's in-flight load
+        let token = generation
         chain = [seed]
         usedIds = [seed.id]
         score = 0
+        points = 0
+        lastGain = 0
+        lastAnswerFast = false
+        isNewBest = false
+        missedAnswer = nil
+        endedByQuit = false
         feedback = nil
         phase = .playing
-        await loadCandidates(for: seed)
-        guard phase == .playing else { return }   // reset() during the await
+        await loadCandidates(for: seed, token: token)
+        // Bail if a reset/quit/new game happened during the await.
+        guard phase == .playing, generation == token else { return }
         startCountdown()
     }
 
@@ -88,6 +135,7 @@ final class GameEngine {
     /// Validate the player's free-text answer against the bounded candidate set.
     func submit(_ text: String) async {
         guard phase == .playing, !isChecking else { return }
+        let token = generation
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -112,45 +160,77 @@ final class GameEngine {
         // candidate load can't fire game-over on an answer submitted in time.
         stopCountdown()
         feedback = nil
+        // Score before the clock is reset by the next turn: fast answers and
+        // obscure picks bank more points.
+        lastGain = Scoring.gain(secondsRemaining: secondsRemaining, popularity: node.popularity)
+        lastAnswerFast = Scoring.isFast(secondsRemaining: secondsRemaining,
+                                        secondsPerTurn: Config.secondsPerTurn)
         chain.append(node)
         usedIds.insert(node.id)
         score += 1
-        await loadCandidates(for: node)
+        points += lastGain
+        await loadCandidates(for: node, token: token)
 
-        // The game may have been reset (or otherwise left play) during the
-        // await; only resume the clock if we're still playing this chain.
-        guard phase == .playing else { return }
+        // The game may have been reset/quit (or a new game started) during the
+        // await; only resume the clock if this is still the same live turn.
+        guard phase == .playing, generation == token else { return }
         startCountdown()
     }
 
+    /// End the current run in place (the player tapped Quit): stop the clock and
+    /// show the game-over summary for the chain as it stands — *not* a reset back
+    /// to the seed picker. Records are committed just as a timeout would.
+    func quit() {
+        guard phase == .playing else { return }
+        endGame(quit: true)
+    }
+
     func reset() {
+        generation += 1                            // drop any in-flight candidate load
         countdownTask?.cancel()
         countdownTask = nil
         chain = []
         usedIds = []
         candidates = []
         score = 0
+        points = 0
+        lastGain = 0
+        lastAnswerFast = false
+        isNewBest = false
+        missedAnswer = nil
+        endedByQuit = false
         feedback = nil
+        isChecking = false
         secondsRemaining = Config.secondsPerTurn
         phase = .seed
     }
 
     // MARK: Candidates
 
-    private func loadCandidates(for node: ChainNode) async {
+    private func loadCandidates(for node: ChainNode, token: Int) async {
+        // Set synchronously (atomic with accepting the link, before any await), so
+        // these are never stale writes — only the post-fetch writes below can be.
         expectedKind = node.nextKind
         isChecking = true
-        defer { isChecking = false }
         do {
+            let loaded: [ChainNode]
             switch node {
             case .movie(let movie):
-                candidates = try await provider.cast(of: movie).map(ChainNode.actor)
+                loaded = try await provider.cast(of: movie).map(ChainNode.actor)
             case .actor(let actor):
-                candidates = try await provider.filmography(of: actor).map(ChainNode.movie)
+                loaded = try await provider.filmography(of: actor).map(ChainNode.movie)
             }
+            // Drop a superseded result: a reset/quit/new game moved the token on
+            // while this fetch was in flight, so installing its candidates would
+            // corrupt the current round.
+            guard generation == token else { return }
+            candidates = loaded
+            isChecking = false
         } catch {
+            guard generation == token else { return }
             candidates = []
             feedback = error.localizedDescription
+            isChecking = false
         }
     }
 
@@ -174,9 +254,28 @@ final class GameEngine {
         }
     }
 
-    private func endGame() {
+    private func endGame(quit: Bool = false) {
+        generation += 1                            // drop any in-flight candidate load
         countdownTask?.cancel()
         countdownTask = nil
+        endedByQuit = quit
+
+        // "You were one away": surface a valid answer the player didn't give on
+        // the turn that ran out — the sting that drives the next run. Skip it on a
+        // manual quit: there was no missed turn.
+        missedAnswer = quit ? nil : candidates.first { !usedIds.contains($0.id) }
+
+        // Commit records.
+        if score > bestChain {
+            bestChain = score
+            isNewBest = true
+            UserDefaults.standard.set(bestChain, forKey: Self.bestChainKey)
+        }
+        if points > bestPoints {
+            bestPoints = points
+            UserDefaults.standard.set(bestPoints, forKey: Self.bestPointsKey)
+        }
+
         phase = .gameOver
     }
 
@@ -201,8 +300,10 @@ final class GameEngine {
         ]
         usedIds = Set(chain.map(\.id))
         score = chain.count - 1
+        points = score * 24
+        lastGain = 24
         expectedKind = chain.last?.nextKind ?? .movie
-        candidates = []
+        candidates = [.actor(Person(id: 9, name: "Jack Nicholson"))]
         feedback = nil
         secondsRemaining = 18
         phase = .playing
@@ -211,6 +312,8 @@ final class GameEngine {
     /// Same sample chain, but jump straight to the game-over summary.
     func loadDemoGameOver() {
         loadDemoChain()
+        missedAnswer = candidates.first
+        isNewBest = true
         phase = .gameOver
     }
     #endif

@@ -51,8 +51,11 @@ That bounded set is what makes two otherwise-hard problems easy:
 All source is in [`movie-quiz/`](../movie-quiz/).
 
 ### Domain types — [`Models.swift`](../movie-quiz/Models.swift)
-- `Person { id: Int, name }` and `Movie { id: Int, title, year? }` — `id` is the
-  stable **TMDB id**, which is what makes validation and dedup exact.
+- `Person { id: Int, name, popularity? }` and `Movie { id: Int, title, year?,
+  popularity? }` — `id` is the stable **TMDB id**, which is what makes validation
+  and dedup exact (equality/hashing are **id-only**, so the same entity compares
+  equal regardless of fetched metadata). `popularity` is optional TMDB popularity,
+  used only for the obscurity scoring bonus (`nil` on the offline stub graph).
 - `ChainNode` — enum `.actor(Person) | .movie(Movie)`, one link in the chain.
   - `id: String` → `"p<id>"` / `"m<id>"` (namespaced so actors and movies never
     collide in `usedIds`).
@@ -69,6 +72,12 @@ cast(of:)                             // bounded set after a movie
 filmography(of:)                      // bounded set after an actor
 ```
 `DataProviderError` covers missing key / bad HTTP / decode failures.
+
+`filmography(of:)` drops **self-appearance credits** (TMDB `character` of "Self",
+incl. "Self - Host" etc.) — making-of featurettes, talk-show and documentary
+appearances are not film roles and must not be valid chain links (e.g. Jack
+Black's "Making of School of Rock" was being accepted for a typed "School of
+Rock").
 
 - [`TMDBProvider.swift`](../movie-quiz/TMDBProvider.swift) — live over
   `https://api.themoviedb.org/3`. Supports both v4 Bearer tokens and v3 `api_key`
@@ -103,22 +112,64 @@ clearing a threshold (default **0.72**), else `nil`.
   2. a single ≥4-char query word is a prefix of a name word ("malkov"→"malkovich")
      → 0.82
   3. typed text fully contains the candidate name ("the movie inception") → 0.85
+- **Tie-break on the raw score.** The boosts are flat floors, so two candidates
+  can hit the *same* boosted score (e.g. "school of rock" is a whole-word subset
+  of both "The School of Rock" and "Making of School of Rock" → both 0.9). When
+  boosted scores tie, the higher *raw* Levenshtein similarity wins (the title with
+  fewer extra words), so the result never depends on candidate order.
+
+### Scoring & feedback (the gamification layer)
+The engine stays pure; all "juice" is layered on top and fired from the **view**
+in reaction to engine state (never from the engine — that keeps it UIKit-free and
+testable).
+- [`Scoring.swift`](../movie-quiz/Scoring.swift) — pure, stateless, unit-tested.
+  `score` (chain length) is the headline metric and drives the flame; `points` is
+  a richer secondary score = `base + speedBonus(secondsRemaining) +
+  obscurityBonus(popularity)`. `flameTier(links:)` maps chain length → flame tier
+  (none < 3, then escalating). Mirrors `FuzzyMatch`/`ActorRanking`: pure rules in
+  their own type so balance can be tuned under test.
+- [`Haptics.swift`](../movie-quiz/Haptics.swift) — UIKit feedback wrapper
+  (`correct(streak:)` ramps intensity with the chain, `wrong()`, `celebrate()`);
+  `#if os(iOS)` no-op elsewhere.
+- [`Sound.swift`](../movie-quiz/Sound.swift) — `SoundPlayer` synthesises short
+  sine tones via `AVAudioEngine` (no bundled assets); a correct link chimes a note
+  cycled through a pentatonic scale *within one octave* — it varies link-to-link
+  but deliberately does **not** climb ever higher (an unbounded rise read as shrill
+  and annoying on long chains). `.ambient` session so it mixes and honours the
+  silent switch. Toggled by `@AppStorage("soundEnabled")`.
 
 ### Game engine — [`GameEngine.swift`](../movie-quiz/GameEngine.swift)
 `@MainActor @Observable final class` — owns **all** game state; UI is a pure
 function of it.
 
 - **State:** `phase` (`.seed`/`.playing`/`.gameOver`), `chain: [ChainNode]`,
-  `score`, `secondsRemaining`, `expectedKind`, transient `feedback`, `isChecking`.
+  `score` (chain length), `points`, `lastGain`/`lastAnswerFast` (for the "+N"
+  flourish), `secondsRemaining`, `expectedKind`, transient `feedback`, `isChecking`.
+- **Records & recap:** `bestChain`/`bestPoints` (persisted via `UserDefaults`),
+  `isNewBest` (celebration trigger), `missedAnswer` (a valid answer left ungiven on
+  the turn that timed out — the "you were one away" near-miss, captured in
+  `endGame()` from the still-loaded `candidates`; `nil` on a manual quit), and
+  `endedByQuit` (so the summary shows "Chain ended" rather than "Time's up").
 - **Private:** injected `provider`, current `candidates`, `usedIds: Set<String>`
-  (no-repeat rule), and the `countdownTask`.
+  (no-repeat rule), the `countdownTask`, and a monotonic `generation` token that
+  guards async candidate loads (see below).
 - **Flow:** `search` (seed only) → `startGame(with:)` → `submit(_:)` per turn →
   `reset()`. `loadCandidates(for:)` refreshes the bounded set after each accepted
-  link.
+  link. `quit()` ends the run in place — it routes through `endGame()` to the
+  game-over summary (committing records) rather than resetting to the seed picker.
 - **Timer correctness:** the countdown is a cancellable `Task`. `submit` **stops
   the clock during the candidate fetch** so a slow network load can't fire
   game-over on an answer that was submitted in time, and re-checks `phase ==
   .playing` after every `await` in case `reset()` ran mid-flight.
+- **Stale-load safety (`generation`):** every lifecycle transition
+  (`startGame` / `endGame` / `reset`, the latter two covering timeout **and**
+  quit) bumps a monotonic `generation` token. `loadCandidates` captures it before
+  awaiting the provider and **drops its result if the token has moved on** — so a
+  slow fetch from an abandoned/quit game can't resume later and install the
+  previous node's cast/filmography into a *new* round. The `phase == .playing`
+  guard alone can't catch this, because the new game is also `.playing`. Regression-
+  tested in `GameEngineTests` with a provider that holds the first fetch open while
+  a new game starts.
 - **Rejections** (don't advance): off-list answer, or an id already in `usedIds`.
 
 ### Design system — [`Theme.swift`](../movie-quiz/Theme.swift) + [`Components.swift`](../movie-quiz/Components.swift)
@@ -131,7 +182,14 @@ fonts, semantic colors, the 8-pt grid) so Dynamic Type and light/dark come free.
   eliminating the icon/color logic that was duplicated across three views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
   `PrimaryButtonStyle` (`.buttonStyle(.primary)`), `CardModifier` (`.card()`),
-  `NodeGlyph`, and `ChainPill`.
+  `NodeGlyph`, `ChainPill`, plus the juice pieces `Shake` (`.shake(trigger)` for a
+  rejected answer), `FloatingGain` (the rising "+N"), and `ConfettiView` (new-best
+  burst).
+- Feature components in their own files: [`StreakFlame.swift`](../movie-quiz/StreakFlame.swift)
+  is the tiered flame that leaps on each link; [`TimerRing.swift`](../movie-quiz/TimerRing.swift)
+  is the draining countdown ring. (The play screen deliberately shows **no
+  running chain visualization** — it read as cluttered; the full chain is
+  recapped only at game over.)
 - App-wide `.tint(.accentColor)` + `.fontDesign(.rounded)` are applied once at
   the root in `movie_quizApp`; the accent is defined for light/dark in
   `Assets.xcassets/AccentColor`.
@@ -141,11 +199,19 @@ fonts, semantic colors, the 8-pt grid) so Dynamic Type and light/dark come free.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
   `@State GameEngine` and switches `SeedView` / `GameView` / `GameOverView` on
   `engine.phase` (animated with `.snappy`).
-- [`SeedView.swift`](../movie-quiz/SeedView.swift) — pick actor/movie, debounced
-  search of the starting node.
-- [`GameView.swift`](../movie-quiz/GameView.swift) — the turn: prompt, timer,
-  chain so far, free-text answer.
-- [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score, replay.
+- [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded start screen:
+  icon lockup + wordmark, a best-chain badge, two accent-lit **Actor / Movie** mode
+  pills, an in-app-styled search field (debounced), and tinted result cards. Built
+  on the shared design system (`NodeGlyph`, node accents, `Theme`, radial-heat
+  background) rather than a stock `NavigationStack`/`List`/`.searchable`, which read
+  as an iOS-Settings screen.
+- [`GameView.swift`](../movie-quiz/GameView.swift) — the turn: the big chain
+  number + flame as the hero, the current node + free-text answer below, a timer
+  ring in the header. Reacts to `engine.score` / `engine.feedback` changes to fire
+  haptics, sound, the "+N" pop and the shake.
+- [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score + points,
+  best-ever records, the "you were one away" near-miss, a new-best confetti
+  celebration, and the full chain recap with replay.
 
 ### Config & secrets — [`Config.swift`](../movie-quiz/Config.swift)
 - `secondsPerTurn = 30` and other tunables.
@@ -203,10 +269,11 @@ split clean.** New rules live in `GameEngine`; new data sources implement
   ```
 - **Unit tests** live in [`movie-quizTests/`](../movie-quizTests/) (target
   `movie-quizTests`, `@testable import movie_quiz`): `FuzzyMatchTests` locks the
-  matcher (incl. the Roman→Arabic sequel fix) and `ActorRankingTests` locks
-  `ActorRanking.rank` (canonical-first, homonyms preserved, stubs dropped). Run
-  with ⌘U or the `xcodebuild … test` invocation above. `GameEngine` (via a stub
-  provider) is the natural next target.
+  matcher (incl. the Roman→Arabic sequel fix), `ActorRankingTests` locks
+  `ActorRanking.rank` (canonical-first, homonyms preserved, stubs dropped),
+  `ScoringTests` locks the point math + flame-tier thresholds, and
+  `GameEngineTests` locks the stale-load safety with a gated stub provider. Run
+  with ⌘U or the `xcodebuild … test` invocation above.
 
 ---
 

@@ -82,20 +82,32 @@ word/substring boosts, threshold ~0.72). This is why misspellings like "John
 Malkovic" resolve correctly without global fuzzy search or false positives.
 
 **Game engine** — `GameEngine.swift` (`@MainActor @Observable`) owns all state:
-`phase` (seed → playing → gameOver), the `chain`, `score`, per-turn countdown,
-the current candidate set, and `usedIds` (no-repeat rule). Every entity resolves
-to a stable TMDB id, so validation and dedup are exact. `Config.swift` holds
+`phase` (seed → playing → gameOver), the `chain`, `score` (chain length) +
+`points` (base + speed + obscurity bonuses), per-turn countdown, the current
+candidate set, `usedIds` (no-repeat rule), persisted `bestChain`/`bestPoints`,
+and the `missedAnswer` near-miss. Every entity resolves to a stable TMDB id, so
+validation and dedup are exact. Async candidate loads are guarded by a monotonic
+`generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
+or quit game can't install stale candidates into a new round. `Config.swift` holds
 tunables (`secondsPerTurn`) and loads the TMDB credential at runtime from a
 **gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
 and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
 
+**Scoring & juice** — the engine stays pure; all feedback is fired from the view
+in reaction to engine state. `Scoring.swift` (pure, unit-tested) defines the
+point math and flame tiers; `Haptics.swift` and `Sound.swift` (synthesised tones,
+no assets, `@AppStorage("soundEnabled")`) provide the tactile/audio payoff.
+
 **UI** — `ContentView.swift` routes on `engine.phase` between `SeedView`,
 `GameView`, and `GameOverView`. Styling is a small design-system layer:
 `Theme.swift` (spacing/radius/motion tokens + per-node icon/color identity) and
 `Components.swift` (reusable `PrimaryButtonStyle`, `.card()`, `NodeGlyph`,
-`ChainPill`), all built on Apple's semantic primitives. App-wide tint and rounded
-font are set once in `movie_quizApp`. Prefer reusing these over hardcoded values.
+`ChainPill`, plus juice pieces `Shake`/`FloatingGain`/`ConfettiView`), all built
+on Apple's semantic primitives. The play screen centers on a hero chain-number +
+`StreakFlame` with a `TimerRing` countdown (no running chain visualization — the
+full chain is recapped only at game over). App-wide tint and rounded font are set
+once in `movie_quizApp`. Prefer reusing these over hardcoded values.
 
 Planned fan-out modes (genre locks, memory-recall every Nth link, leaderboards)
 all layer on this same engine — keep the engine/provider split clean.
