@@ -68,12 +68,8 @@ struct GameView: View {
     // MARK: Current node
 
     private func currentNode(_ node: ChainNode) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: {
-                if case .actor = node { return "person.fill" } else { return "film" }
-            }())
-            .font(.largeTitle)
-            .foregroundStyle(.tint)
+        VStack(spacing: Theme.Spacing.md) {
+            NodeGlyph(kind: node.kind, size: 72)
 
             Text(node.displayName)
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
@@ -122,21 +118,17 @@ struct GameView: View {
 
     private var chainTrail: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.Spacing.xs + 2) {
                 ForEach(Array(engine.chain.enumerated()), id: \.element.id) { index, node in
                     if index > 0 {
                         Image(systemName: "arrow.right")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
-                    Text(node.displayName)
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.quaternary, in: Capsule())
+                    ChainPill(node: node)
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Theme.Spacing.xs)
         }
     }
 

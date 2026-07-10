@@ -22,6 +22,16 @@ struct ContentView: View {
             }
         }
         .animation(.snappy, value: engine.phase)
+        .onAppear {
+            #if DEBUG
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("-uiDemoGameOver") {
+                engine.loadDemoGameOver()
+            } else if args.contains("-uiDemoChain") {
+                engine.loadDemoChain()
+            }
+            #endif
+        }
     }
 }
 

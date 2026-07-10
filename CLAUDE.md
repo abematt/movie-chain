@@ -91,7 +91,11 @@ and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
 
 **UI** — `ContentView.swift` routes on `engine.phase` between `SeedView`,
-`GameView`, and `GameOverView`.
+`GameView`, and `GameOverView`. Styling is a small design-system layer:
+`Theme.swift` (spacing/radius/motion tokens + per-node icon/color identity) and
+`Components.swift` (reusable `PrimaryButtonStyle`, `.card()`, `NodeGlyph`,
+`ChainPill`), all built on Apple's semantic primitives. App-wide tint and rounded
+font are set once in `movie_quizApp`. Prefer reusing these over hardcoded values.
 
 Planned fan-out modes (genre locks, memory-recall every Nth link, leaderboards)
 all layer on this same engine — keep the engine/provider split clean.

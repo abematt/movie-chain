@@ -31,8 +31,8 @@ struct SeedView: View {
                         start(with: node)
                     } label: {
                         HStack {
-                            Image(systemName: icon(for: node))
-                                .foregroundStyle(.secondary)
+                            Image(systemName: node.symbol)
+                                .foregroundStyle(node.accent)
                             Text(node.displayName)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -57,13 +57,6 @@ struct SeedView: View {
             .navigationTitle("Movie Chain")
             .searchable(text: $query, prompt: engine.seedKind == .actor ? "Search actors" : "Search movies")
             .onChange(of: query) { runSearch() }
-        }
-    }
-
-    private func icon(for node: ChainNode) -> String {
-        switch node {
-        case .actor: return "person.fill"
-        case .movie: return "film"
         }
     }
 

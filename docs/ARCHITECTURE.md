@@ -121,6 +121,21 @@ function of it.
   .playing` after every `await` in case `reset()` ran mid-flight.
 - **Rejections** (don't advance): off-list answer, or an id already in `usedIds`.
 
+### Design system — [`Theme.swift`](../movie-quiz/Theme.swift) + [`Components.swift`](../movie-quiz/Components.swift)
+The styling foundation, built entirely on Apple's semantic primitives (system
+fonts, semantic colors, the 8-pt grid) so Dynamic Type and light/dark come free.
+- `Theme` — a token namespace: `Spacing`, `Radius`, `Motion`. Views reference
+  these instead of hardcoded numbers so the look re-tunes from one place.
+- `NodeKind` / `ChainNode` extensions give each node kind one consistent
+  `symbol` (SF Symbol) and `accent` (orange = actor, indigo = movie),
+  eliminating the icon/color logic that was duplicated across three views.
+- `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
+  `PrimaryButtonStyle` (`.buttonStyle(.primary)`), `CardModifier` (`.card()`),
+  `NodeGlyph`, and `ChainPill`.
+- App-wide `.tint(.accentColor)` + `.fontDesign(.rounded)` are applied once at
+  the root in `movie_quizApp`; the accent is defined for light/dark in
+  `Assets.xcassets/AccentColor`.
+
 ### UI — SwiftUI, routed by phase
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single

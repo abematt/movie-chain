@@ -179,4 +179,39 @@ final class GameEngine {
         countdownTask = nil
         phase = .gameOver
     }
+
+    #if DEBUG
+    // MARK: Preview / QA hook
+    //
+    // Jump straight into a mid-game `playing` state with a sample chain so the
+    // play screen (and its design-system components) can be inspected without
+    // typing. Triggered by the `-uiDemoChain` launch argument in `ContentView`;
+    // guarded by `#if DEBUG` so it is never compiled into release builds.
+    func loadDemoChain() {
+        func actor(_ id: Int, _ name: String) -> ChainNode { .actor(Person(id: id, name: name)) }
+        func movie(_ id: Int, _ title: String, _ year: Int) -> ChainNode {
+            .movie(Movie(id: id, title: title, year: year))
+        }
+        chain = [
+            actor(1, "Brad Pitt"),
+            movie(1001, "Ocean's Eleven", 2001),
+            actor(2, "Matt Damon"),
+            movie(1002, "The Departed", 2006),
+            actor(3, "Leonardo DiCaprio"),
+        ]
+        usedIds = Set(chain.map(\.id))
+        score = chain.count - 1
+        expectedKind = chain.last?.nextKind ?? .movie
+        candidates = []
+        feedback = nil
+        secondsRemaining = 18
+        phase = .playing
+    }
+
+    /// Same sample chain, but jump straight to the game-over summary.
+    func loadDemoGameOver() {
+        loadDemoChain()
+        phase = .gameOver
+    }
+    #endif
 }

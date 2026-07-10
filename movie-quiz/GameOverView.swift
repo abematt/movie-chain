@@ -32,10 +32,8 @@ struct GameOverView: View {
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.tertiary)
                                 .frame(width: 24, alignment: .trailing)
-                            Image(systemName: {
-                                if case .actor = node { return "person.fill" } else { return "film" }
-                            }())
-                            .foregroundStyle(.secondary)
+                            Image(systemName: node.symbol)
+                                .foregroundStyle(node.accent)
                             Text(node.displayName)
                         }
                     }
@@ -47,10 +45,8 @@ struct GameOverView: View {
                 engine.reset()
             } label: {
                 Label("Play again", systemImage: "arrow.clockwise")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.primary)
             .padding(.horizontal)
         }
         .padding(.vertical)
