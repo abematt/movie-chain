@@ -2,20 +2,26 @@
 //  ContentView.swift
 //  movie-quiz
 //
-//  Created by Abraham Mathew on 7/9/26.
+//  Root router: swaps between the seed, playing, and game-over screens.
 //
 
 import SwiftUI
 
 struct ContentView: View {
+    @State private var engine = GameEngine()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        Group {
+            switch engine.phase {
+            case .seed:
+                SeedView(engine: engine)
+            case .playing:
+                GameView(engine: engine)
+            case .gameOver:
+                GameOverView(engine: engine)
+            }
         }
-        .padding()
+        .animation(.snappy, value: engine.phase)
     }
 }
 

@@ -1,0 +1,16 @@
+# Secrets — never commit the real TMDB credential.
+movie-quiz/TMDBSecrets.plist
+
+# Xcode / build artifacts
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Editor
+.vscode/
+
+# macOS
+.DS_Store
