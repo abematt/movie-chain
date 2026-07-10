@@ -51,7 +51,17 @@ drive SwiftUI canvas previews.
 
 ## Architecture
 
+> For the full module-by-module breakdown, game-loop diagram, and design
+> rationale, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Keep that doc
+> current when the architecture, providers, rules, or stack change; the summary
+> below should stay lean.
+
 The game logic is fully decoupled from both the UI and the data source.
+
+**Domain types** — `Models.swift` defines the core entities: `Person`, `Movie`,
+the `ChainNode` enum (a link is either an actor or a movie) and `NodeKind`. All
+are `Identifiable`/`Hashable`/`Sendable` and carry a stable TMDB id, which is
+what makes validation and the no-repeat dedup exact.
 
 **Data layer** — everything speaks the `MovieDataProvider` protocol
 (`MovieDataProvider.swift`): global `searchActors`/`searchMovies` (used only to
