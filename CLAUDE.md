@@ -20,9 +20,10 @@ that alternates actor → movie → actor → movie …, where each link must be
 - Deployment target: iOS 26.2 (high — only installs on a 26.x runtime; lower it
   in build settings if broader device/simulator support is wanted)
 - Supported platforms: iOS, iPad, macOS, visionOS
-- Single app target (`movie-quiz`), single scheme. No test target yet.
+- App target (`movie-quiz`) + `movie-quizTests` unit-test target, one shared scheme.
 - Files are auto-included via `PBXFileSystemSynchronizedRootGroup` — just add
-  `.swift` files under `movie-quiz/`, no `.pbxproj` editing needed.
+  `.swift` files under `movie-quiz/` (or `movie-quizTests/` for tests), no
+  `.pbxproj` editing needed.
 
 ## Commands
 
@@ -36,14 +37,14 @@ xcodebuild -list -project movie-quiz.xcodeproj
 xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
   -destination 'platform=iOS Simulator,name=iPhone 16' build
 
-# Run tests (no test target exists yet — add one before this is useful)
+# Run tests (target `movie-quizTests`)
 xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
   -destination 'platform=iOS Simulator,name=iPhone 16' test
 
-# Run a single test after tests exist (XCTest)
+# Run a single test (XCTest)
 xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
-  test -only-testing:movie-quizTests/SomeTestCase/testSomething
+  test -only-testing:movie-quizTests/FuzzyMatchTests/testArabicSequelMatchesRomanTitle
 ```
 
 Day-to-day development is normally done in Xcode (⌘B build, ⌘R run, ⌘U test). `#Preview` blocks

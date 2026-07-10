@@ -15,8 +15,18 @@ enum FuzzyMatch {
     /// Normalize a string for comparison: lowercase, strip diacritics, elide
     /// apostrophes (so possessives/contractions collapse to one token —
     /// "Ocean's" -> "oceans", "O'Brien" -> "obrien"), turn remaining
-    /// punctuation into spaces, and collapse whitespace.
+    /// punctuation into spaces, canonicalize Roman-numeral tokens to Arabic
+    /// digits, and collapse whitespace.
     /// "Jóhn  Malkóvich!" -> "john malkovich"
+    /// "Mission: Impossible III" -> "mission impossible 3"
+    ///
+    /// Roman→Arabic matters because TMDB titles sequels in Roman ("Mission:
+    /// Impossible III") while players type Arabic ("mission impossible 3").
+    /// Character-level edit distance treats "3" as *closer* to "ii" (2 edits)
+    /// than to "iii" (3 edits), so raw matching picks the wrong sequel.
+    /// Folding both sides to a digit makes the right sequel an exact match, and
+    /// because it is applied consistently, single-letter cases that are not
+    /// sequels ("Malcolm X", "X-Men", "I Am Legend") still match themselves.
     static func normalize(_ s: String) -> String {
         let folded = s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
         let elided = folded
@@ -32,7 +42,43 @@ enum FuzzyMatch {
         }
         return String(cleaned)
             .split(separator: " ", omittingEmptySubsequences: true)
+            .map { token -> String in
+                if let value = romanToArabic(String(token)) { return String(value) }
+                return String(token)
+            }
             .joined(separator: " ")
+    }
+
+    /// Value of a *canonical* lowercase Roman-numeral token ("iii" -> 3), or
+    /// `nil` if the token is not a well-formed Roman numeral. Validated by
+    /// round-trip (convert back and compare) so malformed strings like "iiii"
+    /// or "vv" — and ordinary words — are left untouched.
+    private static func romanToArabic(_ token: String) -> Int? {
+        let values: [Character: Int] = ["i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000]
+        guard !token.isEmpty, token.count <= 15 else { return nil }
+        var total = 0, prev = 0
+        for ch in token.reversed() {
+            guard let v = values[ch] else { return nil }
+            if v < prev { total -= v } else { total += v; prev = v }
+        }
+        guard total > 0, arabicToRoman(total) == token else { return nil }
+        return total
+    }
+
+    /// Canonical lowercase Roman numeral for `n` (1..<4000), used to validate
+    /// `romanToArabic`. Empty string outside the representable range.
+    private static func arabicToRoman(_ n: Int) -> String {
+        guard n > 0, n < 4000 else { return "" }
+        let table: [(Int, String)] = [
+            (1000, "m"), (900, "cm"), (500, "d"), (400, "cd"),
+            (100, "c"), (90, "xc"), (50, "l"), (40, "xl"),
+            (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i"),
+        ]
+        var n = n, out = ""
+        for (value, symbol) in table {
+            while n >= value { out += symbol; n -= value }
+        }
+        return out
     }
 
     /// Levenshtein edit distance between two already-normalized strings.

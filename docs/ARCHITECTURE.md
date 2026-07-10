@@ -26,7 +26,7 @@ and each turn is on a countdown — run out of time and the game ends.
 | Min OS | iOS **26.2** deployment target (lower it in build settings for wider support) |
 | Platforms | iOS, iPadOS, macOS, visionOS |
 | Data | TMDB REST API (live) or a built-in stub graph (offline demo) |
-| Project | `movie-quiz.xcodeproj` (project, not workspace); single target + scheme; no test target yet |
+| Project | `movie-quiz.xcodeproj` (project, not workspace); app target + `movie-quizTests` unit-test target, single shared scheme |
 | File inclusion | `PBXFileSystemSynchronizedRootGroup` — drop `.swift` files under `movie-quiz/`, no `.pbxproj` edits |
 
 ## The core idea: bounded candidate sets
@@ -73,7 +73,13 @@ filmography(of:)                      // bounded set after an actor
 - [`TMDBProvider.swift`](../movie-quiz/TMDBProvider.swift) — live over
   `https://api.themoviedb.org/3`. Supports both v4 Bearer tokens and v3 `api_key`
   query auth (`Config.usesBearerToken`). Private `Decodable` DTOs map TMDB JSON to
-  the domain types.
+  the domain types. Seed search results are **sorted by TMDB `popularity`** so the
+  canonical record leads: TMDB returns a canonical record *plus* near-empty stubs
+  sharing the same name (two "Tom Cruise" entries — one with 94 credits, one with
+  1), and seeding on a stub would reject films the actor was really in. Identity is
+  the **TMDB id, never the name**, so same-name records are *not* collapsed
+  (legitimate homonyms must stay selectable); only records with **no evidence of
+  being real** — zero popularity *and* no `known_for` — are dropped.
 - [`StubProvider.swift`](../movie-quiz/StubProvider.swift) — a small, deliberately
   connected hardcoded movie/cast graph so the game is fully playable with **no
   network or key**. Person ids are derived deterministically from names so the
@@ -83,7 +89,14 @@ filmography(of:)                      // bounded set after an actor
 Pure, stateless. `bestMatch(for:in:nameOf:threshold:)` returns the best candidate
 clearing a threshold (default **0.72**), else `nil`.
 - `normalize` — diacritic-fold, case-fold, elide apostrophes, punctuation→space,
-  collapse whitespace (`"Jóhn  Malkóvich!"` → `"john malkovich"`).
+  canonicalize Roman-numeral tokens to Arabic digits, collapse whitespace
+  (`"Jóhn  Malkóvich!"` → `"john malkovich"`, `"Mission: Impossible III"` →
+  `"mission impossible 3"`). The Roman→Arabic step fixes sequel matching: TMDB
+  titles sequels in Roman while players type Arabic, and character-level edit
+  distance otherwise treats `"3"` as closer to `"ii"` (2 edits) than `"iii"` (3),
+  so `"mission impossible 3"` used to resolve to *Mission: Impossible II*. Folding
+  both sides to a digit is validated by round-trip, so non-sequel single letters
+  ("Malcolm X", "X-Men", "I Am Legend") still match themselves.
 - Base score = Levenshtein similarity in `[0,1]`, then three boosts:
   1. all typed words are whole words in the name **and** ≥1 is a "content word"
      (≥4 chars, so stopwords like "the" can't carry it) → 0.9
@@ -173,9 +186,12 @@ split clean.** New rules live in `GameEngine`; new data sources implement
   xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
     -destination 'platform=iOS Simulator,name=iPhone 16' build
   ```
-- **No test target exists yet** — add one before `test` invocations are useful.
-  `FuzzyMatch` and `GameEngine` (via a stub provider) are the natural first
-  targets.
+- **Unit tests** live in [`movie-quizTests/`](../movie-quizTests/) (target
+  `movie-quizTests`, `@testable import movie_quiz`): `FuzzyMatchTests` locks the
+  matcher (incl. the Roman→Arabic sequel fix) and `ActorRankingTests` locks
+  `ActorRanking.rank` (canonical-first, homonyms preserved, stubs dropped). Run
+  with ⌘U or the `xcodebuild … test` invocation above. `GameEngine` (via a stub
+  provider) is the natural next target.
 
 ---
 

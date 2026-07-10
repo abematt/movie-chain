@@ -45,8 +45,12 @@ final class GameEngine {
     private var usedIds: Set<String> = []
     private var countdownTask: Task<Void, Never>?
 
-    init(provider: MovieDataProvider = Config.makeProvider()) {
-        self.provider = provider
+    init(provider: MovieDataProvider? = nil) {
+        // Resolve the default in the init body (which is @MainActor-isolated),
+        // not in a default argument — default arguments evaluate in a
+        // nonisolated context, and Config.makeProvider() is @MainActor under
+        // the project's MainActor-default isolation.
+        self.provider = provider ?? Config.makeProvider()
     }
 
     var current: ChainNode? { chain.last }

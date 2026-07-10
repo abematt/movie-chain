@@ -55,9 +55,15 @@ struct TMDBProvider: MovieDataProvider {
             path: "search/person",
             query: [URLQueryItem(name: "query", value: query)]
         )
-        return page.results
-            .filter { $0.known_for_department == nil || $0.known_for_department == "Acting" }
-            .map { Person(id: $0.id, name: $0.name) }
+        return ActorRanking.rank(page.results.map {
+            ActorSearchCandidate(
+                id: $0.id,
+                name: $0.name,
+                department: $0.known_for_department,
+                popularity: $0.popularity ?? 0,
+                knownForCount: $0.known_for?.count ?? 0
+            )
+        })
     }
 
     func searchMovies(_ query: String) async throws -> [Movie] {
@@ -66,7 +72,11 @@ struct TMDBProvider: MovieDataProvider {
             path: "search/movie",
             query: [URLQueryItem(name: "query", value: query)]
         )
-        return page.results.map { $0.toMovie() }
+        // Most-popular first so the canonical title leads over obscure remakes
+        // and same-title stubs.
+        return page.results
+            .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
+            .map { $0.toMovie() }
     }
 
     func cast(of movie: Movie) async throws -> [Person] {
@@ -87,13 +97,54 @@ struct TMDBProvider: MovieDataProvider {
     }
 }
 
+// MARK: - Seed ranking (pure, unit-testable)
+
+/// One person from a search response reduced to the fields that decide seed
+/// ranking. Extracted as a plain value type so `ActorRanking` is pure and
+/// testable without a live TMDB round-trip.
+struct ActorSearchCandidate {
+    let id: Int
+    let name: String
+    let department: String?
+    let popularity: Double
+    let knownForCount: Int
+}
+
+enum ActorRanking {
+    /// Order search results for the seed picker.
+    ///
+    /// TMDB returns duplicate person records for popular actors — the real one
+    /// plus near-empty stubs (e.g. two "Tom Cruise" entries, one with 94 credits
+    /// and one with 1). Seeding on a stub gives an almost-empty filmography and
+    /// rejects films the actor was really in.
+    ///
+    /// A person's identity is its TMDB id, NOT its name: distinct ids that share
+    /// a name are legitimate homonyms, so we must not drop by name. Instead:
+    /// keep acting-eligible people, drop only records with *no* evidence of being
+    /// real (zero popularity AND no known work), and sort canonical-first by
+    /// popularity. Every real id — including low-popularity homonyms — stays
+    /// selectable while obvious stubs sink to the bottom.
+    static func rank(_ candidates: [ActorSearchCandidate]) -> [Person] {
+        candidates
+            .filter { $0.department == nil || $0.department == "Acting" }
+            .filter { $0.popularity > 0 || $0.knownForCount > 0 }
+            .sorted { $0.popularity > $1.popularity }
+            .map { Person(id: $0.id, name: $0.name) }
+    }
+}
+
 // MARK: - DTOs
 
 private struct PersonSearchResponse: Decodable {
+    /// Decodes each `known_for` entry structurally without reading its fields —
+    /// we only need the array's presence/count as evidence the person is real.
+    struct KnownForItem: Decodable {}
     struct Item: Decodable {
         let id: Int
         let name: String
         let known_for_department: String?
+        let popularity: Double?
+        let known_for: [KnownForItem]?
     }
     let results: [Item]
 }
@@ -118,6 +169,7 @@ private struct MovieDTO: Decodable {
     let id: Int
     let title: String?
     let release_date: String?
+    let popularity: Double?
 
     func toMovie() -> Movie {
         let year = release_date.flatMap { Int($0.prefix(4)) }
