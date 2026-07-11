@@ -217,7 +217,12 @@ pure-value + observable-store split as the rest of the app:
   chains/longest/this-week stat strip, "your regulars" (most-logged), a filter,
   and the tile grid. Tiles stream art via `AsyncImage` from
   `Config.imageURL(path:)` (system-cached, never stored on disk); no path → the
-  category-tinted typographic placeholder.
+  category-tinted typographic placeholder. Motion polish: art **fades in** as it
+  streams (the phase-based `AsyncImage(transaction:)`), the hero numbers **roll up
+  from 0** on appear (`numericText` gated by `statsIn`), the Actors/Movies filter
+  **cross-fades** (`.id(filter)` + `.transition(.opacity)`) instead of reflowing
+  in place, and grid tiles **stagger in** via `.appear(i)` — all off under Reduce
+  Motion.
 
 ### Design system — [`Theme.swift`](../movie-quiz/Theme.swift) + [`Components.swift`](../movie-quiz/Components.swift)
 An **editorial, puzzle-page treatment** (NYT Games / Connections): paper-warm
@@ -230,7 +235,10 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   stays legible on the pastels in *both* themes). `Theme.Color` just names them;
   muted text still uses Apple's semantic `.secondary`/`.tertiary`.
 - `Theme` — token namespaces: `Color`, `Spacing`, `Radius`, `Motion` (incl.
-  `drop`, the spring a new tile lands on). Views reference these, never literals.
+  `drop`, the spring a new tile lands on; `screen`, the soft spring the
+  screen-to-screen carousel rides; and `intro`, the seed cold-launch reveal).
+  Views reference these, never literals. `AnyTransition.screenPush(reduceMotion:)`
+  (also here) is the router's directional page push — see the UI section.
 - `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/purple),
   a `tileLabel` ("ACTOR"/"MOVIE"), and a `symbol`, eliminating color/label logic
   that was duplicated across views.
@@ -239,7 +247,15 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   `GhostButtonStyle` (`.ghost`, outlined), `CardModifier` (`.card()`), `NodeTile`
   (the Connections category tile — the atom of the chain), `NodeDot` (small
   category chip), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
-  answer) and `FloatingGain` (the rising "+N").
+  answer), `FloatingGain` (the rising "+N"), and `StaggeredAppear` (`.appear(i)` —
+  fades + lifts a view in on appear, delayed by its position, so a group of
+  siblings assembles one-after-another; drives both the seed intro's control
+  reveal and the Reel grid tiles from one place, and honors Reduce Motion). Its
+  `enabled:` flag keeps the stagger for a first-run reveal but skips it on
+  ordinary re-insertions — the seed controls stagger during the cold-launch intro
+  yet arrive **solid** on a "Play again" re-entry, so they don't run their own
+  motion *while the carousel is already pushing the screen in* (that clash read as
+  whiplash).
 - Feature components in their own files: [`ChainStack.swift`](../movie-quiz/ChainStack.swift)
   is the signature visual — the chain as a **rising Tetris-style stack of category
   tiles**: each accepted link drops in from the top and the column builds; in the
@@ -257,8 +273,16 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
   `@State GameEngine` **and the shared `@State CollectionStore`** (injected into
   the engine so it can record, and passed to the screens that display it), and
-  switches `SeedView` / `GameView` / `GameOverView` on `engine.phase` (animated
-  with `.snappy`).
+  switches `SeedView` / `GameView` / `GameOverView` on `engine.phase` with a
+  **direction-free forward carousel**: the app is a one-way loop (seed → playing →
+  gameOver → *play again* → seed), so every change is a forward push on one
+  horizontal axis via `.transition(.screenPush(reduceMotion:))` on
+  `Theme.Motion.screen` — new screen in from the trailing edge, old out to the
+  leading edge; no "back" (Play again is the next lap, not a retreat). Reduce
+  Motion degrades it to a cross-fade. `ContentView` also owns `seedIntroDone`, the
+  persisted (`@AppStorage`) once-ever flag for the seed intro (below) — kept here,
+  above `SeedView` (recreated on each `.seed` re-entry), so every launch after the
+  first, and every Play-again re-entry, correctly starts assembled.
 - [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
   start screen: an ambient mini-chain lockup + **serif wordmark**, a best-chain
   badge, **a "Your Reel · N" button that opens the collection sheet**, two big
@@ -267,6 +291,14 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   and warm-tile result rows with a category dot. Built on the shared design system
   over a plain canvas, rather than a stock `NavigationStack`/`List`/`.searchable`,
   which read as an iOS-Settings screen.
+  - **Cold-launch intro** (once ever, on the first cold launch only): the title lockup
+    starts centered (an animatable top spacer, no `matchedGeometryEffect`), its
+    mini-chain drops in tile-by-tile via `TileBuild` (echoing the in-game Tetris
+    landing), then on `Theme.Motion.intro` the lockup rises to its header rest and
+    the controls (badges → mode tiles → search → results) assemble beneath it via
+    the shared `.appear(i)` stagger. Gated by the `introDone` binding from
+    `ContentView` — a Play-again re-entry starts fully assembled, so the carousel
+    push never flashes a centered logo. Reduce Motion shows it assembled at once.
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn, laid out around the
   **always-present software keyboard** (the dominant constraint of a typing game):
   compact chrome (sound · seconds · quit) + `TimerBar` up top, a centered **serif

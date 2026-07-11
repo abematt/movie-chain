@@ -32,6 +32,12 @@ final class SoundPlayer {
         engine.connect(player, to: engine.mainMixerNode, format: format)
     }
 
+    /// Spin the audio engine up ahead of the first chime so it lands in sync with
+    /// the haptic and the tile drop. Without this, the first `correct()` of a run
+    /// pays engine-start + session-activation latency and the chime arrives late,
+    /// breaking the visual/sound/haptic harmony a correct link should have.
+    func warm() { startIfNeeded() }
+
     private func startIfNeeded() {
         guard !started else { return }
         #if os(iOS)

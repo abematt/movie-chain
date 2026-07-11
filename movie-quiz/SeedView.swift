@@ -8,42 +8,159 @@
 //  the two category accents) on the shared design system, rather than a stock
 //  navigation/list/`.searchable` screen, which reads as "iOS Settings".
 //
+//  Cold-launch intro: on the very first launch the title lockup starts
+//  centered, its mini-chain drops in tile-by-tile (echoing the in-game Tetris
+//  landing), then the lockup rises to its header rest as the controls assemble
+//  beneath it. Runs once ever — `introDone` (owned by `ContentView`, persisted)
+//  is already true on every later launch and every "Play again" re-entry, so the
+//  screen starts assembled and the carousel push never flashes a centered logo.
+//  Reduce Motion skips it all.
+//
 
 import SwiftUI
 
 struct SeedView: View {
-    @Bindable var engine: GameEngine
+    var engine: GameEngine
     var collection: CollectionStore
+    @Binding var introDone: Bool
 
     @State private var query = ""
     @State private var results: [ChainNode] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var showReel = false
+    /// The mini-chain tiles have dropped in.
+    @State private var chainBuilt: Bool
+    /// The lockup has risen to its header rest.
+    @State private var revealed: Bool
+    /// How many controls have been revealed so far (0…`controlSlotCount`). Driven
+    /// up one at a time by `runIntro`, each step inside its own `withAnimation`
+    /// spaced by a real delay, so each control springs in on its own transaction.
+    @State private var revealedControls: Int
+    /// Latches "this instance plays the intro" in `@State` so it survives the view
+    /// re-init that fires when `runIntro` finally sets the `introDone` binding. A
+    /// plain `let` derived from `introDone` flips to false on that re-init *mid
+    /// cascade* — which disables the reveal animation and snaps every remaining
+    /// control in at once (the exact bug that made the controls pop while the
+    /// mini-chain, which finishes before `introDone` is touched, animated fine).
+    @State private var playsIntro: Bool
+    /// The running intro sequence, held so a tap can cancel it (skip-to-assembled).
+    @State private var introTask: Task<Void, Never>?
     @FocusState private var searchFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Number of staggered control slots — badges(0), Actor(1), Movie(2),
+    /// search(3), results(4). See `controls`.
+    private static let controlSlotCount = 5
+
+    init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
+        self.engine = engine
+        self.collection = collection
+        self._introDone = introDone
+        // If the intro already played this launch, start fully assembled so a
+        // "Play again" re-entry settles instantly under the carousel push.
+        let done = introDone.wrappedValue
+        _playsIntro = State(initialValue: !done)
+        _chainBuilt = State(initialValue: done)
+        _revealed = State(initialValue: done)
+        _revealedControls = State(initialValue: done ? Self.controlSlotCount : 0)
+    }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            header
-            modeToggle
-            searchField
-            if results.isEmpty {
-                emptyState
-            } else {
-                resultsList
+        GeometryReader { geo in
+            VStack(spacing: Theme.Spacing.lg) {
+                // Animatable centering spacer: pushes the lockup toward the middle
+                // during the intro, collapses to nothing once assembled.
+                Color.clear.frame(height: topInset(geo.size.height))
+
+                titleLockup
+                    .scaleEffect(revealed ? 1 : 1.1)
+
+                // Always mounted (like the mini-chain tiles) so each control's
+                // reveal animates on a view that's been on screen since launch;
+                // hidden + inert until its slot is dealt in. Gating this behind an
+                // `if` makes SwiftUI snap them in instead.
+                controls
+                    .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
+            }
+            .padding(.horizontal)
+            .padding(.top, Theme.Spacing.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .background(Theme.Color.canvas.ignoresSafeArea())
+        // Tap-to-skip: while the intro is still playing, a tap anywhere collapses
+        // it to the assembled screen. The controls are inert (`allowsHitTesting`)
+        // during the intro, so this catcher owns every touch until assembly — and
+        // it's gone the instant assembly completes, so it never eats a real tap.
+        .overlay {
+            if introRunning {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { skipIntro() }
+                    .accessibilityLabel("Skip intro")
+                    .accessibilityAddTraits(.isButton)
             }
         }
-        .padding(.horizontal)
-        .padding(.top, Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Color.canvas.ignoresSafeArea())
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection)
         }
+        .onAppear {
+            if introTask == nil { introTask = Task { await runIntro() } }
+        }
+        .onDisappear { introTask?.cancel() }
     }
 
-    // MARK: Branded header (category lockup · serif wordmark · best badge)
+    private func topInset(_ height: CGFloat) -> CGFloat {
+        revealed ? 0 : max(Theme.Spacing.xl, height * 0.30)
+    }
 
-    private var header: some View {
+    /// True while the scripted intro is mid-flight — drives the skip-catcher.
+    /// Once the last control is dealt in, assembly is complete and this is false.
+    private var introRunning: Bool {
+        playsIntro && revealedControls < Self.controlSlotCount
+    }
+
+    // MARK: Intro sequence
+
+    private func runIntro() async {
+        // Already played (ever), or motion is reduced: show it assembled.
+        if introDone || reduceMotion {
+            chainBuilt = true
+            revealed = true
+            revealedControls = Self.controlSlotCount
+            introDone = true
+            return
+        }
+        chainBuilt = true                                        // 1. mini-chain drops in
+        try? await Task.sleep(for: .milliseconds(950))            //    build + hold
+        if Task.isCancelled { return }                            //    (tapped to skip)
+        withAnimation(Theme.Motion.intro) { revealed = true }     // 2. lockup rises
+        try? await Task.sleep(for: .milliseconds(500))            //    let the rise settle
+        if Task.isCancelled { return }
+        for slot in 0..<Self.controlSlotCount {                   // 3. controls deal in one-by-one
+            withAnimation(Theme.Motion.cascade) { revealedControls = slot + 1 }
+            try? await Task.sleep(for: .milliseconds(100))
+            if Task.isCancelled { return }
+        }
+        introDone = true                                          //    (re-inits the view — must be last)
+    }
+
+    /// Collapse the running intro straight to the assembled screen. Cancels the
+    /// sequence (so its remaining steps bail at the next `Task.isCancelled` check)
+    /// and settles every stage at once on a single quick spring.
+    private func skipIntro() {
+        guard playsIntro, !introDone else { return }
+        introTask?.cancel()
+        withAnimation(Theme.Motion.cascade) {
+            chainBuilt = true
+            revealed = true
+            revealedControls = Self.controlSlotCount
+        }
+        introDone = true
+    }
+
+    // MARK: Title lockup — mini-chain · serif wordmark · tagline
+
+    private var titleLockup: some View {
         VStack(spacing: Theme.Spacing.sm) {
             chainLockup
 
@@ -53,36 +170,10 @@ struct SeedView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
 
-            Text("Actor → movie → actor. How long can you keep the chain alive?")
+            Text("How long can you keep the chain alive?")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-
-            HStack(spacing: Theme.Spacing.sm) {
-                if engine.bestChain > 0 {
-                    Text("Your best · \(engine.bestChain) links")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.vertical, Theme.Spacing.xs + 2)
-                        .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
-                }
-                if collection.total > 0 {
-                    Button { showReel = true } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "film.stack")
-                            Text("Your Reel · \(collection.total)")
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.Color.ink)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.vertical, Theme.Spacing.xs + 2)
-                        .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, Theme.Spacing.xs)
         }
     }
 
@@ -90,10 +181,11 @@ struct SeedView: View {
 
     private var chainLockup: some View {
         HStack(spacing: 5) {
-            ForEach(Array([NodeKind.actor, .movie, .actor, .movie].enumerated()), id: \.offset) { _, kind in
+            ForEach(Array([NodeKind.actor, .movie, .actor, .movie].enumerated()), id: \.offset) { i, kind in
                 RoundedRectangle(cornerRadius: 4)
                     .fill(kind.accent)
                     .frame(width: 26, height: 15)
+                    .modifier(TileBuild(shown: chainBuilt, index: i))
             }
             RoundedRectangle(cornerRadius: 4)
                 .strokeBorder(Theme.Color.hairline, style: StrokeStyle(lineWidth: 1.5, dash: [3]))
@@ -103,6 +195,56 @@ struct SeedView: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.tertiary)
                 )
+                .modifier(TileBuild(shown: chainBuilt, index: 4))
+        }
+    }
+
+    // MARK: Controls — assembled beneath the lockup on reveal
+
+    // The controls deal in one at a time *after* the lockup has risen — each
+    // rises + grows into place on the smooth `cascade` spring (a gentle
+    // overshoot). The stagger is real time, not a baked-in `.delay`: `runIntro`
+    // bumps `revealedControls` one slot at a time inside its own `withAnimation`,
+    // spaced by a 100ms sleep, so each control springs in on its own transaction
+    // and reads as a distinct beat. The two mode tiles carry their own indices
+    // (1, 2), so Actor then Movie deal in rather than appearing together.
+    private func cascade<V: View>(_ view: V, _ index: Int) -> some View {
+        view.modifier(ControlReveal(visible: revealedControls > index, enabled: playsIntro))
+    }
+
+    @ViewBuilder private var controls: some View {
+        cascade(badges, 0)
+        modeToggle                       // its tiles cascade internally (indices 1, 2)
+        cascade(searchField, 3)
+        cascade(resultsSection, 4)
+    }
+
+    // MARK: Badges (personal best · Your Reel)
+
+    private var badges: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            if engine.bestChain > 0 {
+                Text("Your best · \(engine.bestChain) links")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.xs + 2)
+                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+            }
+            if collection.total > 0 {
+                Button { showReel = true } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "film.stack")
+                        Text("Your Reel · \(collection.total)")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.Color.ink)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.xs + 2)
+                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -110,8 +252,8 @@ struct SeedView: View {
 
     private var modeToggle: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            choiceTile(.actor)
-            choiceTile(.movie)
+            cascade(choiceTile(.actor), 1)
+            cascade(choiceTile(.movie), 2)
         }
     }
 
@@ -168,6 +310,14 @@ struct SeedView: View {
     }
 
     // MARK: Results — warm-tile rows with a category dot
+
+    @ViewBuilder private var resultsSection: some View {
+        if results.isEmpty {
+            emptyState
+        } else {
+            resultsList
+        }
+    }
 
     private var resultsList: some View {
         ScrollView {
@@ -235,6 +385,57 @@ struct SeedView: View {
     }
 }
 
+// MARK: - Control cascade reveal
+
+/// Rises + grows + fades one control into place once its slot is dealt in. The
+/// animation itself lives in `runIntro`'s `withAnimation` loop, not here — this
+/// just declares the hidden vs shown geometry. Shown at once (no stagger) on a
+/// "Play again" re-entry (`enabled == false`) and under Reduce Motion.
+private struct ControlReveal: ViewModifier {
+    /// Whether this control's slot has been dealt in yet.
+    let visible: Bool
+    /// False on a "Play again" re-entry — the controls arrive solid, no stagger.
+    var enabled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        // No implicit `.animation` here — the spring comes from the `withAnimation`
+        // in `runIntro` that flips this slot on, so the reveal and its animation
+        // ride the same transaction (an implicit one would be silently dropped
+        // when `introDone` re-inits the view mid-cascade).
+        let shown = visible || !enabled || reduceMotion
+        return content
+            .opacity(shown ? 1 : 0)
+            .scaleEffect(shown ? 1 : 0.94, anchor: .bottom)
+            .offset(y: shown ? 0 : 26)
+            // Keep the reveal gate honest across every input path: a slot that's
+            // visually hidden is also removed from the accessibility tree and
+            // disabled, so VoiceOver/Switch Control can't focus or activate a
+            // control that isn't on screen yet during the cold-launch intro.
+            .disabled(!shown)
+            .accessibilityHidden(!shown)
+    }
+}
+
+// MARK: - Mini-chain tile build
+
+/// Drops one lockup tile in — scaling up from just above its slot — with a delay
+/// keyed to its position, so the mini-chain assembles left-to-right like the
+/// in-game stack landing. No-op under Reduce Motion.
+private struct TileBuild: ViewModifier {
+    let shown: Bool
+    let index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .scaleEffect(shown ? 1 : 0.5, anchor: .bottom)
+            .offset(y: shown ? 0 : -12)
+            .animation(reduceMotion ? nil : Theme.Motion.drop.delay(Double(index) * 0.10), value: shown)
+    }
+}
+
 #Preview {
-    SeedView(engine: GameEngine(), collection: CollectionStore(fileURL: nil))
+    SeedView(engine: GameEngine(), collection: CollectionStore(fileURL: nil), introDone: .constant(true))
 }

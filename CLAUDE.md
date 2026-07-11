@@ -115,13 +115,19 @@ typographic placeholder), fed by the new `imagePath` on `Person`/`Movie`. The
 store is owned at the app root and injected into the engine.
 
 **UI (NYT-Games / Connections treatment)** — `ContentView.swift` routes on
-`engine.phase` between `SeedView`, `GameView`, and `GameOverView`, and owns the
+`engine.phase` between `SeedView`, `GameView`, and `GameOverView` with a
+**direction-free forward carousel** (`.screenPush` on `Theme.Motion.screen`: the
+app is a one-way loop, so every change pushes the new screen in from the trailing
+edge — no "back"; Reduce Motion → cross-fade). It owns the
 shared `CollectionStore` (opened as a `.sheet` from the seed and game-over
-screens). Styling is a
+screens) and the persisted once-ever `seedIntroDone` flag driving `SeedView`'s
+first-run cold-launch intro (the title lockup starts centered, the mini-chain drops in, then
+it rises as the controls assemble). Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, purple = movie**) and
 `Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`, `.card()`,
-`NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`), all built on the
+`NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
+(`.appear(i)`)), all built on the
 warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
 ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
 `ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category

@@ -12,7 +12,14 @@ struct ContentView: View {
     /// The collection ("Your Reel"), owned at the root and shared with the engine
     /// (which records into it) and the screens that display it.
     @State private var collection: CollectionStore
+    /// Whether the branded seed intro has already played. Persisted, so the full
+    /// reveal is a genuine first-run moment — it plays once *ever*, and every later
+    /// launch (and every "Play again" re-entry, since `SeedView` is recreated on
+    /// each return to `.seed`) starts assembled. Owned here, above `SeedView`, and
+    /// kept out of `GameEngine` so the engine stays free of view state.
+    @AppStorage("seedIntroPlayed") private var seedIntroDone = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init() {
         let store = CollectionStore()
@@ -24,14 +31,17 @@ struct ContentView: View {
         Group {
             switch engine.phase {
             case .seed:
-                SeedView(engine: engine, collection: collection)
+                SeedView(engine: engine, collection: collection, introDone: $seedIntroDone)
+                    .transition(.screenPush(reduceMotion: reduceMotion))
             case .playing:
                 GameView(engine: engine)
+                    .transition(.screenPush(reduceMotion: reduceMotion))
             case .gameOver:
                 GameOverView(engine: engine, collection: collection)
+                    .transition(.screenPush(reduceMotion: reduceMotion))
             }
         }
-        .animation(.snappy, value: engine.phase)
+        .animation(Theme.Motion.screen, value: engine.phase)
         .onChange(of: scenePhase) { _, phase in
             // Guarantee the latest collection snapshot is on disk before the app
             // is suspended/killed, not just eventually via the async save.

@@ -70,6 +70,37 @@ enum Theme {
         static let standard: Animation = .snappy
         static let emphasized: Animation = .bouncy(duration: 0.4)
         static let drop: Animation = .spring(response: 0.34, dampingFraction: 0.62)
+        /// The screen-to-screen carousel curve — a soft spring, damped high so a
+        /// full-width directional push carries continuity without overshooting
+        /// into a visible edge gap.
+        static let screen: Animation = .spring(response: 0.45, dampingFraction: 0.86)
+        /// The seed cold-launch reveal — the lockup rising to its header rest as
+        /// the controls assemble beneath it. A shade slower than a UI spring so
+        /// the entrance reads as deliberate rather than snappy.
+        static let intro: Animation = .spring(response: 0.62, dampingFraction: 0.82)
+        /// The staggered entrance a group of siblings rises in on (the seed
+        /// controls, the Reel grid). Softer and longer-travelling than `drop`
+        /// with a gentle overshoot, so — stepped tight enough that consecutive
+        /// items overlap — it reads as one springy wave rather than discrete pops.
+        static let cascade: Animation = .spring(response: 0.5, dampingFraction: 0.72)
+    }
+}
+
+// MARK: - Screen transition
+//
+// The app is a one-way loop — seed → playing → gameOver → (play again) → seed —
+// so every screen change is a *forward* push on a single horizontal axis: the
+// new screen enters from the trailing edge while the old one leaves toward the
+// leading edge. There is no "back": "Play again" is the next lap, not a retreat,
+// so treating it like everything else is what keeps the motion legible. Under
+// Reduce Motion the push degrades to a plain cross-fade.
+extension AnyTransition {
+    static func screenPush(reduceMotion: Bool) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: .trailing),
+            removal: .move(edge: .leading)
+        )
     }
 }
 

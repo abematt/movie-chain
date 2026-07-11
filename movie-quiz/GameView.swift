@@ -62,6 +62,12 @@ struct GameView: View {
         .background(Theme.Color.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) { answerDock }
         .task {
+            // Warm the feedback paths before the first link so the haptic, chime,
+            // and tile drop land on the same frame instead of the first hit lagging
+            // on a cold taptic/audio engine (Apple fluid-interface: kill latency).
+            Haptics.prepare()
+            if soundEnabled { SoundPlayer.shared.warm() }
+
             // Defer the focus request a beat. On a cold launch the field isn't in
             // the responder chain yet when `task` first runs, so a synchronous
             // focus set is silently dropped and the keyboard never appears until

@@ -200,6 +200,65 @@ struct FloatingGain: View {
     }
 }
 
+// MARK: - Staggered appear
+//
+// Fades + lifts a view in on its first appearance, delayed by its position, so a
+// group of siblings assembles one-after-another instead of all at once. Drives
+// the seed intro's control reveal and the Reel grid tiles from one place, so the
+// stagger feel is identical everywhere. Honors Reduce Motion (shows instantly).
+// Because it fires on `onAppear`, lazy containers stagger their rows in as they
+// scroll into view for free.
+
+struct StaggeredAppear: ViewModifier {
+    let index: Int
+    var step: Double = 0.03
+    var cap: Int = 16
+    var animation: Animation = Theme.Motion.standard
+    /// How far below its resting spot the view starts (the lift distance).
+    var offset: CGFloat = 10
+    /// Scale the view starts at before settling to 1 — a subtle grow-into-place
+    /// that reads springier than a pure fade+lift. `1` = no scale (the default,
+    /// so existing callers are unchanged).
+    var scaleFrom: CGFloat = 1
+    /// When false, the view is shown at once with no stagger. Lets a caller keep
+    /// the effect for a first-run reveal but skip it on ordinary re-insertions —
+    /// e.g. the seed controls stagger during the cold-launch intro, but arrive
+    /// solid on a "Play again" re-entry so they don't fight the carousel push.
+    var enabled: Bool = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        let visible = shown || !enabled
+        return content
+            .opacity(visible ? 1 : 0)
+            .scaleEffect(visible ? 1 : scaleFrom, anchor: .bottom)
+            .offset(y: visible ? 0 : offset)
+            .onAppear {
+                guard enabled, !shown else { return }
+                if reduceMotion { shown = true; return }
+                withAnimation(animation.delay(Double(min(index, cap)) * step)) {
+                    shown = true
+                }
+            }
+    }
+}
+
+extension View {
+    /// Fade + lift this view in on appear, delayed by `index` (its position in a
+    /// group) so siblings assemble in sequence. `index: 0` = no delay. Set
+    /// `enabled: false` to skip the effect and show it immediately.
+    func appear(_ index: Int = 0,
+                animation: Animation = Theme.Motion.standard,
+                step: Double = 0.03,
+                offset: CGFloat = 10,
+                scaleFrom: CGFloat = 1,
+                enabled: Bool = true) -> some View {
+        modifier(StaggeredAppear(index: index, step: step, animation: animation, offset: offset, scaleFrom: scaleFrom, enabled: enabled))
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Components") {

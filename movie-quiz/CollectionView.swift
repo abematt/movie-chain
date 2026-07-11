@@ -20,7 +20,15 @@ struct CollectionView: View {
     let store: CollectionStore
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var filter: Filter = .actors
+    /// Gates the hero numbers so they roll up from 0 on first appear.
+    @State private var statsIn = false
+
+    /// Fade art in as it streams from the network, unless motion is reduced.
+    private var imageTransaction: Transaction {
+        Transaction(animation: reduceMotion ? nil : .easeIn(duration: 0.25))
+    }
 
     enum Filter: String, CaseIterable, Identifiable {
         case actors, movies
@@ -48,6 +56,11 @@ struct CollectionView: View {
                         }
                         .padding(.horizontal)
                         .padding(.vertical, Theme.Spacing.md)
+                        .onAppear {
+                            guard !statsIn else { return }
+                            if reduceMotion { statsIn = true }
+                            else { withAnimation(Theme.Motion.emphasized) { statsIn = true } }
+                        }
                     }
                 }
             }
@@ -78,10 +91,10 @@ struct CollectionView: View {
                 Text("You have logged")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text("\(store.total)")
+                Text("\(statsIn ? store.total : 0)")
                     .font(.system(size: 64, weight: .bold, design: .serif))
                     .monospacedDigit()
-                    .contentTransition(.numericText())
+                    .contentTransition(.numericText(value: Double(store.total)))
                     .foregroundStyle(Theme.Color.ink)
             }
 
@@ -94,11 +107,11 @@ struct CollectionView: View {
 
     private func countCard(_ kind: NodeKind, _ value: Int, _ label: String) -> some View {
         VStack(spacing: Theme.Spacing.sm) {
-            Text("\(value)")
+            Text("\(statsIn ? value : 0)")
                 .font(.system(size: 44, weight: .bold, design: .serif))
                 .monospacedDigit()
                 .foregroundStyle(kind.accent)
-                .contentTransition(.numericText())
+                .contentTransition(.numericText(value: Double(value)))
             Text(label)
                 .font(.caption2.weight(.bold))
                 .textCase(.uppercase)
@@ -154,11 +167,13 @@ struct CollectionView: View {
         ZStack {
             entity.kind.accent
             if let url = Config.imageURL(path: entity.imagePath, size: "w185") {
-                AsyncImage(url: url) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Image(systemName: entity.kind.symbol)
-                        .foregroundStyle(Theme.Color.onAccent.opacity(0.4))
+                AsyncImage(url: url, transaction: imageTransaction) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        Image(systemName: entity.kind.symbol)
+                            .foregroundStyle(Theme.Color.onAccent.opacity(0.4))
+                    }
                 }
             } else {
                 Image(systemName: entity.kind.symbol)
@@ -214,12 +229,18 @@ struct CollectionView: View {
     }
 
     @ViewBuilder private var grids: some View {
-        switch filter {
-        case .actors:
-            gridSection(.actor, "Actors", store.actorCount, store.sortedActors)
-        case .movies:
-            gridSection(.movie, "Movies", store.movieCount, store.sortedMovies)
+        Group {
+            switch filter {
+            case .actors:
+                gridSection(.actor, "Actors", store.actorCount, store.sortedActors)
+            case .movies:
+                gridSection(.movie, "Movies", store.movieCount, store.sortedMovies)
+            }
         }
+        // Give each filter its own identity so switching cross-fades and re-deals
+        // the tiles, rather than reflowing one grid's contents into the other's.
+        .id(filter)
+        .transition(.opacity)
     }
 
     private func gridSection(_ kind: NodeKind, _ title: String, _ n: Int, _ items: [CollectedEntity]) -> some View {
@@ -233,8 +254,9 @@ struct CollectionView: View {
                 Text("\(n)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.tertiary)
             }
             LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-                ForEach(items) { entity in
+                ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
                     ReelTile(entity: entity, isNew: store.isNew(entity))
+                        .appear(i)
                 }
             }
         }
@@ -273,6 +295,7 @@ struct CollectionView: View {
 private struct ReelTile: View {
     let entity: CollectedEntity
     let isNew: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -288,7 +311,7 @@ private struct ReelTile: View {
 
     @ViewBuilder private var artContent: some View {
         if let url = Config.imageURL(path: entity.imagePath, size: "w185") {
-            AsyncImage(url: url) { phase in
+            AsyncImage(url: url, transaction: Transaction(animation: reduceMotion ? nil : .easeIn(duration: 0.25))) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)
