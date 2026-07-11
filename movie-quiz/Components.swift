@@ -4,22 +4,17 @@
 //
 //  Reusable view primitives built on the `Theme` tokens. These are the app's
 //  equivalent of a component library (shadcn/ui, in React terms): small, owned,
-//  composable pieces that encapsulate a look so screens stay declarative and
-//  consistent.
-//
-//  The idiomatic SwiftUI building blocks used here:
-//    • `ButtonStyle`   — reusable button appearance + press feedback
-//    • `ViewModifier`  — reusable "wrap this content in a styled container"
-//    • small `View`s   — reusable widgets (a chain pill, a node glyph)
+//  composable pieces that encapsulate the puzzle-page look so screens stay
+//  declarative and consistent.
 //
 
 import SwiftUI
 
-// MARK: - Primary button
+// MARK: - Primary button (ink-filled pill)
 //
-// One prominent call-to-action style ("Play again", "Start"). Fills its width,
-// uses the app tint, and gives tactile press feedback (scale + dim) — the small
-// details that make a control feel native and responsive.
+// The one prominent call-to-action ("Play again"). A solid near-black (ink)
+// capsule with inverted text — the Connections "Submit" affordance. Fills width
+// and gives tactile press feedback.
 
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -27,10 +22,30 @@ struct PrimaryButtonStyle: ButtonStyle {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.md)
-            .background(.tint, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.Color.onInk)
+            .background(Theme.Color.ink, in: Capsule())
             .opacity(configuration.isPressed ? 0.85 : 1)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(Theme.Motion.standard, value: configuration.isPressed)
+    }
+}
+
+// MARK: - Ghost button (outlined pill)
+//
+// The quieter secondary action ("Share"): a hairline-outlined capsule with
+// muted text. Sits under the primary CTA without competing with it.
+
+struct GhostButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.md)
+            .foregroundStyle(.secondary)
+            .background(
+                Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1.5)
+            )
+            .opacity(configuration.isPressed ? 0.6 : 1)
             .animation(Theme.Motion.standard, value: configuration.isPressed)
     }
 }
@@ -40,20 +55,21 @@ extension ButtonStyle where Self == PrimaryButtonStyle {
     static var primary: PrimaryButtonStyle { .init() }
 }
 
+extension ButtonStyle where Self == GhostButtonStyle {
+    /// Usage: `.buttonStyle(.ghost)`
+    static var ghost: GhostButtonStyle { .init() }
+}
+
 // MARK: - Card container
 //
-// Wraps content in a padded, grouped-background surface with a soft rounded
-// edge — the standard way to visually cluster related content. Uses
-// `.background(...)` semantic material so it adapts to light/dark.
+// Wraps content in a padded warm-tile surface — the standard way to visually
+// cluster related content (the game-over near-miss uses it).
 
 struct CardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(Theme.Spacing.md)
-            .background(
-                .background.secondary,
-                in: RoundedRectangle(cornerRadius: Theme.Radius.card)
-            )
+            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
     }
 }
 
@@ -62,45 +78,65 @@ extension View {
     func card() -> some View { modifier(CardModifier()) }
 }
 
-// MARK: - Node glyph
+// MARK: - Node dot
 //
-// The circular, tinted icon that represents an actor or a movie. Centralizes
-// the "colored circle + symbol" look so it's identical everywhere a node shows
-// up. `size` scales the whole thing proportionally.
+// A small category chip (blue = actor, purple = movie) used where a full tile
+// would be too heavy — seed results, the "what comes next" hint.
 
-struct NodeGlyph: View {
+struct NodeDot: View {
     let kind: NodeKind
-    var size: CGFloat = 44
+    var size: CGFloat = 10
 
     var body: some View {
-        Image(systemName: kind.symbol)
-            .font(.system(size: size * 0.45, weight: .semibold))
-            .foregroundStyle(kind.accent)
+        Circle()
+            .fill(kind.accent)
             .frame(width: size, height: size)
-            .background(kind.accent.opacity(0.15), in: Circle())
     }
 }
 
-// MARK: - Chain pill
+// MARK: - Node tile
 //
-// One link in the chain trail: a capsule tag carrying the node's icon + name,
-// tinted by node kind. Reused in the play screen's horizontal trail.
+// One link rendered as a Connections group-tile: a solid category-colored bar
+// carrying the node's name (optionally its kind label and its position in the
+// chain). This is the atom of both the play-screen stack and the game-over
+// recap — the app's most identity-defining component.
 
-struct ChainPill: View {
+struct NodeTile: View {
     let node: ChainNode
+    /// Show the "ACTOR" / "MOVIE" kind stamp (play screen). Off in the recap,
+    /// where the color already encodes kind and a number takes the slot.
+    var showKind = true
+    /// 1-based position, shown on the trailing edge (recap only).
+    var index: Int? = nil
+    /// Dim earlier links that are scrolling off the top of the stack.
+    var dimmed = false
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            Image(systemName: node.symbol)
-                .font(.caption2)
+        HStack(spacing: Theme.Spacing.sm) {
+            if showKind {
+                Text(node.kind.tileLabel)
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.Color.onAccent.opacity(0.5))
+            }
             Text(node.displayName)
-                .font(.caption)
+                .font(.system(.subheadline, weight: .bold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.65)
+                .foregroundStyle(Theme.Color.onAccent)
+            Spacer(minLength: 0)
+            if let index {
+                Text("\(index)")
+                    .font(.caption.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.Color.onAccent.opacity(0.45))
+            }
         }
-        .foregroundStyle(node.accent)
-        .padding(.horizontal, Theme.Spacing.sm + 2)
-        .padding(.vertical, Theme.Spacing.xs + 2)
-        .background(node.accent.opacity(0.12), in: Capsule())
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(node.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.tile))
+        .opacity(dimmed ? 0.32 : 1)
     }
 }
 
@@ -108,8 +144,7 @@ struct ChainPill: View {
 //
 // A horizontal wobble used to reject a wrong answer — the input physically
 // shakes "no". Driven by a `GeometryEffect` so it animates the offset without
-// disturbing layout. Bump `animatableData` (an incrementing counter, animated)
-// to fire one shake.
+// disturbing layout. Bump `trigger` (an incrementing counter) to fire one shake.
 
 struct Shake: GeometryEffect {
     var animatableData: CGFloat
@@ -154,62 +189,13 @@ struct FloatingGain: View {
 
     var body: some View {
         Text("+\(value)")
-            .font(.system(.headline, design: .rounded, weight: .heavy))
-            .foregroundStyle(.green)
+            .font(.system(.subheadline, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(Theme.Color.good)
             .opacity(rise ? 0 : 1)
-            .offset(y: rise ? -52 : -6)
+            .offset(y: rise ? -34 : 0)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.85)) { rise = true }
-            }
-    }
-}
-
-// MARK: - Confetti
-//
-// A lightweight celebratory burst for a new best chain. A handful of emoji fall
-// and scatter once on appear — no assets, no dependency, self-contained.
-
-struct ConfettiView: View {
-    var pieces = 28
-    private let emojis = ["🎬", "🍿", "⭐️", "🔥", "🎉", "🏆"]
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                ForEach(0..<pieces, id: \.self) { i in
-                    ConfettiPiece(
-                        emoji: emojis[i % emojis.count],
-                        startX: CGFloat.random(in: 0...geo.size.width),
-                        endX: CGFloat.random(in: 0...geo.size.width),
-                        fall: geo.size.height,
-                        delay: Double.random(in: 0...0.5),
-                        spin: Double.random(in: -220...220)
-                    )
-                }
-            }
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-private struct ConfettiPiece: View {
-    let emoji: String
-    let startX: CGFloat
-    let endX: CGFloat
-    let fall: CGFloat
-    let delay: Double
-    let spin: Double
-
-    @State private var animate = false
-
-    var body: some View {
-        Text(emoji)
-            .font(.system(size: 26))
-            .position(x: animate ? endX : startX, y: animate ? fall + 40 : -40)
-            .rotationEffect(.degrees(animate ? spin : 0))
-            .opacity(animate ? 0 : 1)
-            .onAppear {
-                withAnimation(.easeIn(duration: 1.6).delay(delay)) { animate = true }
+                withAnimation(.easeOut(duration: 0.8)) { rise = true }
             }
     }
 }
@@ -217,25 +203,15 @@ private struct ConfettiPiece: View {
 // MARK: - Previews
 
 #Preview("Components") {
-    VStack(spacing: Theme.Spacing.lg) {
-        HStack(spacing: Theme.Spacing.md) {
-            NodeGlyph(kind: .actor)
-            NodeGlyph(kind: .movie)
-            NodeGlyph(kind: .movie, size: 64)
-        }
+    VStack(spacing: Theme.Spacing.md) {
+        NodeTile(node: .actor(Person(id: 1, name: "Robin Wright")))
+        NodeTile(node: .movie(Movie(id: 2, title: "Wonder Woman", year: 2017)))
+        NodeTile(node: .movie(Movie(id: 3, title: "Forrest Gump", year: 1994)),
+                 showKind: false, index: 2)
 
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Card container").font(.headline)
-            Text("Groups related content on an adaptive surface.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
-
-        Button("Play again") {}
-            .buttonStyle(.primary)
+        Button("Play again") {}.buttonStyle(.primary)
+        Button("Share") {}.buttonStyle(.ghost)
     }
     .padding()
-    .tint(.indigo)
+    .background(Theme.Color.canvas)
 }

@@ -2,10 +2,12 @@
 //  GameView.swift
 //  movie-quiz
 //
-//  The play screen. The big chain number and its flame sit front-and-centre as
-//  the hero, and the current node + answer field anchor the bottom. Every correct
-//  link fires a haptic, a rising chime, a "+points" pop and a flame leap; a wrong
-//  one shakes and buzzes.
+//  The play screen, designed around the one constant of a typing game: the
+//  software keyboard is up the entire time. So the layout is three bands —
+//  compact chrome (sound · timer · score) at the top, the chain building as a
+//  rising Tetris-style stack of category tiles in the middle, and the answer
+//  input docked directly above the keyboard. Every correct link drops a new tile
+//  in with a haptic and a chime; a wrong one shakes and buzzes.
 //
 
 import SwiftUI
@@ -20,49 +22,50 @@ struct GameView: View {
     @State private var gainToken = 0     // bumps to replay the "+N" pop
     @State private var shakeToken = 0    // bumps to shake the field on reject
 
+    /// How many links stay visible in the rising window before older ones
+    /// collapse into "+N earlier". Tuned to the band above the keyboard.
+    private let visibleLinks = 5
+
     private var timeFraction: Double {
         Double(engine.secondsRemaining) / Double(Config.secondsPerTurn)
     }
 
-    private var heatTier: Int { Scoring.flameTier(links: engine.score) }
+    private var lowTime: Bool { timeFraction <= 0.25 }
+
+    private var canSubmit: Bool {
+        !answer.trimmingCharacters(in: .whitespaces).isEmpty && !engine.isChecking
+    }
 
     var body: some View {
-        // No scrolling: the header is pinned to the top, the answer field is
-        // pinned above the keyboard, and the hero + prompt sit centered in the
-        // remaining space.
-        VStack(spacing: 0) {
-            Spacer(minLength: Theme.Spacing.md)
+        VStack(spacing: Theme.Spacing.sm) {
+            header
+            TimerBar(fraction: timeFraction)
+            scoreHero
 
-            hero
+            // The stack renders at its *natural* height, pinned to the bottom of
+            // this flexible region; any overflow (the oldest links) is clipped off
+            // the top — the "rising" effect. Without `fixedSize`, a full stack
+            // would instead be compressed to fit, which shrinks the tile text.
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .bottom) {
+                    ChainStack(chain: engine.chain, maxVisible: visibleLinks)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .clipped()
 
-            Spacer(minLength: Theme.Spacing.md)
-
-            if let current = engine.current {
-                prompt(for: current)
-                    .padding(.bottom, Theme.Spacing.sm)
-            }
+            nextHint
         }
         .padding(.horizontal)
+        .padding(.top, Theme.Spacing.xs)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            header
-                .padding(.horizontal)
-                .padding(.top, Theme.Spacing.xs)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            answerField
-                .padding(.horizontal)
-                .padding(.top, Theme.Spacing.sm)
-                .padding(.bottom, Theme.Spacing.xs)
-                .background(.bar)
-        }
-        .background(heatBackground.ignoresSafeArea())
+        .background(Theme.Color.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) { answerDock }
         .task {
             // Defer the focus request a beat. On a cold launch the field isn't in
-            // the responder chain yet when `onAppear`/`task` first runs, so a
-            // synchronous focus set is silently dropped and the keyboard never
-            // appears until the app is relaunched. One runloop hop lets the field
-            // become first responder reliably.
+            // the responder chain yet when `task` first runs, so a synchronous
+            // focus set is silently dropped and the keyboard never appears until
+            // relaunch. One runloop hop lets the field become first responder.
             try? await Task.sleep(for: .milliseconds(100))
             fieldFocused = true
         }
@@ -74,7 +77,7 @@ struct GameView: View {
         }
     }
 
-    // MARK: Header (sound · timer · quit)
+    // MARK: Header (sound · seconds · quit)
 
     private var header: some View {
         HStack {
@@ -82,92 +85,83 @@ struct GameView: View {
                 soundEnabled.toggle()
             } label: {
                 Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                    .font(.headline)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
 
             Spacer()
 
-            TimerRing(fraction: timeFraction, seconds: engine.secondsRemaining)
-                .frame(width: 52, height: 52)
+            Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(lowTime ? Color.red : .secondary)
+                .contentTransition(.numericText())
 
             Spacer()
 
             Button("Quit") { engine.quit() }
-                .buttonStyle(.borderless)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .buttonStyle(.plain)
         }
     }
 
-    // MARK: Hero (chain number + flame + points)
+    // MARK: Score hero (the emphasized chain number + points)
 
-    private var hero: some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            StreakFlame(links: engine.score)
-                .frame(height: 44)
-
+    private var scoreHero: some View {
+        VStack(spacing: 2) {
             Text("\(engine.score)")
-                .font(.system(size: 60, weight: .heavy, design: .rounded))
+                .font(.system(size: 60, weight: .bold, design: .serif))
                 .monospacedDigit()
                 .contentTransition(.numericText())
-                .foregroundStyle(.primary)
-                .overlay(alignment: .topTrailing) {
+                .foregroundStyle(Theme.Color.ink)
+                .overlay(alignment: .trailing) {
                     if gainToken > 0 {
                         FloatingGain(value: engine.lastGain)
                             .id(gainToken)
-                            .offset(x: 44)
+                            .offset(x: 30)
                     }
                 }
 
-            Text(engine.score == 1 ? "link · \(engine.points) pts" : "links · \(engine.points) pts")
+            Text("\(engine.points) pts")
                 .font(.subheadline)
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .contentTransition(.numericText())
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Theme.Spacing.sm)
         .animation(.snappy, value: engine.score)
     }
 
-    // MARK: Current node prompt (compact — the snake already shows the node)
+    // MARK: Next-up hint
 
-    private func prompt(for node: ChainNode) -> some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            HStack(spacing: Theme.Spacing.sm) {
-                NodeGlyph(kind: node.kind, size: 32)
-                Text(node.displayName)
-                    .font(.system(.title3, design: .rounded, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            Text(engine.expectedKind.prompt)
-                .font(.subheadline)
+    private var nextHint: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            NodeDot(kind: engine.expectedKind)
+            Text(hintText)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
-        .id(node.id)
-        .transition(.push(from: .trailing))
-        .animation(.snappy, value: node.id)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, Theme.Spacing.xs)
     }
 
-    // MARK: Answer field
+    private var hintText: String {
+        guard let current = engine.current else { return engine.expectedKind.prompt }
+        switch engine.expectedKind {
+        case .actor: return "Name an actor from \(current.matchText)"
+        case .movie: return "Name a movie \(current.matchText) was in"
+        }
+    }
 
-    private var answerField: some View {
-        VStack(spacing: 8) {
-            HStack {
-                TextField(engine.expectedKind.placeholder, text: $answer)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    .focused($fieldFocused)
-                    .submitLabel(.go)
-                    .onSubmit(submit)
+    // MARK: Answer dock (pinned above the keyboard)
 
-                Button(action: submit) {
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.title)
-                }
-                .disabled(answer.trimmingCharacters(in: .whitespaces).isEmpty || engine.isChecking)
-            }
-            .shake(shakeToken)
-
+    private var answerDock: some View {
+        VStack(spacing: Theme.Spacing.sm) {
             if let feedback = engine.feedback {
                 Text(feedback)
                     .font(.footnote)
@@ -175,20 +169,37 @@ struct GameView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
             }
+
+            HStack(spacing: Theme.Spacing.sm) {
+                TextField(engine.expectedKind.placeholder, text: $answer)
+                    .textFieldStyle(.plain)
+                    .autocorrectionDisabled()
+                    .focused($fieldFocused)
+                    .submitLabel(.go)
+                    .onSubmit(submit)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.sm + 4)
+                    .background(Theme.Color.tile, in: Capsule())
+
+                Button(action: submit) {
+                    Text("Go")
+                        .font(.headline)
+                        .foregroundStyle(Theme.Color.onInk)
+                        .padding(.horizontal, Theme.Spacing.md + 2)
+                        .padding(.vertical, Theme.Spacing.sm + 4)
+                        .background(Theme.Color.ink, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSubmit)
+                .opacity(canSubmit ? 1 : 0.4)
+            }
+            .shake(shakeToken)
         }
+        .padding(.horizontal)
+        .padding(.top, Theme.Spacing.sm)
+        .padding(.bottom, Theme.Spacing.xs)
+        .background(Theme.Color.canvas)
         .animation(.snappy, value: engine.feedback)
-    }
-
-    // MARK: Heat background
-
-    private var heatBackground: some View {
-        RadialGradient(
-            colors: [Color.orange.opacity(Double(heatTier) * 0.05), .clear],
-            center: .center,
-            startRadius: 0,
-            endRadius: 320
-        )
-        .animation(.easeInOut(duration: 0.6), value: heatTier)
     }
 
     // MARK: Feedback reactions

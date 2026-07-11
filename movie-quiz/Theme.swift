@@ -2,27 +2,44 @@
 //  Theme.swift
 //  movie-quiz
 //
-//  The design-token layer: the single source of truth for spacing, corner
-//  radii, and typography. Think of `Theme` as the app's design system — views
+//  The design-token layer: the single source of truth for color, spacing, corner
+//  radii, and motion. Think of `Theme` as the app's design system — views
 //  reference these tokens instead of hardcoding magic numbers, so the whole app
 //  can be re-tuned from one place and stays visually consistent.
 //
-//  Why a token layer at all? Hardcoded values (`.padding(13)`, `.font(.system(
-//  size: 22))`) are the #1 tell of an ad-hoc UI: they drift, they don't scale
-//  with Dynamic Type, and they break in dark mode. Everything here is built on
-//  Apple's *semantic* primitives (system fonts, semantic colors, the 8-pt grid)
-//  so accessibility and light/dark adaptation come for free.
+//  The look is an editorial, puzzle-page treatment (NYT Games / Connections):
+//  paper-warm neutrals, near-black ink, and two "category" accents — blue for
+//  actors, purple for movies — used the way Connections uses its group colors.
+//  Color is defined in the asset catalog (light + dark variants) so light/dark
+//  adaptation and Dynamic Type come for free; `Theme.Color` just names them.
 //
 
 import SwiftUI
 
 enum Theme {
 
-    // MARK: Spacing — an 8-pt rhythm (Apple's implicit grid)
+    // MARK: Color — the warm-paper palette (defined in Assets.xcassets)
     //
-    // Reference these instead of literal numbers so vertical/horizontal rhythm
-    // stays consistent. `md` (16) is the workhorse; it matches SwiftUI's own
-    // default padding.
+    // Surfaces and accents are custom (the warm greys and the two category
+    // hues are the identity). Muted text still uses Apple's semantic
+    // `.secondary`/`.tertiary` so it tracks accessibility contrast.
+    enum Color {
+        static let canvas = SwiftUI.Color("Canvas")     // page background
+        static let ink = SwiftUI.Color("Ink")           // primary text / filled controls
+        static let tile = SwiftUI.Color("Tile")         // warm unselected surface
+        static let hairline = SwiftUI.Color("Hairline") // thin rules
+        static let actor = SwiftUI.Color("ActorBlue")   // actor category accent
+        static let movie = SwiftUI.Color("MoviePurple") // movie category accent
+        static let good = SwiftUI.Color("Good")         // correct-link green
+        /// Text/glyphs that sit on a pastel accent tile — always near-black in
+        /// both themes (the pastels are light in dark mode too).
+        static let onAccent = SwiftUI.Color("OnAccent")
+        /// Text/glyphs on an ink-filled control — inverts with the theme, which
+        /// is exactly what `canvas` does (white on light, near-black on dark).
+        static let onInk = canvas
+    }
+
+    // MARK: Spacing — an 8-pt rhythm (Apple's implicit grid)
     enum Spacing {
         static let xs: CGFloat = 4
         static let sm: CGFloat = 8
@@ -34,9 +51,10 @@ enum Theme {
 
     // MARK: Corner radii
     //
-    // A small, deliberate set. `card` is the standard container; `pill` is the
-    // fully-rounded capsule look used for chain links and tags.
+    // `tile` is the squared-off Connections tile; `card`/`pill` remain for
+    // grouped surfaces and capsules.
     enum Radius {
+        static let tile: CGFloat = 8
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
         static let card: CGFloat = 16
@@ -46,24 +64,24 @@ enum Theme {
     // MARK: Motion
     //
     // Centralizing animation curves keeps transitions feeling like one system.
-    // `.snappy` is Apple's spring for most UI; `bouncy` is for celebratory
-    // moments (a correct answer, a new high score).
+    // `drop` is the spring a new chain tile falls in on — the Tetris "landing"
+    // that replaced the old flame leap.
     enum Motion {
         static let standard: Animation = .snappy
         static let emphasized: Animation = .bouncy(duration: 0.4)
+        static let drop: Animation = .spring(response: 0.34, dampingFraction: 0.62)
     }
 }
 
 // MARK: - Node visual identity
 //
-// Actors and movies each get a consistent icon + accent everywhere they appear
-// (seed list, current-node hero, chain trail, game-over recap). This extension
-// is the single definition — previously the `person.fill` / `film` mapping was
-// duplicated as an inline closure in three different views. Change it once here
-// and every screen updates.
+// Actors and movies each get a consistent accent + label everywhere they appear
+// (seed results, the chain stack, the game-over recap). This extension is the
+// single definition — change it once here and every screen updates.
 
 extension NodeKind {
-    /// SF Symbol representing this kind of node.
+    /// SF Symbol representing this kind of node (used where an icon still reads
+    /// better than a color chip).
     var symbol: String {
         switch self {
         case .actor: "person.fill"
@@ -71,20 +89,26 @@ extension NodeKind {
         }
     }
 
-    /// A distinct accent per node kind, so the eye can tell actor-links from
-    /// movie-links at a glance. Uses system-provided colors that adapt to
-    /// light/dark and accessibility contrast automatically.
+    /// The category accent: blue = actor, purple = movie (Connections-style).
     var accent: Color {
         switch self {
-        case .actor: .orange
-        case .movie: .indigo
+        case .actor: Theme.Color.actor
+        case .movie: Theme.Color.movie
+        }
+    }
+
+    /// Short uppercase label stamped on a chain tile ("ACTOR" / "MOVIE").
+    var tileLabel: String {
+        switch self {
+        case .actor: "ACTOR"
+        case .movie: "MOVIE"
         }
     }
 }
 
 extension ChainNode {
     /// The kind of *this* node (as opposed to `nextKind`, which is what must
-    /// come next). Lets any view ask a node for its own icon/color.
+    /// come next). Lets any view ask a node for its own accent/label.
     var kind: NodeKind {
         switch self {
         case .actor: .actor

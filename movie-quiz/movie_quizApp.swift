@@ -12,13 +12,13 @@ struct movie_quizApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // App-wide tint: every interactive control (buttons, the search
-                // bar, the segmented picker) inherits this one accent, defined
-                // in Assets → AccentColor for light/dark.
+                // App-wide tint: interactive controls (the text cursor, the
+                // keyboard's Go key) inherit this one accent — near-black ink,
+                // defined in Assets → AccentColor for light/dark.
                 .tint(Color.accentColor)
-                // A single rounded type design across the app for a friendlier,
-                // game-like feel. Individual views can still override.
-                .fontDesign(.rounded)
+                // No app-wide font design: the puzzle-page look pairs the system
+                // serif (wordmark, game-over number) with the default sans for
+                // all UI. Views opt into serif with `.system(design: .serif)`.
         }
     }
 }

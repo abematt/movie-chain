@@ -123,11 +123,15 @@ The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and
 testable).
 - [`Scoring.swift`](../movie-quiz/Scoring.swift) — pure, stateless, unit-tested.
-  `score` (chain length) is the headline metric and drives the flame; `points` is
-  a richer secondary score = `base + speedBonus(secondsRemaining) +
-  obscurityBonus(popularity)`. `flameTier(links:)` maps chain length → flame tier
-  (none < 3, then escalating). Mirrors `FuzzyMatch`/`ActorRanking`: pure rules in
-  their own type so balance can be tuned under test.
+  `score` (chain length) is the headline metric; `points` is a richer secondary
+  score = `base + speedBonus(secondsRemaining) + obscurityBonus(popularity)`.
+  `flameTier(links:)` still exists and is unit-tested, but the current
+  Connections-treatment UI no longer renders a flame (kept as a tuned rule for
+  potential reuse). Mirrors `FuzzyMatch`/`ActorRanking`: pure rules in their own
+  type so balance can be tuned under test.
+- **Share card** — `GameEngine.shareSummary` (pure `String`) renders the finished
+  run as a spoiler-free Connections-style card: score/points + a 🟦🟪 square chain
+  (🟦 actor, 🟪 movie), fed to a SwiftUI `ShareLink` at game over.
 - [`Haptics.swift`](../movie-quiz/Haptics.swift) — UIKit feedback wrapper
   (`correct(streak:)` ramps intensity with the chain, `wrong()`, `celebrate()`);
   `#if os(iOS)` no-op elsewhere.
@@ -173,45 +177,63 @@ function of it.
 - **Rejections** (don't advance): off-list answer, or an id already in `usedIds`.
 
 ### Design system — [`Theme.swift`](../movie-quiz/Theme.swift) + [`Components.swift`](../movie-quiz/Components.swift)
-The styling foundation, built entirely on Apple's semantic primitives (system
-fonts, semantic colors, the 8-pt grid) so Dynamic Type and light/dark come free.
-- `Theme` — a token namespace: `Spacing`, `Radius`, `Motion`. Views reference
-  these instead of hardcoded numbers so the look re-tunes from one place.
-- `NodeKind` / `ChainNode` extensions give each node kind one consistent
-  `symbol` (SF Symbol) and `accent` (orange = actor, indigo = movie),
-  eliminating the icon/color logic that was duplicated across three views.
+An **editorial, puzzle-page treatment** (NYT Games / Connections): paper-warm
+neutrals, near-black ink, and two "category" accents — **blue for actors, purple
+for movies** — used the way Connections uses its group colors. A serif wordmark +
+system sans carry the type; there is no flame, confetti, or radial-heat.
+- **Color** lives in `Assets.xcassets` as named sets with light+dark variants —
+  `Canvas`, `Ink`, `Tile` (warm grey surface), `Hairline`, `ActorBlue`,
+  `MoviePurple`, `Good` (correct-link green), and `OnAccent` (near-black text that
+  stays legible on the pastels in *both* themes). `Theme.Color` just names them;
+  muted text still uses Apple's semantic `.secondary`/`.tertiary`.
+- `Theme` — token namespaces: `Color`, `Spacing`, `Radius`, `Motion` (incl.
+  `drop`, the spring a new tile lands on). Views reference these, never literals.
+- `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/purple),
+  a `tileLabel` ("ACTOR"/"MOVIE"), and a `symbol`, eliminating color/label logic
+  that was duplicated across views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
-  `PrimaryButtonStyle` (`.buttonStyle(.primary)`), `CardModifier` (`.card()`),
-  `NodeGlyph`, `ChainPill`, plus the juice pieces `Shake` (`.shake(trigger)` for a
-  rejected answer), `FloatingGain` (the rising "+N"), and `ConfettiView` (new-best
-  burst).
-- Feature components in their own files: [`StreakFlame.swift`](../movie-quiz/StreakFlame.swift)
-  is the tiered flame that leaps on each link; [`TimerRing.swift`](../movie-quiz/TimerRing.swift)
-  is the draining countdown ring. (The play screen deliberately shows **no
-  running chain visualization** — it read as cluttered; the full chain is
-  recapped only at game over.)
-- App-wide `.tint(.accentColor)` + `.fontDesign(.rounded)` are applied once at
-  the root in `movie_quizApp`; the accent is defined for light/dark in
-  `Assets.xcassets/AccentColor`.
+  `PrimaryButtonStyle` (`.buttonStyle(.primary)`, an ink-filled pill),
+  `GhostButtonStyle` (`.ghost`, outlined), `CardModifier` (`.card()`), `NodeTile`
+  (the Connections category tile — the atom of the chain), `NodeDot` (small
+  category chip), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
+  answer) and `FloatingGain` (the rising "+N").
+- Feature components in their own files: [`ChainStack.swift`](../movie-quiz/ChainStack.swift)
+  is the signature visual — the chain as a **rising Tetris-style stack of category
+  tiles**: each accepted link drops in from the top and the column builds; in the
+  play window older links collapse into "+N earlier" to fit the band above the
+  keyboard, while the game-over recap shows the whole chain numbered.
+  [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
+  (drains in ink, shifts to a warning red in the final quarter).
+- App-wide `.tint(.accentColor)` (ink) is applied once at the root in
+  `movie_quizApp`; **no `.fontDesign`** — the look pairs the system serif (wordmark,
+  game-over number) with the default sans for UI. The accent is defined for
+  light/dark in `Assets.xcassets/AccentColor` (near-black / off-white).
 
 ### UI — SwiftUI, routed by phase
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
   `@State GameEngine` and switches `SeedView` / `GameView` / `GameOverView` on
   `engine.phase` (animated with `.snappy`).
-- [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded start screen:
-  icon lockup + wordmark, a best-chain badge, two accent-lit **Actor / Movie** mode
-  pills, an in-app-styled search field (debounced), and tinted result cards. Built
-  on the shared design system (`NodeGlyph`, node accents, `Theme`, radial-heat
-  background) rather than a stock `NavigationStack`/`List`/`.searchable`, which read
-  as an iOS-Settings screen.
-- [`GameView.swift`](../movie-quiz/GameView.swift) — the turn: the big chain
-  number + flame as the hero, the current node + free-text answer below, a timer
-  ring in the header. Reacts to `engine.score` / `engine.feedback` changes to fire
-  haptics, sound, the "+N" pop and the shake.
-- [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score + points,
-  best-ever records, the "you were one away" near-miss, a new-best confetti
-  celebration, and the full chain recap with replay.
+- [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
+  start screen: an ambient mini-chain lockup + **serif wordmark**, a best-chain
+  badge, two big **Actor / Movie category choice tiles** (the selected one ringed)
+  that set the mode and focus the search, an in-app-styled search field (debounced),
+  and warm-tile result rows with a category dot. Built on the shared design system
+  over a plain canvas, rather than a stock `NavigationStack`/`List`/`.searchable`,
+  which read as an iOS-Settings screen.
+- [`GameView.swift`](../movie-quiz/GameView.swift) — the turn, laid out around the
+  **always-present software keyboard** (the dominant constraint of a typing game):
+  compact chrome (sound · seconds · quit) + `TimerBar` up top, a centered **serif
+  score hero** (chain number + points) filling the band above the rising
+  `ChainStack`, a "Name a movie X was in" hint, and the answer input **docked via
+  `.safeAreaInset(.bottom)`** directly above the keys (auto-focused; the keyboard's
+  Go submits). Reacts to `engine.score` / `engine.feedback` to fire haptics, sound,
+  the "+N" pop and the shake.
+- [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score (serif) +
+  points, a quiet "a new best" mark (a serif-italic green pill, no confetti), the
+  **Personal best fenced between hairlines** so it never reads as this run, the
+  "you were one away" near-miss, the full chain revealed as a numbered `ChainStack`
+  recap, and **Play again** + **Share** (the 🟦🟪 card).
 
 ### Config & secrets — [`Config.swift`](../movie-quiz/Config.swift)
 - `secondsPerTurn = 30` and other tunables.

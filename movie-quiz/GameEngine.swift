@@ -93,6 +93,15 @@ final class GameEngine {
 
     var current: ChainNode? { chain.last }
 
+    /// A spoiler-free, shareable recap of the finished run: the score line plus a
+    /// blue/purple square rendering of the chain (🟦 actor, 🟪 movie) — the
+    /// Connections-style share card. Pure text, so the engine stays UIKit-free.
+    var shareSummary: String {
+        let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
+        let linkWord = score == 1 ? "link" : "links"
+        return "Movie Chain 🎬\n\(score) \(linkWord) · \(points) pts\n\(squares)"
+    }
+
     // MARK: Seed selection
 
     /// Global search for the starting node.

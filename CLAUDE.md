@@ -96,18 +96,26 @@ token is never committed to source.
 
 **Scoring & juice** — the engine stays pure; all feedback is fired from the view
 in reaction to engine state. `Scoring.swift` (pure, unit-tested) defines the
-point math and flame tiers; `Haptics.swift` and `Sound.swift` (synthesised tones,
-no assets, `@AppStorage("soundEnabled")`) provide the tactile/audio payoff.
+point math (base + speed + obscurity); `Haptics.swift` and `Sound.swift`
+(synthesised tones, no assets, `@AppStorage("soundEnabled")`) provide the
+tactile/audio payoff. `engine.shareSummary` builds a spoiler-free 🟦🟪 share card.
 
-**UI** — `ContentView.swift` routes on `engine.phase` between `SeedView`,
-`GameView`, and `GameOverView`. Styling is a small design-system layer:
-`Theme.swift` (spacing/radius/motion tokens + per-node icon/color identity) and
-`Components.swift` (reusable `PrimaryButtonStyle`, `.card()`, `NodeGlyph`,
-`ChainPill`, plus juice pieces `Shake`/`FloatingGain`/`ConfettiView`), all built
-on Apple's semantic primitives. The play screen centers on a hero chain-number +
-`StreakFlame` with a `TimerRing` countdown (no running chain visualization — the
-full chain is recapped only at game over). App-wide tint and rounded font are set
-once in `movie_quizApp`. Prefer reusing these over hardcoded values.
+**UI (NYT-Games / Connections treatment)** — `ContentView.swift` routes on
+`engine.phase` between `SeedView`, `GameView`, and `GameOverView`. Styling is a
+small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
+per-node category identity — **blue = actor, purple = movie**) and
+`Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`, `.card()`,
+`NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`), all built on the
+warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
+ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
+`ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category
+tiles** — a new link drops in and older ones collapse into "+N earlier". The play
+screen is laid out around the **always-present keyboard** (the input is docked via
+`.safeAreaInset(.bottom)` above the keys, with `TimerBar.swift` as a slim linear
+countdown); the full chain is revealed as a numbered recap at game over. App-wide
+tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the
+system serif wordmark with the default sans). Prefer reusing these over hardcoded
+values.
 
 Planned fan-out modes (genre locks, memory-recall every Nth link, leaderboards)
 all layer on this same engine — keep the engine/provider split clean.

@@ -4,9 +4,9 @@
 //
 //  The start screen — pick the actor or movie to open the chain. This is the only
 //  screen that uses global search (there is no bounded candidate set until play
-//  begins). Styled as a branded game landing on the shared design system
-//  (`NodeGlyph`, node accents, `Theme` tokens, the radial-heat background) rather
-//  than a stock navigation/list/`.searchable` screen, which read as "iOS Settings".
+//  begins). Styled as a puzzle-page landing (serif wordmark, warm-tile surfaces,
+//  the two category accents) on the shared design system, rather than a stock
+//  navigation/list/`.searchable` screen, which reads as "iOS Settings".
 //
 
 import SwiftUI
@@ -33,68 +33,90 @@ struct SeedView: View {
         .padding(.horizontal)
         .padding(.top, Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(background.ignoresSafeArea())
+        .background(Theme.Color.canvas.ignoresSafeArea())
     }
 
-    // MARK: Branded header (icon lockup · title · best badge)
+    // MARK: Branded header (category lockup · serif wordmark · best badge)
 
     private var header: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            HStack(spacing: Theme.Spacing.sm) {
-                NodeGlyph(kind: .actor, size: 40)
-                Image(systemName: "link")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.secondary)
-                NodeGlyph(kind: .movie, size: 40)
-            }
+            chainLockup
 
-            Text("MOVIE CHAIN")
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .tracking(1)
+            Text("Movie\nChain")
+                .font(.system(size: 46, weight: .bold, design: .serif))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
                 .minimumScaleFactor(0.7)
-                .lineLimit(1)
 
-            Text("Actor → movie → actor. Keep the chain alive.")
+            Text("Actor → movie → actor. How long can you keep the chain alive?")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             if engine.bestChain > 0 {
-                Label("Best chain \(engine.bestChain)", systemImage: "trophy.fill")
+                Text("Your best · \(engine.bestChain) links")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.vertical, Theme.Spacing.xs + 2)
-                    .background(.orange.opacity(0.12), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
                     .padding(.top, Theme.Spacing.xs)
             }
         }
     }
 
-    // MARK: Mode toggle — two big tappable pills, lit by the node accent
+    // MARK: Chain lockup — an ambient mini-chain that telegraphs the game
 
-    private var modeToggle: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            modeButton(.actor)
-            modeButton(.movie)
+    private var chainLockup: some View {
+        HStack(spacing: 5) {
+            ForEach(Array([NodeKind.actor, .movie, .actor, .movie].enumerated()), id: \.offset) { _, kind in
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(kind.accent)
+                    .frame(width: 26, height: 15)
+            }
+            RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(Theme.Color.hairline, style: StrokeStyle(lineWidth: 1.5, dash: [3]))
+                .frame(width: 26, height: 15)
+                .overlay(
+                    Text("?")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                )
         }
     }
 
-    private func modeButton(_ kind: NodeKind) -> some View {
+    // MARK: Start choice — two big category tiles ("start with an actor / movie")
+
+    private var modeToggle: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            choiceTile(.actor)
+            choiceTile(.movie)
+        }
+    }
+
+    private func choiceTile(_ kind: NodeKind) -> some View {
         let selected = engine.seedKind == kind
         return Button {
             engine.seedKind = kind
+            searchFocused = true
             runSearch()
         } label: {
-            HStack(spacing: Theme.Spacing.xs) {
+            VStack(spacing: Theme.Spacing.xs) {
                 Image(systemName: kind.symbol)
-                Text(kind == .actor ? "Actor" : "Movie").fontWeight(.semibold)
+                    .font(.title2)
+                Text(kind == .actor ? "Actor" : "Movie")
+                    .font(.headline)
+                Text(kind == .actor ? "start with a name" : "start with a title")
+                    .font(.caption2)
+                    .opacity(0.65)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.sm + 2)
-            .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(kind.accent))
-            .background(
-                selected ? AnyShapeStyle(kind.accent) : AnyShapeStyle(kind.accent.opacity(0.12)),
-                in: RoundedRectangle(cornerRadius: Theme.Radius.md)
+            .padding(.vertical, Theme.Spacing.md)
+            .foregroundStyle(Theme.Color.onAccent)
+            .background(kind.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.card)
+                    .strokeBorder(Theme.Color.ink, lineWidth: selected ? 2.5 : 0)
             )
         }
         .buttonStyle(.plain)
@@ -119,12 +141,12 @@ struct SeedView: View {
             }
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm + 2)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .padding(.vertical, Theme.Spacing.sm + 4)
+        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
         .onChange(of: query) { runSearch() }
     }
 
-    // MARK: Results — tinted cards with a clear "start" affordance
+    // MARK: Results — warm-tile rows with a category dot
 
     private var resultsList: some View {
         ScrollView {
@@ -142,42 +164,34 @@ struct SeedView: View {
 
     private func resultRow(_ node: ChainNode) -> some View {
         HStack(spacing: Theme.Spacing.md) {
-            NodeGlyph(kind: node.kind, size: 40)
+            NodeDot(kind: node.kind, size: 11)
             Text(node.displayName)
-                .font(.body.weight(.medium))
-                .foregroundStyle(.primary)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.Color.ink)
                 .lineLimit(1)
             Spacer()
-            Image(systemName: "play.circle.fill")
-                .font(.title2)
-                .foregroundStyle(node.accent)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.tertiary)
         }
-        .padding(Theme.Spacing.sm + 2)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.md - 2)
+        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.tile))
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label(query.isEmpty ? "Pick your start" : "No matches",
-                  systemImage: engine.seedKind.symbol)
-        } description: {
+        VStack(spacing: Theme.Spacing.sm) {
+            Text(query.isEmpty ? "Pick your start" : "No matches")
+                .font(.headline)
             Text(query.isEmpty
-                 ? "Search for an \(engine.seedKind == .actor ? "actor" : "movie") to begin your chain."
+                 ? "Search an \(engine.seedKind == .actor ? "actor" : "movie") to begin your chain."
                  : "Try a different spelling.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: Background — the same subtle radial heat as the play screen
-
-    private var background: some View {
-        RadialGradient(
-            colors: [engine.seedKind.accent.opacity(0.10), .clear],
-            center: .top,
-            startRadius: 0,
-            endRadius: 500
-        )
-        .animation(.easeInOut(duration: 0.5), value: engine.seedKind)
+        .padding(.top, Theme.Spacing.xl)
     }
 
     // MARK: Search
