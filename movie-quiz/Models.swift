@@ -14,6 +14,9 @@ struct Person: Identifiable, Hashable, Sendable {
     /// TMDB popularity, when known. Drives the obscurity scoring bonus — a
     /// deep-cut pick is worth more than an A-lister. `nil` for the stub graph.
     var popularity: Double? = nil
+    /// TMDB `profile_path` (e.g. `/abc.jpg`), when known. The headshot shown in
+    /// the collection ("Your Reel"); `nil` for the stub graph → typographic tile.
+    var imagePath: String? = nil
 
     // Identity is the TMDB id, never the name or popularity, so records with the
     // same id compare equal regardless of the metadata we happened to fetch.
@@ -28,6 +31,9 @@ struct Movie: Identifiable, Hashable, Sendable {
     let year: Int?       // release year, for disambiguation/display
     /// TMDB popularity, when known. See `Person.popularity`.
     var popularity: Double? = nil
+    /// TMDB `poster_path` (e.g. `/xyz.jpg`), when known. The poster shown in the
+    /// collection ("Your Reel"); `nil` for the stub graph → typographic tile.
+    var imagePath: String? = nil
 
     var displayTitle: String {
         if let year { return "\(title) (\(year))" }
@@ -83,10 +89,19 @@ enum ChainNode: Identifiable, Hashable, Sendable {
         case .movie(let m): return m.popularity
         }
     }
+
+    /// TMDB image path of the underlying entity, when known — the headshot/poster
+    /// stored in the collection.
+    var imagePath: String? {
+        switch self {
+        case .actor(let p): return p.imagePath
+        case .movie(let m): return m.imagePath
+        }
+    }
 }
 
 /// Whether a turn expects an actor or a movie.
-enum NodeKind: Sendable {
+enum NodeKind: String, Sendable, Codable {
     case actor
     case movie
 

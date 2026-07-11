@@ -11,12 +11,17 @@ import SwiftUI
 
 struct GameOverView: View {
     @Bindable var engine: GameEngine
+    var collection: CollectionStore
+
+    @State private var showReel = false
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
             scoreHeader
 
             bestLine
+
+            reelLine
 
             if let missed = engine.missedAnswer {
                 oneAway(missed)
@@ -32,6 +37,38 @@ struct GameOverView: View {
         .onAppear {
             if engine.isNewBest { Haptics.celebrate() }
         }
+        .sheet(isPresented: $showReel) {
+            CollectionView(store: collection)
+        }
+    }
+
+    // MARK: Reel — what this run added to the collection
+
+    @ViewBuilder private var reelLine: some View {
+        if collection.total > 0 {
+            Button { showReel = true } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "film.stack")
+                        .font(.footnote)
+                        .foregroundStyle(engine.reelAdditions > 0 ? Theme.Color.good : .secondary)
+                    Text(reelMessage)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.Color.ink)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var reelMessage: String {
+        if engine.reelAdditions > 0 {
+            let n = engine.reelAdditions
+            return "\(n) new to your Reel · \(collection.total) total"
+        }
+        return "View your Reel · \(collection.total)"
     }
 
     // MARK: Score header
@@ -152,5 +189,5 @@ struct GameOverView: View {
 #Preview {
     let engine = GameEngine()
     engine.loadDemoGameOver()
-    return GameOverView(engine: engine)
+    return GameOverView(engine: engine, collection: CollectionStore(fileURL: nil))
 }

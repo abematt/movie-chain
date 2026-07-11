@@ -51,11 +51,13 @@ That bounded set is what makes two otherwise-hard problems easy:
 All source is in [`movie-quiz/`](../movie-quiz/).
 
 ### Domain types — [`Models.swift`](../movie-quiz/Models.swift)
-- `Person { id: Int, name, popularity? }` and `Movie { id: Int, title, year?,
-  popularity? }` — `id` is the stable **TMDB id**, which is what makes validation
-  and dedup exact (equality/hashing are **id-only**, so the same entity compares
-  equal regardless of fetched metadata). `popularity` is optional TMDB popularity,
-  used only for the obscurity scoring bonus (`nil` on the offline stub graph).
+- `Person { id: Int, name, popularity?, imagePath? }` and `Movie { id: Int, title,
+  year?, popularity?, imagePath? }` — `id` is the stable **TMDB id**, which is what
+  makes validation and dedup exact (equality/hashing are **id-only**, so the same
+  entity compares equal regardless of fetched metadata). `popularity` is optional
+  TMDB popularity, used only for the obscurity scoring bonus (`nil` on the offline
+  stub graph). `imagePath` is the TMDB `profile_path`/`poster_path` (nil-safe), used
+  to render the collection grid; `nil` → typographic placeholder tile.
 - `ChainNode` — enum `.actor(Person) | .movie(Movie)`, one link in the chain.
   - `id: String` → `"p<id>"` / `"m<id>"` (namespaced so actors and movies never
     collide in `usedIds`).
@@ -152,8 +154,15 @@ function of it.
 - **Records & recap:** `bestChain`/`bestPoints` (persisted via `UserDefaults`),
   `isNewBest` (celebration trigger), `missedAnswer` (a valid answer left ungiven on
   the turn that timed out — the "you were one away" near-miss, captured in
-  `endGame()` from the still-loaded `candidates`; `nil` on a manual quit), and
-  `endedByQuit` (so the summary shows "Chain ended" rather than "Time's up").
+  `endGame()` from the still-loaded `candidates`; `nil` on a manual quit),
+  `endedByQuit` (so the summary shows "Chain ended" rather than "Time's up"), and
+  `reelAdditions` (how many brand-new entities this run added to the collection —
+  the "+N to your Reel" figure).
+- **Collection recording:** in `endGame()`, when `chain.count >= 2`, the run is
+  logged into the injected `CollectionStore` (see below). The `>= 2` guard is the
+  whole logging rule: it means at least one link validated, so the seed (chain[0])
+  counts only once a real combination lands off it, and a seed-then-quit logs
+  nothing.
 - **Private:** injected `provider`, current `candidates`, `usedIds: Set<String>`
   (no-repeat rule), the `countdownTask`, and a monotonic `generation` token that
   guards async candidate loads (see below).
@@ -175,6 +184,40 @@ function of it.
   tested in `GameEngineTests` with a provider that holds the first fetch open while
   a new game starts.
 - **Rejections** (don't advance): off-list answer, or an id already in `usedIds`.
+
+### Collection / "Your Reel" — [`Collection.swift`](../movie-quiz/Collection.swift) + [`CollectionView.swift`](../movie-quiz/CollectionView.swift)
+The registry of every actor/movie the player has logged through play — a
+"Pokédex" retention hook ("look how many you know"). Follows the same
+pure-value + observable-store split as the rest of the app:
+- `CollectedEntity` — a pure `Codable` value (`kind`, `tmdbID`, `name`, `year`,
+  `imagePath`, `firstSeen`/`lastSeen`, `timesLogged`). `id` matches
+  `ChainNode.id` (`"p<id>"`/`"m<id>"`) so keys line up with the game's no-repeat
+  ids. Unit-tested with no container.
+- `CollectionStore` (`@MainActor @Observable`) — owns `[String: CollectedEntity]`
+  + a `chainsLogged` counter, persisted as a JSON `CollectionSnapshot` in
+  Application Support (**not** SwiftData — the data is a small bounded dictionary,
+  matching the engine's lightweight `UserDefaults` records). Writes go through a
+  **serial** `DispatchQueue`, so calls (always from the main actor, hence already
+  ordered by mutation) land FIFO and the newest snapshot always wins — an older
+  in-flight write can't clobber a newer one. `flush()` drains the queue and is
+  called from `ContentView`'s `scenePhase` hook so the latest snapshot is
+  guaranteed on disk before the app is suspended/killed. Exposes the rollups the view reads: `actorCount`/`movieCount`/`total`,
+  `sortedActors`/`sortedMovies` (most-logged first), `mostLoggedActor`/`Movie`,
+  `addedThisWeek`, and `newThisSession` (the "New" badge). Injected into the
+  engine and shared from the app root.
+- **The one logging rule** lives in `record(chain:)`: every node upserted once
+  (so `timesLogged` counts distinct chains, never submissions), deduped by id,
+  returning the count of brand-new additions. Called only from `endGame()` on
+  chains of length ≥ 2 — see the engine's "Collection recording" note for why
+  that single condition encodes "successful combinations only; seeds count once a
+  link lands; nothing logged on a bare seed".
+- `CollectionView` — the grid screen, presented as a `.sheet` from `SeedView`
+  ("Your Reel · N") and `GameOverView` ("+N new to your Reel"). Pure count stats
+  (no rarity/obscurity): a hero total + blue/purple category split, a
+  chains/longest/this-week stat strip, "your regulars" (most-logged), a filter,
+  and the tile grid. Tiles stream art via `AsyncImage` from
+  `Config.imageURL(path:)` (system-cached, never stored on disk); no path → the
+  category-tinted typographic placeholder.
 
 ### Design system — [`Theme.swift`](../movie-quiz/Theme.swift) + [`Components.swift`](../movie-quiz/Components.swift)
 An **editorial, puzzle-page treatment** (NYT Games / Connections): paper-warm
@@ -212,12 +255,15 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
 ### UI — SwiftUI, routed by phase
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
-  `@State GameEngine` and switches `SeedView` / `GameView` / `GameOverView` on
-  `engine.phase` (animated with `.snappy`).
+  `@State GameEngine` **and the shared `@State CollectionStore`** (injected into
+  the engine so it can record, and passed to the screens that display it), and
+  switches `SeedView` / `GameView` / `GameOverView` on `engine.phase` (animated
+  with `.snappy`).
 - [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
   start screen: an ambient mini-chain lockup + **serif wordmark**, a best-chain
-  badge, two big **Actor / Movie category choice tiles** (the selected one ringed)
-  that set the mode and focus the search, an in-app-styled search field (debounced),
+  badge, **a "Your Reel · N" button that opens the collection sheet**, two big
+  **Actor / Movie category choice tiles** (the selected one ringed) that set the
+  mode and focus the search, an in-app-styled search field (debounced),
   and warm-tile result rows with a category dot. Built on the shared design system
   over a plain canvas, rather than a stock `NavigationStack`/`List`/`.searchable`,
   which read as an iOS-Settings screen.
@@ -232,11 +278,14 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
 - [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score (serif) +
   points, a quiet "a new best" mark (a serif-italic green pill, no confetti), the
   **Personal best fenced between hairlines** so it never reads as this run, the
-  "you were one away" near-miss, the full chain revealed as a numbered `ChainStack`
+  "you were one away" near-miss, **a "+N new to your Reel" line that opens the
+  collection sheet**, the full chain revealed as a numbered `ChainStack`
   recap, and **Play again** + **Share** (the 🟦🟪 card).
 
 ### Config & secrets — [`Config.swift`](../movie-quiz/Config.swift)
 - `secondsPerTurn = 30` and other tunables.
+- `imageBaseURL` + `imageURL(path:size:)` — builds a TMDB image URL from a stored
+  `profile_path`/`poster_path` for the collection grid (nil path → nil → placeholder).
 - `makeProvider()` → `TMDBProvider` when a token is present, else `StubProvider`.
 - Token is loaded **at runtime** from a gitignored
   `movie-quiz/TMDBSecrets.plist` (key `TMDBToken`, optional `UsesBearerToken`).
@@ -275,10 +324,14 @@ pick seed  ──▶  candidates = cast/filmography of last node
 
 ## Extending it
 
-Planned fan-out modes — genre locks, memory-recall every Nth link, leaderboards —
-all layer on this same engine. The rule of thumb: **keep the engine/provider
-split clean.** New rules live in `GameEngine`; new data sources implement
-`MovieDataProvider`; new screens read engine state and call engine methods.
+The collection ("Your Reel") is the first fan-out built on top of the loop —
+a local, login-free registry that layers on the engine without touching the
+engine/provider split (it's just another observable store the engine records
+into at game over). Still planned: genre locks, memory-recall every Nth link,
+and leaderboards (the natural point to add accounts — local session/collection
+data is forward-compatible with a future sync). The rule of thumb: **keep the
+engine/provider split clean.** New rules live in `GameEngine`; new data sources
+implement `MovieDataProvider`; new screens read observable state and call methods.
 
 ## Dev workflow
 
@@ -293,9 +346,11 @@ split clean.** New rules live in `GameEngine`; new data sources implement
   `movie-quizTests`, `@testable import movie_quiz`): `FuzzyMatchTests` locks the
   matcher (incl. the Roman→Arabic sequel fix), `ActorRankingTests` locks
   `ActorRanking.rank` (canonical-first, homonyms preserved, stubs dropped),
-  `ScoringTests` locks the point math + flame-tier thresholds, and
-  `GameEngineTests` locks the stale-load safety with a gated stub provider. Run
-  with ⌘U or the `xcodebuild … test` invocation above.
+  `ScoringTests` locks the point math + flame-tier thresholds,
+  `GameEngineTests` locks the stale-load safety with a gated stub provider, and
+  `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
+  counted once a link lands, dedup by id, `timesLogged` per-chain). Run with ⌘U
+  or the `xcodebuild … test` invocation above.
 
 ---
 

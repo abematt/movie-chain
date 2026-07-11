@@ -61,7 +61,8 @@ struct TMDBProvider: MovieDataProvider {
                 name: $0.name,
                 department: $0.known_for_department,
                 popularity: $0.popularity ?? 0,
-                knownForCount: $0.known_for?.count ?? 0
+                knownForCount: $0.known_for?.count ?? 0,
+                imagePath: $0.profile_path
             )
         })
     }
@@ -84,7 +85,9 @@ struct TMDBProvider: MovieDataProvider {
             MovieCreditsResponse.self,
             path: "movie/\(movie.id)/credits"
         )
-        return credits.cast.map { Person(id: $0.id, name: $0.name, popularity: $0.popularity) }
+        return credits.cast.map {
+            Person(id: $0.id, name: $0.name, popularity: $0.popularity, imagePath: $0.profile_path)
+        }
     }
 
     func filmography(of actor: Person) async throws -> [Movie] {
@@ -113,6 +116,7 @@ struct ActorSearchCandidate {
     let department: String?
     let popularity: Double
     let knownForCount: Int
+    var imagePath: String? = nil
 }
 
 enum ActorRanking {
@@ -134,7 +138,7 @@ enum ActorRanking {
             .filter { $0.department == nil || $0.department == "Acting" }
             .filter { $0.popularity > 0 || $0.knownForCount > 0 }
             .sorted { $0.popularity > $1.popularity }
-            .map { Person(id: $0.id, name: $0.name, popularity: $0.popularity) }
+            .map { Person(id: $0.id, name: $0.name, popularity: $0.popularity, imagePath: $0.imagePath) }
     }
 }
 
@@ -150,6 +154,7 @@ private struct PersonSearchResponse: Decodable {
         let known_for_department: String?
         let popularity: Double?
         let known_for: [KnownForItem]?
+        let profile_path: String?
     }
     let results: [Item]
 }
@@ -163,6 +168,7 @@ private struct MovieCreditsResponse: Decodable {
         let id: Int
         let name: String
         let popularity: Double?
+        let profile_path: String?
     }
     let cast: [CastMember]
 }
@@ -176,6 +182,7 @@ private struct MovieDTO: Decodable {
     let title: String?
     let release_date: String?
     let popularity: Double?
+    let poster_path: String?
     /// Role name, present on person `movie_credits` (nil on movie search results).
     let character: String?
 
@@ -191,6 +198,6 @@ private struct MovieDTO: Decodable {
 
     func toMovie() -> Movie {
         let year = release_date.flatMap { Int($0.prefix(4)) }
-        return Movie(id: id, title: title ?? "Untitled", year: year, popularity: popularity)
+        return Movie(id: id, title: title ?? "Untitled", year: year, popularity: popularity, imagePath: poster_path)
     }
 }

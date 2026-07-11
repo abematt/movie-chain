@@ -45,6 +45,19 @@ enum Config {
     /// Seconds allowed per turn before the game ends.
     static let secondsPerTurn = 30
 
+    /// Base for TMDB-hosted images (headshots/posters shown in the collection).
+    /// Full URL = base + size + path, e.g. `.../t/p/w185/abc.jpg`.
+    static let imageBaseURL = "https://image.tmdb.org/t/p/"
+
+    /// Build a TMDB image URL from a stored `profile_path`/`poster_path`. Returns
+    /// `nil` when there is no path (the stub graph, or an entity TMDB has no art
+    /// for) so the collection tile falls back to its typographic placeholder.
+    /// `size` is a TMDB size bucket (`w92`, `w185`, `w342`, …); `w185` suits the grid.
+    static func imageURL(path: String?, size: String = "w185") -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return URL(string: imageBaseURL + size + path)
+    }
+
     /// Chooses the live provider if a token is set, otherwise the demo stub.
     static func makeProvider() -> MovieDataProvider {
         hasTMDBToken ? TMDBProvider() : StubProvider()

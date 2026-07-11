@@ -100,8 +100,24 @@ point math (base + speed + obscurity); `Haptics.swift` and `Sound.swift`
 (synthesised tones, no assets, `@AppStorage("soundEnabled")`) provide the
 tactile/audio payoff. `engine.shareSummary` builds a spoiler-free 🟦🟪 share card.
 
+**Collection ("Your Reel")** — `Collection.swift` + `CollectionView.swift`: a
+local, login-free registry of every actor/movie the player has logged, a
+"look how many you know" retention hook. `CollectedEntity` is a pure `Codable`
+value (deduped by TMDB id); `CollectionStore` (`@MainActor @Observable`) owns
+the dictionary + a `chainsLogged` counter, persisted as JSON in Application
+Support (**not** SwiftData — small bounded data, matches the engine's UserDefaults
+style). The single logging rule lives in `record(chain:)`, called from
+`endGame()` only when `chain.count >= 2` — that condition alone encodes
+"successful combinations only, seed counts once a link lands, bare seed logs
+nothing". Pure count stats only (no rarity). Tiles stream art via `AsyncImage`
+from `Config.imageURL(path:)` (system-cached, never stored on disk; nil path →
+typographic placeholder), fed by the new `imagePath` on `Person`/`Movie`. The
+store is owned at the app root and injected into the engine.
+
 **UI (NYT-Games / Connections treatment)** — `ContentView.swift` routes on
-`engine.phase` between `SeedView`, `GameView`, and `GameOverView`. Styling is a
+`engine.phase` between `SeedView`, `GameView`, and `GameOverView`, and owns the
+shared `CollectionStore` (opened as a `.sheet` from the seed and game-over
+screens). Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, purple = movie**) and
 `Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`, `.card()`,
@@ -117,8 +133,10 @@ tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs th
 system serif wordmark with the default sans). Prefer reusing these over hardcoded
 values.
 
-Planned fan-out modes (genre locks, memory-recall every Nth link, leaderboards)
-all layer on this same engine — keep the engine/provider split clean.
+Remaining fan-out modes (genre locks, memory-recall every Nth link, leaderboards)
+all layer on this same engine — keep the engine/provider split clean. Leaderboards
+are the natural point to add accounts; the local collection/session data is
+forward-compatible with a future sync.
 
 ## Running it
 

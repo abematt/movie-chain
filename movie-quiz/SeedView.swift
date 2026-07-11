@@ -13,10 +13,12 @@ import SwiftUI
 
 struct SeedView: View {
     @Bindable var engine: GameEngine
+    var collection: CollectionStore
 
     @State private var query = ""
     @State private var results: [ChainNode] = []
     @State private var searchTask: Task<Void, Never>?
+    @State private var showReel = false
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -34,6 +36,9 @@ struct SeedView: View {
         .padding(.top, Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
+        .sheet(isPresented: $showReel) {
+            CollectionView(store: collection)
+        }
     }
 
     // MARK: Branded header (category lockup · serif wordmark · best badge)
@@ -53,15 +58,31 @@ struct SeedView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            if engine.bestChain > 0 {
-                Text("Your best · \(engine.bestChain) links")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.xs + 2)
-                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
-                    .padding(.top, Theme.Spacing.xs)
+            HStack(spacing: Theme.Spacing.sm) {
+                if engine.bestChain > 0 {
+                    Text("Your best · \(engine.bestChain) links")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.vertical, Theme.Spacing.xs + 2)
+                        .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+                }
+                if collection.total > 0 {
+                    Button { showReel = true } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "film.stack")
+                            Text("Your Reel · \(collection.total)")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.Color.ink)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.vertical, Theme.Spacing.xs + 2)
+                        .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+            .padding(.top, Theme.Spacing.xs)
         }
     }
 
@@ -215,5 +236,5 @@ struct SeedView: View {
 }
 
 #Preview {
-    SeedView(engine: GameEngine())
+    SeedView(engine: GameEngine(), collection: CollectionStore(fileURL: nil))
 }

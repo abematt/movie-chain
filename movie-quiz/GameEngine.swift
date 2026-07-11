@@ -58,6 +58,9 @@ final class GameEngine {
     /// Whether this run ended because the player tapped Quit (vs. the clock
     /// running out). Lets the summary avoid a misleading "Time's up".
     private(set) var endedByQuit = false
+    /// How many brand-new actors/movies this run added to the collection ("Your
+    /// Reel") — the "+N to your Reel" figure shown at game over.
+    private(set) var reelAdditions = 0
 
     /// The kind chosen for the seed search.
     var seedKind: NodeKind = .actor
@@ -65,6 +68,9 @@ final class GameEngine {
     // MARK: Private
 
     private let provider: MovieDataProvider
+    /// The registry every completed chain is logged into. Optional so previews
+    /// and tests can run without touching disk.
+    private let collection: CollectionStore?
     /// Valid next nodes for the current turn (cast or filmography), pre-wrapped.
     private var candidates: [ChainNode] = []
     private var usedIds: Set<String> = []
@@ -81,12 +87,13 @@ final class GameEngine {
     private static let bestChainKey = "bestChain"
     private static let bestPointsKey = "bestPoints"
 
-    init(provider: MovieDataProvider? = nil) {
+    init(provider: MovieDataProvider? = nil, collection: CollectionStore? = nil) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
         // the project's MainActor-default isolation.
         self.provider = provider ?? Config.makeProvider()
+        self.collection = collection
         self.bestChain = UserDefaults.standard.integer(forKey: Self.bestChainKey)
         self.bestPoints = UserDefaults.standard.integer(forKey: Self.bestPointsKey)
     }
@@ -131,6 +138,7 @@ final class GameEngine {
         isNewBest = false
         missedAnswer = nil
         endedByQuit = false
+        reelAdditions = 0
         feedback = nil
         phase = .playing
         await loadCandidates(for: seed, token: token)
@@ -283,6 +291,15 @@ final class GameEngine {
         if points > bestPoints {
             bestPoints = points
             UserDefaults.standard.set(bestPoints, forKey: Self.bestPointsKey)
+        }
+
+        // Log the run into the collection. A chain of length ≥ 2 means at least
+        // one link was validated, which is exactly the condition we want: the
+        // seed (chain[0]) counts only once a real combination lands off it, and
+        // a seed-then-quit (length 1) logs nothing. `record` dedups by id, so
+        // each entity is counted once per chain.
+        if chain.count >= 2 {
+            reelAdditions = collection?.record(chain: chain) ?? 0
         }
 
         phase = .gameOver
