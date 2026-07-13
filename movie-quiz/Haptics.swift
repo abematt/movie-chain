@@ -30,6 +30,7 @@ enum Haptics {
     private static let mediumGen = UIImpactFeedbackGenerator(style: .medium)
     private static let heavyGen = UIImpactFeedbackGenerator(style: .heavy)
     private static let notifyGen = UINotificationFeedbackGenerator()
+    private static let selectionGen = UISelectionFeedbackGenerator()
     #endif
 
     /// Warm the taptic engine ahead of the first hit of a turn, so it lands in
@@ -40,6 +41,18 @@ enum Haptics {
         mediumGen.prepare()
         heavyGen.prepare()
         notifyGen.prepare()
+        selectionGen.prepare()
+        #endif
+    }
+
+    /// A light "detent" tick for switching a discrete choice — the seed
+    /// actor/movie toggle. `UISelectionFeedbackGenerator` is Apple's purpose-built
+    /// generator for exactly this (picker/segment value changes): crisper and
+    /// lighter than an impact, so it reads as "clicked into place", not a hit.
+    static func selection() {
+        #if os(iOS)
+        selectionGen.selectionChanged()
+        selectionGen.prepare()   // re-warm for the next toggle
         #endif
     }
 

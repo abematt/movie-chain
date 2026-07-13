@@ -121,7 +121,12 @@ final class GameEngine {
                 return try await provider.searchMovies(query).map(ChainNode.movie)
             }
         } catch {
-            feedback = error.localizedDescription
+            // A failed seed search surfaces as an empty result set — `SeedView`
+            // shows its "no matches" empty state. Deliberately do *not* write
+            // `feedback` here: that field is gameplay feedback (read by `GameView`
+            // for rejected links), and a debounced seed search that only resolves
+            // *after* the player has tapped a result and the round has begun would
+            // otherwise buzz a stale error mid-game.
             return []
         }
     }

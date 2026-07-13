@@ -284,18 +284,30 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   above `SeedView` (recreated on each `.seed` re-entry), so every launch after the
   first, and every Play-again re-entry, correctly starts assembled.
 - [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
-  start screen: an ambient mini-chain lockup + **serif wordmark**, a best-chain
-  badge, **a "Your Reel · N" button that opens the collection sheet**, two big
-  **Actor / Movie category choice tiles** (the selected one ringed) that set the
-  mode and focus the search, an in-app-styled search field (debounced),
-  and warm-tile result rows with a category dot. Built on the shared design system
-  over a plain canvas, rather than a stock `NavigationStack`/`List`/`.searchable`,
-  which read as an iOS-Settings screen.
+  **hero + live-search home**: an ambient mini-chain lockup + **serif wordmark** +
+  tagline as the hero, a best-chain badge, **a "Your Reel · N" button that opens
+  the collection sheet**, a slim **Actor / Movie segment** (the selected side
+  filled) that re-points the search, an in-app-styled search field (debounced,
+  **tap-to-focus** — no auto-keyboard on launch), and warm-tile result rows with a
+  category dot that reveal inline. Built on the shared design system over a plain
+  canvas, rather than a stock `NavigationStack`/`List`/`.searchable`, which read as
+  an iOS-Settings screen.
+  - **Keyboard-aware collapse** — `heroCollapsed` (`searchFocused || !query.isEmpty`)
+    folds the mini-chain, tagline, and stat chips away and tightens the top padding
+    the moment the player engages the search (keying it to the query too keeps the
+    hero compact after an interactive scroll-dismiss, so the list never jumps on
+    focus loss mid-browse). The results list is the flexible region
+    (`maxHeight: .infinity`), so SwiftUI's automatic keyboard avoidance shrinks it
+    and the field + first rows stay clear of the keys. The wordmark stays — it's the
+    identity. iPhone is locked to **portrait** (project setting) — the whole game is
+    portrait-designed (the play screen docks the keyboard as its primary layout), and
+    in landscape the fixed hero above a flexible results list can't clear the keyboard;
+    iPad keeps all orientations.
   - **Cold-launch intro** (once ever, on the first cold launch only): the title lockup
     starts centered (an animatable top spacer, no `matchedGeometryEffect`), its
     mini-chain drops in tile-by-tile via `TileBuild` (echoing the in-game Tetris
     landing), then on `Theme.Motion.intro` the lockup rises to its header rest and
-    the controls (badges → mode tiles → search → results) assemble beneath it via
+    the controls (badges → segment → search → results) assemble beneath it via
     the shared `.appear(i)` stagger. Gated by the `introDone` binding from
     `ContentView` — a Play-again re-entry starts fully assembled, so the carousel
     push never flashes a centered logo. Reduce Motion shows it assembled at once.

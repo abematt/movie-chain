@@ -20,6 +20,8 @@ that alternates actor → movie → actor → movie …, where each link must be
 - Deployment target: iOS 26.2 (high — only installs on a 26.x runtime; lower it
   in build settings if broader device/simulator support is wanted)
 - Supported platforms: iOS, iPad, macOS, visionOS
+- Orientation: **iPhone is portrait-only**; iPad keeps all orientations. The play
+  screen docks the keyboard as its primary layout, so the game is portrait by design.
 - App target (`movie-quiz`) + `movie-quizTests` unit-test target, one shared scheme.
 - Files are auto-included via `PBXFileSystemSynchronizedRootGroup` — just add
   `.swift` files under `movie-quiz/` (or `movie-quizTests/` for tests), no

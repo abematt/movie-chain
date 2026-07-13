@@ -2,19 +2,31 @@
 //  SeedView.swift
 //  movie-quiz
 //
-//  The start screen — pick the actor or movie to open the chain. This is the only
-//  screen that uses global search (there is no bounded candidate set until play
-//  begins). Styled as a puzzle-page landing (serif wordmark, warm-tile surfaces,
-//  the two category accents) on the shared design system, rather than a stock
-//  navigation/list/`.searchable` screen, which reads as "iOS Settings".
+//  The home screen — a branded landing that doubles as the seed picker. This is
+//  the only screen that uses global search (there is no bounded candidate set
+//  until play begins). Styled as a puzzle-page landing (serif wordmark, warm-tile
+//  surfaces, the two category accents) on the shared design system, rather than a
+//  stock navigation/list/`.searchable` screen, which reads as "iOS Settings".
 //
-//  Cold-launch intro: on the very first launch the title lockup starts
-//  centered, its mini-chain drops in tile-by-tile (echoing the in-game Tetris
-//  landing), then the lockup rises to its header rest as the controls assemble
-//  beneath it. Runs once ever — `introDone` (owned by `ContentView`, persisted)
-//  is already true on every later launch and every "Play again" re-entry, so the
-//  screen starts assembled and the carousel push never flashes a centered logo.
-//  Reduce Motion skips it all.
+//  Layout: a "hero + live search" home. The wordmark, tagline, and your
+//  best/Reel stats own the resting screen; a slim actor/movie segment and a
+//  tap-to-focus search field sit beneath, and results reveal inline as you type
+//  (no push, no new screen) — so the fastest path to play stays: tap the field →
+//  type → tap a result.
+//
+//  Keyboard-aware collapse: the moment the field is focused (or any text is
+//  typed) the hero folds — mini-chain, tagline, and stat chips fade out and the
+//  top padding tightens — so the field and its results rise clear of the
+//  keyboard. The results list is the flexible region, so it absorbs the reduced
+//  height and everything stays on screen. Clearing the field re-expands the hero.
+//
+//  Cold-launch intro: on the very first launch the title lockup starts centered,
+//  its mini-chain drops in tile-by-tile (echoing the in-game Tetris landing),
+//  then the lockup rises to its header rest as the controls assemble beneath it.
+//  Runs once ever — `introDone` (owned by `ContentView`, persisted) is already
+//  true on every later launch and every "Play again" re-entry, so the screen
+//  starts assembled and the carousel push never flashes a centered logo. Reduce
+//  Motion skips it all.
 //
 
 import SwiftUI
@@ -48,9 +60,9 @@ struct SeedView: View {
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Number of staggered control slots — badges(0), Actor(1), Movie(2),
-    /// search(3), results(4). See `controls`.
-    private static let controlSlotCount = 5
+    /// Number of staggered control slots — badges(0), segment(1), search(2),
+    /// results(3). See `controls`.
+    private static let controlSlotCount = 4
 
     init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
         self.engine = engine
@@ -65,6 +77,15 @@ struct SeedView: View {
         _revealedControls = State(initialValue: done ? Self.controlSlotCount : 0)
     }
 
+    /// The hero folds (mini-chain / tagline / stat chips out, padding tight) once
+    /// the player engages the search — either the field is focused or they've
+    /// typed something. Keying it to the query too keeps the hero compact after an
+    /// interactive scroll-to-dismiss (keyboard gone but results still on screen),
+    /// so the list doesn't jump when focus is lost mid-browse.
+    private var heroCollapsed: Bool {
+        searchFocused || !query.isEmpty
+    }
+
     var body: some View {
         GeometryReader { geo in
             VStack(spacing: Theme.Spacing.lg) {
@@ -73,7 +94,6 @@ struct SeedView: View {
                 Color.clear.frame(height: topInset(geo.size.height))
 
                 titleLockup
-                    .scaleEffect(revealed ? 1 : 1.1)
 
                 // Always mounted (like the mini-chain tiles) so each control's
                 // reveal animates on a view that's been on screen since launch;
@@ -83,8 +103,9 @@ struct SeedView: View {
                     .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
             }
             .padding(.horizontal)
-            .padding(.top, Theme.Spacing.xl)
+            .padding(.top, heroCollapsed ? Theme.Spacing.sm : Theme.Spacing.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .animation(Theme.Motion.standard, value: heroCollapsed)
         }
         .background(Theme.Color.canvas.ignoresSafeArea())
         // Tap-to-skip: while the intro is still playing, a tap anywhere collapses
@@ -106,7 +127,10 @@ struct SeedView: View {
         .onAppear {
             if introTask == nil { introTask = Task { await runIntro() } }
         }
-        .onDisappear { introTask?.cancel() }
+        .onDisappear {
+            introTask?.cancel()
+            searchTask?.cancel()   // a pending debounced search must not outlive the screen
+        }
     }
 
     private func topInset(_ height: CGFloat) -> CGFloat {
@@ -159,21 +183,34 @@ struct SeedView: View {
     }
 
     // MARK: Title lockup — mini-chain · serif wordmark · tagline
+    //
+    // Collapses on `heroCollapsed`: the mini-chain and tagline fold away (the
+    // wordmark stays — it's the identity) so the search + results clear the
+    // keyboard. Both are always mounted during the intro (`heroCollapsed` is
+    // false throughout it), so their intro entrance still animates via `TileBuild`
+    // and the lockup rise; the collapse fade only fires later, on focus/typing.
 
     private var titleLockup: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            chainLockup
+            if !heroCollapsed {
+                chainLockup
+                    .transition(.scale(scale: 0.7, anchor: .bottom).combined(with: .opacity))
+            }
 
             Text("Movie\nChain")
                 .font(.system(size: 46, weight: .bold, design: .serif))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
+                .scaleEffect(revealed ? 1 : 1.1)
 
-            Text("How long can you keep the chain alive?")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if !heroCollapsed {
+                Text("How long can you keep the chain alive?")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -206,20 +243,25 @@ struct SeedView: View {
     // overshoot). The stagger is real time, not a baked-in `.delay`: `runIntro`
     // bumps `revealedControls` one slot at a time inside its own `withAnimation`,
     // spaced by a 100ms sleep, so each control springs in on its own transaction
-    // and reads as a distinct beat. The two mode tiles carry their own indices
-    // (1, 2), so Actor then Movie deal in rather than appearing together.
+    // and reads as a distinct beat.
     private func cascade<V: View>(_ view: V, _ index: Int) -> some View {
         view.modifier(ControlReveal(visible: revealedControls > index, enabled: playsIntro))
     }
 
     @ViewBuilder private var controls: some View {
-        cascade(badges, 0)
-        modeToggle                       // its tiles cascade internally (indices 1, 2)
-        cascade(searchField, 3)
-        cascade(resultsSection, 4)
+        // The stat chips are part of the hero, so they fold with it. Mounted
+        // throughout the intro (`heroCollapsed` stays false there) so slot 0 still
+        // cascades in; removed only later when the hero collapses.
+        if !heroCollapsed {
+            cascade(badges, 0)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+        cascade(segment, 1)
+        cascade(searchField, 2)
+        cascade(resultsSection, 3)
     }
 
-    // MARK: Badges (personal best · Your Reel)
+    // MARK: Stat chips (personal best · Your Reel)
 
     private var badges: some View {
         HStack(spacing: Theme.Spacing.sm) {
@@ -248,42 +290,46 @@ struct SeedView: View {
         }
     }
 
-    // MARK: Start choice — two big category tiles ("start with an actor / movie")
+    // MARK: Start choice — an actor/movie toggle
 
-    private var modeToggle: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            cascade(choiceTile(.actor), 1)
-            cascade(choiceTile(.movie), 2)
+    // The two big category tiles from the old landing shrink to a compact
+    // segmented toggle: it names the choice and carries the category accents
+    // without eating the vertical room the hero + results now want. The active
+    // side fills solid with its category color (blue = actor, purple = movie) so
+    // the on/off state reads at a glance. Switching side re-points the search (and
+    // re-runs it if there's a query) but does not force-focus, so it never yanks
+    // the keyboard up on its own.
+    private var segment: some View {
+        HStack(spacing: 4) {
+            segmentButton(.actor)
+            segmentButton(.movie)
         }
+        .padding(4)
+        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .strokeBorder(Theme.Color.hairline, lineWidth: 1)
+        )
     }
 
-    private func choiceTile(_ kind: NodeKind) -> some View {
-        let selected = engine.seedKind == kind
-        return Button {
+    private func segmentButton(_ kind: NodeKind) -> some View {
+        Button {
+            // Only act on a real change: keeps the detent haptic honest (no tick
+            // for re-tapping the side you're already on) and avoids a redundant
+            // search kick.
+            guard engine.seedKind != kind else { return }
+            Haptics.selection()
             engine.seedKind = kind
-            searchFocused = true
             runSearch()
         } label: {
-            VStack(spacing: Theme.Spacing.xs) {
+            HStack(spacing: 6) {
                 Image(systemName: kind.symbol)
-                    .font(.title2)
+                    .font(.footnote.weight(.bold))
                 Text(kind == .actor ? "Actor" : "Movie")
-                    .font(.headline)
-                Text(kind == .actor ? "start with a name" : "start with a title")
-                    .font(.caption2)
-                    .opacity(0.65)
+                    .font(.subheadline.weight(.semibold))
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.md)
-            .foregroundStyle(Theme.Color.onAccent)
-            .background(kind.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.card)
-                    .strokeBorder(Theme.Color.ink, lineWidth: selected ? 2.5 : 0)
-            )
         }
-        .buttonStyle(.plain)
-        .animation(Theme.Motion.standard, value: selected)
+        .buttonStyle(SegmentButtonStyle(kind: kind, selected: engine.seedKind == kind))
     }
 
     // MARK: Search field (in-app styled, not a system search bar)
@@ -310,6 +356,10 @@ struct SeedView: View {
     }
 
     // MARK: Results — warm-tile rows with a category dot
+    //
+    // The flexible region: it fills the space between the search field and the
+    // bottom safe area, so when the keyboard raises that inset the list shrinks to
+    // fit and the field + first rows stay clear of the keys.
 
     @ViewBuilder private var resultsSection: some View {
         if results.isEmpty {
@@ -362,7 +412,7 @@ struct SeedView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, Theme.Spacing.xl)
+        .padding(.top, Theme.Spacing.lg)
     }
 
     // MARK: Search
@@ -381,7 +431,43 @@ struct SeedView: View {
     }
 
     private func start(with node: ChainNode) {
+        searchTask?.cancel()   // don't let a still-pending debounced search resume into the round
         Task { await engine.startGame(with: node) }
+    }
+}
+
+// MARK: - Segment toggle button style
+
+/// One side of the actor/movie toggle. A `ButtonStyle` (not a `.plain` button)
+/// for two reasons: it exposes `configuration.isPressed` for the press-down
+/// squish, and its `contentShape` makes the *entire* padded width tappable —
+/// `.plain` only hit-tests the opaque label glyphs, which is why the old toggle
+/// dropped touches that landed on the empty padding. The active side fills solid
+/// with its category accent (near-black glyphs on the pastel); the inactive side
+/// is a quiet, tinted glyph on the track. Both transitions animate.
+private struct SegmentButtonStyle: ButtonStyle {
+    let kind: NodeKind
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(selected ? Theme.Color.onAccent : kind.accent.opacity(0.9))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.sm + 2)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(selected ? kind.accent : Color.clear)
+                    .shadow(color: selected ? .black.opacity(0.14) : .clear, radius: 3, y: 1)
+            }
+            // The whole padded frame is the hit target, so a touch anywhere on the
+            // half registers — no more dead padding.
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(Theme.Motion.standard, value: configuration.isPressed)
+            .animation(Theme.Motion.emphasized, value: selected)
+            // Expose on/off to VoiceOver like a real segmented control, so the
+            // active side is announced "selected" rather than just looking filled.
+            .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
