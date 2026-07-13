@@ -22,12 +22,20 @@ and each turn is on a countdown — run out of time and the game ends.
 | Language | Swift 5.0 |
 | UI | SwiftUI |
 | State | Observation framework (`@Observable`, `@State`) |
-| Concurrency | Swift structured concurrency (`async`/`await`, `Task`, `@MainActor`) |
+| Concurrency | Swift structured concurrency (`async`/`await`, `Task`, `@MainActor`); builds with **MainActor-default isolation** (`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`) |
 | Min OS | iOS **26.2** deployment target (lower it in build settings for wider support) |
 | Platforms | iOS, iPadOS, macOS, visionOS |
 | Data | TMDB REST API (live) or a built-in stub graph (offline demo) |
 | Project | `movie-quiz.xcodeproj` (project, not workspace); app target + `movie-quizTests` unit-test target, single shared scheme |
 | File inclusion | `PBXFileSystemSynchronizedRootGroup` — drop `.swift` files under `movie-quiz/`, no `.pbxproj` edits |
+
+> **MainActor-default isolation shapes new code.** Because everything is
+> implicitly `@MainActor`, code that must run off the main actor opts *out*
+> explicitly: `CollectedEntity`/`CollectionSnapshot` are marked `nonisolated` so
+> their `Codable` conformances can encode on the background save queue, and
+> `GameEngine.init` resolves `Config.makeProvider()` in its body rather than as a
+> default argument (default arguments evaluate in a nonisolated context). Keep
+> this in mind for any new background work or `Sendable`/`Codable` value types.
 
 ## The core idea: bounded candidate sets
 
@@ -75,17 +83,21 @@ filmography(of:)                      // bounded set after an actor
 ```
 `DataProviderError` covers missing key / bad HTTP / decode failures.
 
-`filmography(of:)` drops **self-appearance credits** (TMDB `character` of "Self",
-incl. "Self - Host" etc.) — making-of featurettes, talk-show and documentary
-appearances are not film roles and must not be valid chain links (e.g. Jack
-Black's "Making of School of Rock" was being accepted for a typed "School of
-Rock").
+The TMDB implementation of `filmography(of:)` drops **self-appearance credits**
+(TMDB `character` of "Self", incl. "Self - Host" etc.) — making-of featurettes,
+talk-show and documentary appearances are not film roles and must not be valid
+chain links (e.g. Jack Black's "Making of School of Rock" was being accepted for
+a typed "School of Rock"). Note this lives in `TMDBProvider`, not the protocol —
+a new provider must apply the same rule itself (the stub graph simply has no
+such credits).
 
 - [`TMDBProvider.swift`](../movie-quiz/TMDBProvider.swift) — live over
   `https://api.themoviedb.org/3`. Supports both v4 Bearer tokens and v3 `api_key`
   query auth (`Config.usesBearerToken`). Private `Decodable` DTOs map TMDB JSON to
   the domain types. Seed search results are **sorted by TMDB `popularity`** so the
-  canonical record leads: TMDB returns a canonical record *plus* near-empty stubs
+  canonical record leads — the rule is `ActorRanking.rank`, a pure type that lives
+  in this same file (extracted so it's unit-testable without a live round-trip):
+  TMDB returns a canonical record *plus* near-empty stubs
   sharing the same name (two "Tom Cruise" entries — one with 94 credits, one with
   1), and seeding on a stub would reject films the actor was really in. Identity is
   the **TMDB id, never the name**, so same-name records are *not* collapsed
@@ -135,8 +147,12 @@ testable).
   run as a spoiler-free Connections-style card: score/points + a 🟦🟪 square chain
   (🟦 actor, 🟪 movie), fed to a SwiftUI `ShareLink` at game over.
 - [`Haptics.swift`](../movie-quiz/Haptics.swift) — UIKit feedback wrapper
-  (`correct(streak:)` ramps intensity with the chain, `wrong()`, `celebrate()`);
-  `#if os(iOS)` no-op elsewhere.
+  (`correct(streak:)` ramps intensity with the chain, `wrong()`, `celebrate()`,
+  `selection()` — the detent tick for the seed actor/movie toggle);
+  `#if os(iOS)` no-op elsewhere. Generators are long-lived and **pre-warmed**:
+  `Haptics.prepare()` + `SoundPlayer.warm()` are fired from `GameView`'s `.task`
+  before the first link, so the haptic, chime, and tile drop land on the same
+  frame instead of the first hit paying cold-engine latency.
 - [`Sound.swift`](../movie-quiz/Sound.swift) — `SoundPlayer` synthesises short
   sine tones via `AVAudioEngine` (no bundled assets); a correct link chimes a note
   cycled through a pentatonic scale *within one octave* — it varies link-to-link
@@ -236,7 +252,8 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   muted text still uses Apple's semantic `.secondary`/`.tertiary`.
 - `Theme` — token namespaces: `Color`, `Spacing`, `Radius`, `Motion` (incl.
   `drop`, the spring a new tile lands on; `screen`, the soft spring the
-  screen-to-screen carousel rides; and `intro`, the seed cold-launch reveal).
+  screen-to-screen carousel rides; `intro`, the seed cold-launch reveal; and
+  `cascade`, the springy wave a staggered group of siblings rises in on).
   Views reference these, never literals. `AnyTransition.screenPush(reduceMotion:)`
   (also here) is the router's directional page push — see the UI section.
 - `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/purple),
@@ -310,7 +327,10 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
     the controls (badges → segment → search → results) assemble beneath it via
     the shared `.appear(i)` stagger. Gated by the `introDone` binding from
     `ContentView` — a Play-again re-entry starts fully assembled, so the carousel
-    push never flashes a centered logo. Reduce Motion shows it assembled at once.
+    push never flashes a centered logo. Reduce Motion shows it assembled at once,
+    and while the intro is mid-flight a full-screen tap catcher lets a tap
+    anywhere **skip straight to the assembled screen** (the controls are inert
+    until assembly completes, so the catcher never eats a real tap).
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn, laid out around the
   **always-present software keyboard** (the dominant constraint of a typing game):
   compact chrome (sound · seconds · quit) + `TimerBar` up top, a centered **serif
@@ -381,6 +401,11 @@ implement `MovieDataProvider`; new screens read observable state and call method
 
 - Day to day: Xcode — ⌘B build, ⌘R run, ⌘U test. `#Preview` blocks drive canvas.
 - Run on an **iOS 26.x** simulator (the deployment target is 26.2), not 18.x.
+- **QA shortcuts (DEBUG only):** launch with `-uiDemoChain` to jump straight into
+  a mid-game `playing` state with a sample chain, or `-uiDemoGameOver` for the
+  game-over summary — no typing required to inspect those screens. Wired in
+  `ContentView.onAppear` to `GameEngine.loadDemoChain()`/`loadDemoGameOver()`
+  (also used by the `#Preview`s); compiled out of release builds.
 - Command line (see `CLAUDE.md` for full `xcodebuild` invocations):
   ```bash
   xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \

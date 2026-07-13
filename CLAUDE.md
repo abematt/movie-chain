@@ -17,6 +17,10 @@ that alternates actor → movie → actor → movie …, where each link must be
 
 - Bundle ID: `abe.movie-quiz`
 - Language: Swift 5.0, SwiftUI + Observation (`@Observable`), iOS 17+ APIs
+- Builds with **MainActor-default isolation** (`SWIFT_DEFAULT_ACTOR_ISOLATION =
+  MainActor`) — off-main-actor code must opt out explicitly (e.g. the
+  `nonisolated` `Codable` values in `Collection.swift`; resolve `@MainActor`
+  defaults in init bodies, not default arguments)
 - Deployment target: iOS 26.2 (high — only installs on a 26.x runtime; lower it
   in build settings if broader device/simulator support is wanted)
 - Supported platforms: iOS, iPad, macOS, visionOS
