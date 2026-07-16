@@ -35,16 +35,25 @@ struct TMDBProvider: MovieDataProvider {
         return req
     }
 
-    private func fetch<T: Decodable>(_ type: T.Type, path: String, query: [URLQueryItem] = []) async throws -> T {
+    private func fetch<T: Decodable & Sendable>(_ type: T.Type, path: String, query: [URLQueryItem] = []) async throws -> T {
         let req = try request(path: path, query: query)
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw DataProviderError.badResponse(-1) }
         guard (200...299).contains(http.statusCode) else { throw DataProviderError.badResponse(http.statusCode) }
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
-            throw DataProviderError.decoding
-        }
+        // Decode OFF the main actor. The provider is MainActor-isolated (project
+        // default), so decoding here would parse every response on the main
+        // thread — including the ~18 concurrent cast fetches that build the deal
+        // pool and a popular actor's 100+ credit filmography — stuttering the
+        // seed→play transition. This nonisolated async helper runs the decode on
+        // the cooperative pool instead.
+        return try await Self.decode(T.self, from: data)
+    }
+
+    /// Off-main JSON decode. `nonisolated async` so it runs on the concurrency
+    /// thread pool, not the caller's (Main) actor.
+    nonisolated private static func decode<T: Decodable & Sendable>(_ type: T.Type, from data: Data) async throws -> T {
+        do { return try JSONDecoder().decode(type, from: data) }
+        catch { throw DataProviderError.decoding }
     }
 
     // MARK: MovieDataProvider
@@ -78,6 +87,66 @@ struct TMDBProvider: MovieDataProvider {
         return page.results
             .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
             .map { $0.toMovie() }
+    }
+
+    func popularMovies() async throws -> [Movie] {
+        // The most-*watched* films of all time, not "trending now": TMDB's
+        // `popular` is a right-now metric that surfaces viral-but-obscure titles,
+        // so we use `discover` sorted by **vote count** — the most-rated films are
+        // the ones the most people have actually seen (Inception, The Dark Knight,
+        // Fight Club, …). Two pages (~40) keeps shuffling fresh.
+        try await mostWatchedMovies(pages: 2)
+    }
+
+    func popularActors() async throws -> [Person] {
+        // TMDB has no all-time "famous people" list — `person/popular` is the same
+        // trending metric that surfaces unrecognizable names. So derive the actor
+        // pool from the **casts of the most-watched films**: the top-billed names
+        // of the movies everyone has seen are exactly the recognizable actors, and
+        // it keeps the actor pool consistent with the movie pool. Deduped by id
+        // (highest popularity wins), most-popular first.
+        let source = try await mostWatchedMovies(pages: 1).prefix(Config.seedActorSourceMovies)
+        // Capture the tunable on the main actor; the task-group children are
+        // nonisolated and can't read MainActor-isolated `Config` statics directly.
+        let topBilled = Config.seedTopBilledPerMovie
+        var byId: [Int: Person] = [:]
+        try await withThrowingTaskGroup(of: [Person].self) { group in
+            for movie in source {
+                group.addTask {
+                    // A single film's failed credits fetch shouldn't sink the pool.
+                    let cast = (try? await self.cast(of: movie)) ?? []
+                    return Array(cast.prefix(topBilled))
+                }
+            }
+            for try await people in group {
+                for p in people {
+                    if let existing = byId[p.id], (p.popularity ?? 0) <= (existing.popularity ?? 0) { continue }
+                    byId[p.id] = p
+                }
+            }
+        }
+        return byId.values
+            .filter { ($0.popularity ?? 0) > 0 }
+            .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
+    }
+
+    /// The most-rated films (a proxy for most-watched), `pages` of ~20 each, in
+    /// vote-count order. Shared by the movie pool and the derived-actor pool.
+    private func mostWatchedMovies(pages: Int) async throws -> [Movie] {
+        var out: [Movie] = []
+        for page in 1...max(1, pages) {
+            let resp: MovieSearchResponse = try await fetch(
+                MovieSearchResponse.self,
+                path: "discover/movie",
+                query: [
+                    URLQueryItem(name: "include_adult", value: "false"),
+                    URLQueryItem(name: "sort_by", value: "vote_count.desc"),
+                    URLQueryItem(name: "page", value: "\(page)"),
+                ]
+            )
+            out.append(contentsOf: resp.results.map { $0.toMovie() })
+        }
+        return out
     }
 
     func cast(of movie: Movie) async throws -> [Person] {
@@ -144,7 +213,10 @@ enum ActorRanking {
 
 // MARK: - DTOs
 
-private struct PersonSearchResponse: Decodable {
+// `nonisolated` so their `Decodable` conformances aren't MainActor-isolated and
+// can be decoded on the off-main `TMDBProvider.decode` helper (mirrors the
+// `nonisolated` Codable values in `Collection.swift`).
+nonisolated private struct PersonSearchResponse: Decodable {
     /// Decodes each `known_for` entry structurally without reading its fields —
     /// we only need the array's presence/count as evidence the person is real.
     struct KnownForItem: Decodable {}
@@ -159,11 +231,11 @@ private struct PersonSearchResponse: Decodable {
     let results: [Item]
 }
 
-private struct MovieSearchResponse: Decodable {
+nonisolated private struct MovieSearchResponse: Decodable {
     let results: [MovieDTO]
 }
 
-private struct MovieCreditsResponse: Decodable {
+nonisolated private struct MovieCreditsResponse: Decodable {
     struct CastMember: Decodable {
         let id: Int
         let name: String
@@ -173,11 +245,11 @@ private struct MovieCreditsResponse: Decodable {
     let cast: [CastMember]
 }
 
-private struct PersonCreditsResponse: Decodable {
+nonisolated private struct PersonCreditsResponse: Decodable {
     let cast: [MovieDTO]
 }
 
-private struct MovieDTO: Decodable {
+nonisolated private struct MovieDTO: Decodable {
     let id: Int
     let title: String?
     let release_date: String?

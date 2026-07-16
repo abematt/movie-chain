@@ -18,6 +18,9 @@ import SwiftUI
 
 struct CollectionView: View {
     let store: CollectionStore
+    /// Personal best chain length, surfaced here now that it's off the home
+    /// screen. `0` (never played) hides the line.
+    var bestChain: Int = 0
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -53,6 +56,7 @@ struct CollectionView: View {
                             regulars
                             filterControl
                             grids
+                            TMDBAttribution()
                         }
                         .padding(.horizontal)
                         .padding(.vertical, Theme.Spacing.md)
@@ -101,6 +105,17 @@ struct CollectionView: View {
             HStack(spacing: Theme.Spacing.sm) {
                 countCard(.actor, store.actorCount, "Actors")
                 countCard(.movie, store.movieCount, "Movies")
+            }
+
+            if bestChain > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "trophy.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.Color.good)
+                    Text("Best chain · \(bestChain) links")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -273,18 +288,54 @@ struct CollectionView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "film.stack")
-                .font(.system(size: 40))
-                .foregroundStyle(.tertiary)
-            Text("Your reel is empty")
-                .font(.title3.weight(.semibold))
-            Text("Finish a chain and every actor and movie you named lands here.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "film.stack")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.tertiary)
+                Text("Your reel is empty")
+                    .font(.title3.weight(.semibold))
+                Text("Finish a chain and every actor and movie you named lands here.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Spacer()
+            // Attribution stays reachable even before the first chain is logged.
+            TMDBAttribution()
         }
         .padding(Theme.Spacing.xl)
+    }
+}
+
+// MARK: - TMDB attribution
+//
+// TMDB's API Terms of Use require crediting them as the data source in-app, with
+// their logo and the standard non-endorsement disclaimer. This lives in the Reel
+// sheet — the calmest secondary surface — so it stays out of the deliberately
+// play-first home while remaining visible in the app (compliant: the terms only
+// require it be shown, not that it be on the home screen).
+//
+// The logo is TMDB's official "long" gradient wordmark, added to the asset
+// catalog as a vector SVG (`TMDBLogo`, from themoviedb.org/about/logos-attribution).
+// Its brand gradient reads on both the warm-paper and dark canvases, so it's
+// rendered as-is (full color, not tinted).
+struct TMDBAttribution: View {
+    var body: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            Divider().overlay(Theme.Color.hairline)
+            Image("TMDBLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 14)
+                .accessibilityLabel("The Movie Database (TMDB)")
+            Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, Theme.Spacing.sm)
     }
 }
 

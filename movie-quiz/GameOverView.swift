@@ -38,7 +38,7 @@ struct GameOverView: View {
             if engine.isNewBest { Haptics.celebrate() }
         }
         .sheet(isPresented: $showReel) {
-            CollectionView(store: collection)
+            CollectionView(store: collection, bestChain: engine.bestChain)
         }
     }
 

@@ -45,6 +45,26 @@ enum Config {
     /// Seconds allowed per turn before the game ends.
     static let secondsPerTurn = 30
 
+    // MARK: Seed deal
+
+    /// Probability (0…1) that a dealt home-screen start is an *actor* rather than
+    /// a movie. Actor-leaning because actor→movie is the canonical opening and the
+    /// famous-actor pool is deeper; movies still surface often enough to show the
+    /// purple accent and vary the first move.
+    static let seedActorBias = 0.6
+
+    /// How many recently-dealt starts to remember and avoid, so repeated shuffles
+    /// don't keep handing back the same few faces. Small relative to the pool.
+    static let seedRecentWindow = 8
+
+    /// How many of the most-watched films to mine for the recognizable-actor pool
+    /// (their top-billed casts become the actors dealt). Higher = deeper pool but
+    /// more first-load cast fetches. See `TMDBProvider.popularActors`.
+    static let seedActorSourceMovies = 18
+
+    /// Top-billed cast taken from each source film — the leads, not the long tail.
+    static let seedTopBilledPerMovie = 5
+
     /// Base for TMDB-hosted images (headshots/posters shown in the collection).
     /// Full URL = base + size + path, e.g. `.../t/p/w185/abc.jpg`.
     static let imageBaseURL = "https://image.tmdb.org/t/p/"
@@ -59,6 +79,19 @@ enum Config {
     }
 
     /// Chooses the live provider if a token is set, otherwise the demo stub.
+    ///
+    /// TODO(scale/security): the TMDB token is bundled in the shipped app (see
+    /// `tmdbToken` above), so it ships inside the `.ipa` and can be extracted
+    /// from the binary. Two consequences to fix before any real launch —
+    /// especially a paid/freemium tier:
+    ///   1. Every install shares this one key, so TMDB's per-key rate limit
+    ///      (~50 req/s) is a global ceiling across all players; the per-turn
+    ///      cast/filmography fetches will throttle at scale.
+    ///   2. A leaked key can be abused, getting our account rate-limited/banned.
+    /// The fix is a thin server-side proxy that holds the key and caches the
+    /// (near-static) cast/filmography responses, with the app pointing at that
+    /// proxy instead of TMDB directly. Deliberately NOT doing this yet — noting
+    /// it here so it's not forgotten. Revenue is the trigger to actually build it.
     static func makeProvider() -> MovieDataProvider {
         hasTMDBToken ? TMDBProvider() : StubProvider()
     }

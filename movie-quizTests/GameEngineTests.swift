@@ -27,6 +27,8 @@ final class GameEngineTests: XCTestCase {
 
         func searchActors(_ query: String) async throws -> [Person] { [] }
         func searchMovies(_ query: String) async throws -> [Movie] { [] }
+        func popularActors() async throws -> [Person] { [] }
+        func popularMovies() async throws -> [Movie] { [] }
         func cast(of movie: Movie) async throws -> [Person] { [] }
 
         func filmography(of actor: Person) async throws -> [Movie] {
@@ -79,5 +81,47 @@ final class GameEngineTests: XCTestCase {
         await engine.submit("Bumblebee Ballad")
         XCTAssertEqual(engine.score, 1)
         XCTAssertEqual(engine.chain.last?.id, "m202")
+    }
+
+    // MARK: Seed-pool per-side load / retry
+
+    /// Counts pool fetches and can fail the actor side for the first N calls, to
+    /// exercise the per-side load: a failed/empty side must NOT be cached as
+    /// loaded (so it retries), while an already-loaded side must NOT be re-fetched.
+    @MainActor
+    final class CountingPoolProvider: MovieDataProvider {
+        private(set) var actorCalls = 0
+        private(set) var movieCalls = 0
+        /// The actor side returns empty (simulating a rate-limited/failed derive)
+        /// until this many calls have been made.
+        var actorsSucceedFromCall = 2
+
+        func searchActors(_ query: String) async throws -> [Person] { [] }
+        func searchMovies(_ query: String) async throws -> [Movie] { [] }
+        func cast(of movie: Movie) async throws -> [Person] { [] }
+        func filmography(of actor: Person) async throws -> [Movie] { [] }
+
+        func popularActors() async throws -> [Person] {
+            actorCalls += 1
+            return actorCalls < actorsSucceedFromCall ? [] : [Person(id: 1, name: "Famous Actor")]
+        }
+        func popularMovies() async throws -> [Movie] {
+            movieCalls += 1
+            return [Movie(id: 10, title: "Famous Movie", year: 2001)]
+        }
+    }
+
+    func testPartialPoolLoadRetriesFailedSideOnly() async {
+        let provider = CountingPoolProvider()   // actor side fails once, then succeeds
+        let engine = GameEngine(provider: provider)
+
+        await engine.prepareSeeds()
+
+        // The movie side landed on the first attempt and must not be re-fetched…
+        XCTAssertEqual(provider.movieCalls, 1, "an already-loaded side must not be re-fetched")
+        // …while the empty actor side must have been retried (not cached as loaded).
+        XCTAssertGreaterThanOrEqual(provider.actorCalls, 2, "a failed/empty side must be retried")
+        // A start is dealt regardless (movie-only until actors land, then either).
+        XCTAssertNotNil(engine.dealtSeed)
     }
 }

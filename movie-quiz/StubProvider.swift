@@ -70,6 +70,16 @@ struct StubProvider: MovieDataProvider {
             .sorted { $0.title < $1.title }
     }
 
+    func popularActors() async throws -> [Person] {
+        // The whole stub cast is "popular" — it's a hand-picked graph of famous
+        // names — so deal from all of it, name-sorted for a stable pool order.
+        Self.people.values.sorted { $0.name < $1.name }
+    }
+
+    func popularMovies() async throws -> [Movie] {
+        Self.movies.values.map(\.movie).sorted { $0.title < $1.title }
+    }
+
     func cast(of movie: Movie) async throws -> [Person] {
         Self.movies[movie.id]?.cast ?? []
     }

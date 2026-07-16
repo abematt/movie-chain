@@ -15,6 +15,12 @@ protocol MovieDataProvider: Sendable {
     func searchActors(_ query: String) async throws -> [Person]
     func searchMovies(_ query: String) async throws -> [Movie]
 
+    /// The recognizable-name pools the home screen deals a random start from —
+    /// popularity-ranked so the dealt seed is always a familiar face/title, never
+    /// an obscure one. Fetched once and cached by the engine.
+    func popularActors() async throws -> [Person]
+    func popularMovies() async throws -> [Movie]
+
     /// The bounded candidate sets used for validation during play.
     func cast(of movie: Movie) async throws -> [Person]
     func filmography(of actor: Person) async throws -> [Movie]

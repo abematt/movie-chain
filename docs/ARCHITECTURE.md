@@ -77,11 +77,42 @@ All source is in [`movie-quiz/`](../movie-quiz/).
 ### Data abstraction — [`MovieDataProvider.swift`](../movie-quiz/MovieDataProvider.swift)
 The engine knows **only this protocol**, never a concrete source:
 ```swift
-searchActors(_:) / searchMovies(_:)   // global — seed node ONLY
+searchActors(_:) / searchMovies(_:)   // global — seed SEARCH (opt-in "pick your own")
+popularActors() / popularMovies()     // popularity pool — the home-screen DEAL
 cast(of:)                             // bounded set after a movie
 filmography(of:)                      // bounded set after an actor
 ```
 `DataProviderError` covers missing key / bad HTTP / decode failures.
+
+`popularActors`/`popularMovies` back the home screen's *dealt start* (see
+`SeedDeal` and `SeedView` below), and are tuned for **recognizability**, not
+recency. TMDB's `*/popular` endpoints are a *trending-right-now* metric that
+surfaces viral-but-obscure titles and unfamiliar (often international/TV) people;
+Letterboxd's "popular" instead reflects member watch activity, which we can't
+access (their API is partner-only). So we approximate "most-*watched* of all time"
+with the closest public signal — **vote count**:
+- **Movies** come from `discover/movie?sort_by=vote_count.desc` (the most-rated
+  films ≈ the most widely seen), two pages (~40).
+- **Actors** have no all-time endpoint, so the pool is **derived from the casts of
+  the most-watched films**: the top-billed few (`Config.seedTopBilledPerMovie`) of
+  the top `Config.seedActorSourceMovies` titles, deduped by id (highest popularity
+  wins), most-popular first. The leads of the films everyone's seen *are* the
+  recognizable actors, and the actor/movie pools stay consistent.
+
+The cast fetches run **concurrently** (`withThrowingTaskGroup`) so the whole pool
+resolves in well under a second — it loads from `SeedView`'s `.task` on the first
+frame, overlapping the cold-launch intro, and is cached for the session
+(`poolLoaded`) so shuffles/resumes are instant. The stub deals from its whole
+hand-picked graph.
+
+> **JSON decode runs off the main actor.** `TMDBProvider` is MainActor-isolated
+> (project default), so a naive `JSONDecoder().decode` parses on the main thread.
+> That was invisible for one-at-a-time fetches but became a real hitch once the
+> deal fired ~18 concurrent cast decodes and popular seeds carried 100+ credit
+> filmographies — the decode stuttered the seed→play transition. `fetch` now routes
+> decoding through a `nonisolated static func decode(...) async` helper (runs on the
+> cooperative pool, off main), and the private DTOs are `nonisolated` so their
+> `Decodable` conformance isn't MainActor-bound (same pattern as `Collection.swift`).
 
 The TMDB implementation of `filmography(of:)` drops **self-appearance credits**
 (TMDB `character` of "Self", incl. "Self - Host" etc.) — making-of featurettes,
@@ -132,6 +163,17 @@ clearing a threshold (default **0.72**), else `nil`.
   boosted scores tie, the higher *raw* Levenshtein similarity wins (the title with
   fewer extra words), so the result never depends on candidate order.
 
+### Seed deal — [`SeedDeal.swift`](../movie-quiz/SeedDeal.swift)
+Pure, stateless (same family as `FuzzyMatch`/`ActorRanking`/`Scoring`), so the
+home-screen deal policy is unit-tested with a seeded RNG — no network.
+`pick(actors:movies:recentIds:actorBias:using:)` deals a *fresh, familiar* start:
+- **familiar** is the caller's job (it passes the popularity pools);
+- **fresh** is this type's job — it avoids `ChainNode.id`s in `recentIds` (falling
+  back to the full pool for a kind if *all* of it is recent, so a tiny pool never
+  deals nothing), and mixes actors/movies by `actorBias` (falling back to the
+  other kind if the chosen pool is empty). Returns `nil` only if both pools are
+  empty. Tunables live in `Config` (`seedActorBias = 0.6`, `seedRecentWindow = 8`).
+
 ### Scoring & feedback (the gamification layer)
 The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and
@@ -150,9 +192,16 @@ testable).
   (`correct(streak:)` ramps intensity with the chain, `wrong()`, `celebrate()`,
   `selection()` — the detent tick for the seed actor/movie toggle);
   `#if os(iOS)` no-op elsewhere. Generators are long-lived and **pre-warmed**:
-  `Haptics.prepare()` + `SoundPlayer.warm()` are fired from `GameView`'s `.task`
-  before the first link, so the haptic, chime, and tile drop land on the same
-  frame instead of the first hit paying cold-engine latency.
+  `Haptics.prepare()` + `SoundPlayer.warm()` are fired from `SeedView`'s
+  `warmFeedbackWhenIdle()` — on the **home screen, once its entrance animation has
+  settled**, not from `GameView`. `AVAudioEngine.start()` (and the audio-session
+  activation) briefly **block the main actor**, and firing them from `GameView`'s
+  `.task` landed that block right on the seed→play push, hitching the transition.
+  Warming on the idle seed screen keeps the cost off every animation; `GameView`'s
+  `.task` now only raises the keyboard, and only *after* the push settles (a focus
+  set mid-push triggers keyboard-driven safe-area relayout that fights the spring).
+  If a player somehow plays before the warm fires, `SoundPlayer.play`'s lazy
+  `startIfNeeded` is the safety net (first chime just pays the latency once).
 - [`Sound.swift`](../movie-quiz/Sound.swift) — `SoundPlayer` synthesises short
   sine tones via `AVAudioEngine` (no bundled assets); a correct link chimes a note
   cycled through a pentatonic scale *within one octave* — it varies link-to-link
@@ -182,10 +231,33 @@ function of it.
 - **Private:** injected `provider`, current `candidates`, `usedIds: Set<String>`
   (no-repeat rule), the `countdownTask`, and a monotonic `generation` token that
   guards async candidate loads (see below).
-- **Flow:** `search` (seed only) → `startGame(with:)` → `submit(_:)` per turn →
-  `reset()`. `loadCandidates(for:)` refreshes the bounded set after each accepted
-  link. `quit()` ends the run in place — it routes through `endGame()` to the
-  game-over summary (committing records) rather than resetting to the seed picker.
+- **Seed deal:** the home screen leads with a *dealt* start, not a search. The
+  engine caches the popularity pools (`popularActors`/`popularMovies`, loaded
+  once), owns the `dealtSeed: ChainNode?` the home renders, and keeps a bounded
+  `recentSeedIds` ring buffer. `prepareSeeds()` (called from `SeedView`'s `.task`
+  on every appearance) loads the pool then deals; `shuffleSeed()` deals on demand
+  (Shuffle button); `dealFreshOnResume()` re-deals when the app returns from the
+  background on the home screen (`ContentView` scenePhase). All route through the
+  private `deal()`, which delegates the *policy* to the pure `SeedDeal.pick` and
+  only owns the pool cache + recent buffer. Search (`search`) remains as the
+  opt-in "pick your own start" path.
+  - **Pool-load robustness (per-side):** the actor and movie pools track load
+    state *independently* (`actorsLoaded` / `moviesLoaded`; `poolReady` = either,
+    `poolComplete` = both). `loadSeedPoolsIfNeeded` fetches only the side(s) not
+    yet loaded, concurrently, and marks a side loaded **only when it returns
+    entries** — an empty result (a failed/rate-limited fetch, incl. the
+    derived-actor task group swallowing per-cast failures) leaves that side
+    unloaded so it **retries**, rather than caching a partial *movie-only* pool for
+    the whole session (the derive-from-casts pool is exactly what a shared-key rate
+    limit throttles first — see `Config.makeProvider`'s TODO). A *cancelled* load
+    (leaving the seed screen) commits nothing. `prepareSeeds` retries with backoff
+    until both sides land; `shuffleSeed`/`dealFreshOnResume` deal from whatever's
+    ready and quietly refill a missing side in the background.
+- **Flow:** `prepareSeeds`/`shuffleSeed` (deal the seed) → `startGame(with:)` →
+  `submit(_:)` per turn → `reset()`. `loadCandidates(for:)` refreshes the bounded
+  set after each accepted link. `quit()` ends the run in place — it routes through
+  `endGame()` to the game-over summary (committing records) rather than resetting
+  to the seed picker.
 - **Timer correctness:** the countdown is a cancellable `Task`. `submit` **stops
   the clock during the candidate fetch** so a slow network load can't fire
   game-over on an answer that was submitted in time, and re-checks `phase ==
@@ -228,10 +300,17 @@ pure-value + observable-store split as the rest of the app:
   that single condition encodes "successful combinations only; seeds count once a
   link lands; nothing logged on a bare seed".
 - `CollectionView` — the grid screen, presented as a `.sheet` from `SeedView`
-  ("Your Reel · N") and `GameOverView` ("+N new to your Reel"). Pure count stats
-  (no rarity/obscurity): a hero total + blue/purple category split, a
-  chains/longest/this-week stat strip, "your regulars" (most-logged), a filter,
-  and the tile grid. Tiles stream art via `AsyncImage` from
+  (a top-trailing corner pill) and `GameOverView` ("+N new to your Reel"). Takes
+  `bestChain:` and shows **personal best** here (a trophy line under the category
+  split) now that it's off the home hero — this is where "best + Reel live in one
+  place." Pure count stats (no rarity/obscurity): a hero total + blue/purple
+  category split, "your regulars" (most-logged), a filter, and the tile grid. Also
+  hosts the **`TMDBAttribution`** view (TMDB logo + the required non-endorsement
+  disclaimer) in both its populated and empty states — TMDB's API terms require
+  in-app attribution. Because of that, the seed-screen Reel pill is shown
+  **regardless of `collection.total`** (count hidden when 0): a first-run player is
+  already being served TMDB-powered dealt seeds, so the attribution must be
+  reachable before any chain is logged — gating the pill on `total > 0` hid it. Tiles stream art via `AsyncImage` from
   `Config.imageURL(path:)` (system-cached, never stored on disk); no path → the
   category-tinted typographic placeholder. Motion polish: art **fades in** as it
   streams (the phase-based `AsyncImage(transaction:)`), the hero numbers **roll up
@@ -284,6 +363,13 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   `movie_quizApp`; **no `.fontDesign`** — the look pairs the system serif (wordmark,
   game-over number) with the default sans for UI. The accent is defined for
   light/dark in `Assets.xcassets/AccentColor` (near-black / off-white).
+- **App icon** (`Assets.xcassets/AppIcon.appiconset/icon-1024.png`) distills the
+  `ChainStack`/lockup identity: a bold zigzag stack of alternating actor-blue /
+  movie-purple rounded tiles on ink. Rendered from the same palette via a
+  CoreGraphics script (kept in the scratchpad, not the repo — regenerate if the
+  mark changes); a single 1024 universal iOS entry. The bitmap is **opaque
+  (no alpha channel)** — iOS app icons with alpha are rejected at archive/upload —
+  so the render uses a `noneSkipLast` context; verify with `sips -g hasAlpha`.
 
 ### UI — SwiftUI, routed by phase
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
@@ -301,36 +387,41 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   above `SeedView` (recreated on each `.seed` re-entry), so every launch after the
   first, and every Play-again re-entry, correctly starts assembled.
 - [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
-  **hero + live-search home**: an ambient mini-chain lockup + **serif wordmark** +
-  tagline as the hero, a best-chain badge, **a "Your Reel · N" button that opens
-  the collection sheet**, a slim **Actor / Movie segment** (the selected side
-  filled) that re-points the search, an in-app-styled search field (debounced,
-  **tap-to-focus** — no auto-keyboard on launch), and warm-tile result rows with a
-  category dot that reveal inline. Built on the shared design system over a plain
-  canvas, rather than a stock `NavigationStack`/`List`/`.searchable`, which read as
-  an iOS-Settings screen.
-  - **Keyboard-aware collapse** — `heroCollapsed` (`searchFocused || !query.isEmpty`)
-    folds the mini-chain, tagline, and stat chips away and tightens the top padding
-    the moment the player engages the search (keying it to the query too keeps the
-    hero compact after an interactive scroll-dismiss, so the list never jumps on
-    focus loss mid-browse). The results list is the flexible region
-    (`maxHeight: .infinity`), so SwiftUI's automatic keyboard avoidance shrinks it
-    and the field + first rows stay clear of the keys. The wordmark stays — it's the
-    identity. iPhone is locked to **portrait** (project setting) — the whole game is
-    portrait-designed (the play screen docks the keyboard as its primary layout), and
-    in landscape the fixed hero above a flexible results list can't clear the keyboard;
-    iPad keeps all orientations.
-  - **Cold-launch intro** (once ever, on the first cold launch only): the title lockup
-    starts centered (an animatable top spacer, no `matchedGeometryEffect`), its
-    mini-chain drops in tile-by-tile via `TileBuild` (echoing the in-game Tetris
-    landing), then on `Theme.Motion.intro` the lockup rises to its header rest and
-    the controls (badges → segment → search → results) assemble beneath it via
-    the shared `.appear(i)` stagger. Gated by the `introDone` binding from
-    `ContentView` — a Play-again re-entry starts fully assembled, so the carousel
-    push never flashes a centered logo. Reduce Motion shows it assembled at once,
-    and while the intro is mid-flight a full-screen tap catcher lets a tap
-    anywhere **skip straight to the assembled screen** (the controls are inert
-    until assembly completes, so the catcher never eats a real tap).
+  home that leads with a **dealt start**, not a search box (that's what made it
+  read as a movie-logging app). Layout: the mini-chain lockup + **serif wordmark**
+  + tagline hero, then the signature control — a single ink **"Start with ·
+  ⟨name⟩" button** (Play and the seed fused into one; the dealt seed is a category
+  dot + name, blue = actor / purple = movie) that starts the round on tap — a
+  **"→ Name a movie they were in" hint** (reuses `NodeKind.prompt`), and a
+  **Shuffle** ghost button. A quiet **"or search for your own start"** link drops
+  down to the (now demoted) search flow, and **Your Reel** shrinks to a single
+  top-trailing corner pill (shown once the player has logged art; personal best
+  folded into that sheet via `CollectionView(bestChain:)`, off the hero).
+  - **The deal** is owned by the engine (`engine.dealtSeed`, dealt on every
+    appearance and on resume — see the engine's "Seed deal" note). The name lives
+    on **one line, auto-sized to fit** (`lineLimit(1)` + `minimumScaleFactor`, like
+    the in-game `NodeTile`) so the button never reflows — which is what lets
+    Shuffle animate as one clean **deal** (`AnyTransition.dealDrop`: old start
+    drops out downward, new drops in from above on `Theme.Motion.drop`, keyed by
+    `.id(seed.id)`) instead of a janky slot-machine roll that changed height. The
+    hint crossfades (`contentTransition(.opacity)`); Reduce Motion → plain swap.
+    The button chrome ("START WITH") and frame stay fixed while only the inner
+    seed content deals in/out, so the button itself never jumps. Disabled with a
+    "Dealing…" placeholder until the first deal lands (pool still loading).
+  - **Search flow** (`searching` state, behind the link) reuses the prior pieces —
+    the Actor/Movie **segment**, the in-app-styled debounced field (auto-focused
+    on open), and warm-tile result rows — with a "‹ Deal a start" back affordance.
+    It's the flexible region (`maxHeight: .infinity`) so keyboard avoidance shrinks
+    it and the field stays clear of the keys. iPhone is **portrait** (project
+    setting); iPad keeps all orientations.
+  - **Cold-launch intro** (once ever): the lockup starts centered (an animatable
+    top spacer), its mini-chain drops in tile-by-tile via `TileBuild`, then on
+    `Theme.Motion.intro` the lockup rises to its header rest and the deal controls
+    (start button → hint → shuffle → search link) assemble beneath it via the
+    `ControlReveal` cascade. Gated by the `introDone` binding from `ContentView` —
+    a Play-again re-entry starts fully assembled. Reduce Motion shows it at once,
+    and a full-screen tap catcher lets a tap **skip to the assembled screen** (the
+    controls are inert until assembly, so the catcher never eats a real tap).
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn, laid out around the
   **always-present software keyboard** (the dominant constraint of a typing game):
   compact chrome (sound · seconds · quit) + `TimerBar` up top, a centered **serif
@@ -416,9 +507,13 @@ implement `MovieDataProvider`; new screens read observable state and call method
   matcher (incl. the Roman→Arabic sequel fix), `ActorRankingTests` locks
   `ActorRanking.rank` (canonical-first, homonyms preserved, stubs dropped),
   `ScoringTests` locks the point math + flame-tier thresholds,
-  `GameEngineTests` locks the stale-load safety with a gated stub provider, and
+  `GameEngineTests` locks the stale-load safety with a gated stub provider (and
+  the per-side seed-pool retry: a failed/empty side isn't cached as loaded and is
+  retried, a loaded side isn't re-fetched),
   `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
-  counted once a link lands, dedup by id, `timesLogged` per-chain). Run with ⌘U
+  counted once a link lands, dedup by id, `timesLogged` per-chain), and
+  `SeedDealTests` locks the home-screen deal policy (actor/movie bias, recent-id
+  avoidance with full-pool fallback, other-kind fallback, empty→nil). Run with ⌘U
   or the `xcodebuild … test` invocation above.
 
 ---

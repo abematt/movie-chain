@@ -62,17 +62,18 @@ struct GameView: View {
         .background(Theme.Color.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) { answerDock }
         .task {
-            // Warm the feedback paths before the first link so the haptic, chime,
-            // and tile drop land on the same frame instead of the first hit lagging
-            // on a cold taptic/audio engine (Apple fluid-interface: kill latency).
-            Haptics.prepare()
-            if soundEnabled { SoundPlayer.shared.warm() }
-
-            // Defer the focus request a beat. On a cold launch the field isn't in
-            // the responder chain yet when `task` first runs, so a synchronous
-            // focus set is silently dropped and the keyboard never appears until
-            // relaunch. One runloop hop lets the field become first responder.
-            try? await Task.sleep(for: .milliseconds(100))
+            // Feedback warm-up (haptics + audio) now happens on the seed screen,
+            // OFF this transition — `AVAudioEngine.start()` briefly blocks the main
+            // actor and was hitching the seed->play push. Here we only raise the
+            // keyboard, and only *after* the push has settled: focusing mid-push
+            // triggers keyboard-driven safe-area relayout that fights the spring.
+            // ~550ms clears `Theme.Motion.screen` and also lets the field enter the
+            // responder chain (a synchronous focus set on a cold launch is dropped).
+            try? await Task.sleep(for: .milliseconds(550))
+            // Bail if the view went away during the wait (e.g. a fast Quit) —
+            // `try?` swallows the sleep's cancellation, so without this the focus
+            // set would fire on whatever screen replaced us and jump the keyboard.
+            guard !Task.isCancelled else { return }
             fieldFocused = true
         }
         .onChange(of: engine.score) { old, new in

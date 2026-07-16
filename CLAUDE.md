@@ -71,9 +71,13 @@ are `Identifiable`/`Hashable`/`Sendable` and carry a stable TMDB id, which is
 what makes validation and the no-repeat dedup exact.
 
 **Data layer** — everything speaks the `MovieDataProvider` protocol
-(`MovieDataProvider.swift`): global `searchActors`/`searchMovies` (used only to
-pick the seed node) plus `cast(of:)` and `filmography(of:)` (the *bounded
-candidate sets* used to validate every subsequent link).
+(`MovieDataProvider.swift`): global `searchActors`/`searchMovies` (the opt-in
+"pick your own start" search), `popularActors`/`popularMovies` (the deal pool —
+tuned for *recognizability*: movies are the most-*watched* of all time via TMDB
+`discover?sort_by=vote_count.desc`, actors are derived from those films' top-billed
+casts, since TMDB's trending `*/popular` surfaces obscure/unfamiliar names), plus
+`cast(of:)` and `filmography(of:)` (the *bounded candidate sets* used to validate
+every subsequent link).
 - `TMDBProvider.swift` — live implementation over the TMDB REST API.
 - `StubProvider.swift` — a small hardcoded movie/cast graph so the game is
   playable with no network/key. `Config.makeProvider()` picks TMDB when a token
@@ -91,11 +95,16 @@ Malkovic" resolve correctly without global fuzzy search or false positives.
 `phase` (seed → playing → gameOver), the `chain`, `score` (chain length) +
 `points` (base + speed + obscurity bonuses), per-turn countdown, the current
 candidate set, `usedIds` (no-repeat rule), persisted `bestChain`/`bestPoints`,
-and the `missedAnswer` near-miss. Every entity resolves to a stable TMDB id, so
+and the `missedAnswer` near-miss. It also owns the **home-screen deal**: the
+cached popularity pools, the `dealtSeed` the home renders, and a `recentSeedIds`
+ring buffer — `prepareSeeds()`/`shuffleSeed()`/`dealFreshOnResume()` all route
+through a private `deal()` that delegates the *policy* to the pure
+`SeedDeal.pick` (`SeedDeal.swift`, unit-tested: popularity pool, actor bias,
+recent-id avoidance). Every entity resolves to a stable TMDB id, so
 validation and dedup are exact. Async candidate loads are guarded by a monotonic
 `generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
 or quit game can't install stale candidates into a new round. `Config.swift` holds
-tunables (`secondsPerTurn`) and loads the TMDB credential at runtime from a
+tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`) and loads the TMDB credential at runtime from a
 **gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
 and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
@@ -128,7 +137,13 @@ edge — no "back"; Reduce Motion → cross-fade). It owns the
 shared `CollectionStore` (opened as a `.sheet` from the seed and game-over
 screens) and the persisted once-ever `seedIntroDone` flag driving `SeedView`'s
 first-run cold-launch intro (the title lockup starts centered, the mini-chain drops in, then
-it rises as the controls assemble). Styling is a
+it rises as the controls assemble). `SeedView` is **play-first**: it leads with a
+*dealt start* — one ink **"Start with ⟨name⟩" button** (Play + seed fused; the
+name auto-fits one line so Shuffle can deal it in/out on `.dealDrop` without
+reflow) + a **Shuffle** button, with search demoted to an opt-in link and **Your
+Reel** shrunk to a corner pill (personal best folded into that sheet; the pill is
+always reachable, count hidden when empty, because the Reel sheet hosts the
+required **TMDB attribution**). Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, purple = movie**) and
 `Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`, `.card()`,

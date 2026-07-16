@@ -65,9 +65,34 @@ final class GameEngine {
     /// The kind chosen for the seed search.
     var seedKind: NodeKind = .actor
 
+    /// The start currently dealt on the home screen (the "Start with …" button).
+    /// `nil` until the popularity pool has loaded and the first deal lands — the
+    /// home shows a placeholder until then.
+    private(set) var dealtSeed: ChainNode?
+
     // MARK: Private
 
     private let provider: MovieDataProvider
+    /// Popularity-ranked pools the home deals from, fetched once and cached.
+    private var actorPool: [Person] = []
+    private var moviePool: [Movie] = []
+    /// Per-side load state. Tracked independently so one side failing (or being
+    /// rate-limited) can't lock in a *partial* pool for the session — the missing
+    /// side is retried on later prepares/shuffles. A side is only "loaded" once it
+    /// actually returned entries (an empty result means it failed → retry).
+    private var actorsLoaded = false
+    private var moviesLoaded = false
+    /// Enough of a pool to deal *something* (at least one side landed).
+    private var poolReady: Bool { actorsLoaded || moviesLoaded }
+    /// Both sides landed — no further loading needed.
+    private var poolComplete: Bool { actorsLoaded && moviesLoaded }
+    /// `ChainNode.id`s dealt recently, so repeated shuffles stay fresh. Bounded to
+    /// `Config.seedRecentWindow`.
+    private var recentSeedIds: [String] = []
+    /// Concrete generator for deals (a stored `var` so it can be passed `inout` to
+    /// the generic `SeedDeal.pick`). Selection policy is unit-tested separately in
+    /// `SeedDeal` with a seeded generator, so the engine needs no injectable RNG.
+    private var systemRNG = SystemRandomNumberGenerator()
     /// The registry every completed chain is logged into. Optional so previews
     /// and tests can run without touching disk.
     private let collection: CollectionStore?
@@ -128,6 +153,93 @@ final class GameEngine {
             // *after* the player has tapped a result and the round has begun would
             // otherwise buzz a stale error mid-game.
             return []
+        }
+    }
+
+    // MARK: Seed deal (the home-screen "Start with …" button)
+
+    /// Load the deal pools (once) and deal a fresh start. Called when the home
+    /// screen appears, so every entry to `.seed` — cold launch or "Play again" —
+    /// presents a new dealt start. While the pool loads on first launch,
+    /// `dealtSeed` stays `nil` and the home shows a placeholder.
+    func prepareSeeds() async {
+        // Retry a transient pool-load failure a few times so a flaky first launch
+        // self-heals while the player is still on the home screen. A hard failure
+        // leaves the hero in its "Dealing…" state; leaving and returning retries
+        // (a side stays unloaded until it actually returns entries).
+        for attempt in 0..<3 {
+            await loadSeedPoolsIfNeeded()
+            if Task.isCancelled { return }
+            if poolComplete { break }
+            if attempt < 2 { try? await Task.sleep(for: .seconds(1)) }
+            if Task.isCancelled { return }
+        }
+        guard !Task.isCancelled else { return }   // don't deal into an abandoned screen
+        deal()
+    }
+
+    /// Deal a new random start on demand (the Shuffle button). Pools are usually
+    /// ready by the time the player can tap; if not (a fast tap during first
+    /// load), the deal is deferred until a side lands. If a side failed earlier,
+    /// quietly retry it in the background so later deals can include it.
+    func shuffleSeed() {
+        guard poolReady else {
+            Task { await loadSeedPoolsIfNeeded(); deal() }
+            return
+        }
+        deal()
+        if !poolComplete { Task { await loadSeedPoolsIfNeeded() } }
+    }
+
+    /// Re-deal when the app returns from the background while still on the home
+    /// screen — "a fresh start every open/resume". No-op mid-game or before a pool
+    /// side has landed (cold launch is handled by `prepareSeeds`).
+    func dealFreshOnResume() {
+        guard phase == .seed, poolReady else { return }
+        deal()
+        if !poolComplete { Task { await loadSeedPoolsIfNeeded() } }
+    }
+
+    /// Load only the pool side(s) not yet loaded, concurrently. Each side is
+    /// marked loaded **only when it returns entries** — an empty result (a failed
+    /// or rate-limited fetch, incl. the derived-actor task group swallowing
+    /// per-cast failures) leaves that side unloaded so it retries later, rather
+    /// than caching a partial (e.g. movie-only) pool for the whole session. A
+    /// cancelled load (leaving the seed screen) commits nothing.
+    private func loadSeedPoolsIfNeeded() async {
+        guard !poolComplete else { return }
+        async let actorsTask = fetchActorsIfNeeded()
+        async let moviesTask = fetchMoviesIfNeeded()
+        let actors = await actorsTask
+        let movies = await moviesTask
+        guard !Task.isCancelled else { return }
+        if let actors, !actors.isEmpty { actorPool = actors; actorsLoaded = true }
+        if let movies, !movies.isEmpty { moviePool = movies; moviesLoaded = true }
+    }
+
+    /// `nil` when the side is already loaded (skip) or the fetch failed.
+    private func fetchActorsIfNeeded() async -> [Person]? {
+        guard !actorsLoaded else { return nil }
+        return try? await provider.popularActors()
+    }
+
+    private func fetchMoviesIfNeeded() async -> [Movie]? {
+        guard !moviesLoaded else { return nil }
+        return try? await provider.popularMovies()
+    }
+
+    private func deal() {
+        guard let node = SeedDeal.pick(
+            actors: actorPool,
+            movies: moviePool,
+            recentIds: Set(recentSeedIds),
+            actorBias: Config.seedActorBias,
+            using: &systemRNG
+        ) else { return }
+        dealtSeed = node
+        recentSeedIds.append(node.id)
+        if recentSeedIds.count > Config.seedRecentWindow {
+            recentSeedIds.removeFirst(recentSeedIds.count - Config.seedRecentWindow)
         }
     }
 

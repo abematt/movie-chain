@@ -42,10 +42,14 @@ struct ContentView: View {
             }
         }
         .animation(Theme.Motion.screen, value: engine.phase)
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { old, phase in
             // Guarantee the latest collection snapshot is on disk before the app
             // is suspended/killed, not just eventually via the async save.
             if phase != .active { collection.flush() }
+            // Deal a fresh start when returning from the background while still on
+            // the home screen — "a new start every open/resume". Cold launch is
+            // handled by SeedView's `.task`; this covers background → foreground.
+            if old == .background, phase == .active { engine.dealFreshOnResume() }
         }
         .onAppear {
             #if DEBUG

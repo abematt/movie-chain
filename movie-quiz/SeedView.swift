@@ -2,31 +2,23 @@
 //  SeedView.swift
 //  movie-quiz
 //
-//  The home screen — a branded landing that doubles as the seed picker. This is
-//  the only screen that uses global search (there is no bounded candidate set
-//  until play begins). Styled as a puzzle-page landing (serif wordmark, warm-tile
-//  surfaces, the two category accents) on the shared design system, rather than a
-//  stock navigation/list/`.searchable` screen, which reads as "iOS Settings".
+//  The home screen. It leads with a *dealt start*, not a search box: the branded
+//  lockup, then one big "Start with · <name>" button whose pill is a random
+//  popular actor or movie (blue = actor, purple = movie). Tapping it plays
+//  immediately; Shuffle deals a fresh start; a quiet link drops down to the
+//  search flow for players who want to pick their own. This reads as a game's
+//  start screen rather than a movie-logging app.
 //
-//  Layout: a "hero + live search" home. The wordmark, tagline, and your
-//  best/Reel stats own the resting screen; a slim actor/movie segment and a
-//  tap-to-focus search field sit beneath, and results reveal inline as you type
-//  (no push, no new screen) — so the fastest path to play stays: tap the field →
-//  type → tap a result.
+//  The dealt seed is owned by the engine (`engine.dealtSeed`, refreshed on every
+//  appearance and on resume). The name lives on one line, auto-sized to fit
+//  (`minimumScaleFactor`, like the in-game `NodeTile`) so the button never
+//  reflows — which lets Shuffle animate as one clean "deal" (old start drops out,
+//  new drops in on `Theme.Motion.drop`) instead of a janky slot-machine roll.
 //
-//  Keyboard-aware collapse: the moment the field is focused (or any text is
-//  typed) the hero folds — mini-chain, tagline, and stat chips fade out and the
-//  top padding tightens — so the field and its results rise clear of the
-//  keyboard. The results list is the flexible region, so it absorbs the reduced
-//  height and everything stays on screen. Clearing the field re-expands the hero.
-//
-//  Cold-launch intro: on the very first launch the title lockup starts centered,
-//  its mini-chain drops in tile-by-tile (echoing the in-game Tetris landing),
-//  then the lockup rises to its header rest as the controls assemble beneath it.
-//  Runs once ever — `introDone` (owned by `ContentView`, persisted) is already
-//  true on every later launch and every "Play again" re-entry, so the screen
-//  starts assembled and the carousel push never flashes a centered logo. Reduce
-//  Motion skips it all.
+//  Cold-launch intro (once ever): the lockup starts centered, its mini-chain
+//  drops in, then the lockup rises to its header rest as the deal controls
+//  cascade in beneath it. Gated by `introDone` (owned by `ContentView`,
+//  persisted); every later launch and every "Play again" starts assembled.
 //
 
 import SwiftUI
@@ -40,36 +32,34 @@ struct SeedView: View {
     @State private var results: [ChainNode] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var showReel = false
+    /// Whether the "pick your own start" search flow is showing (vs the deal).
+    @State private var searching = false
+
+    // MARK: Intro state (see `runIntro`)
     /// The mini-chain tiles have dropped in.
     @State private var chainBuilt: Bool
     /// The lockup has risen to its header rest.
     @State private var revealed: Bool
-    /// How many controls have been revealed so far (0…`controlSlotCount`). Driven
-    /// up one at a time by `runIntro`, each step inside its own `withAnimation`
-    /// spaced by a real delay, so each control springs in on its own transaction.
+    /// How many deal controls have been revealed (0…`controlSlotCount`).
     @State private var revealedControls: Int
-    /// Latches "this instance plays the intro" in `@State` so it survives the view
-    /// re-init that fires when `runIntro` finally sets the `introDone` binding. A
-    /// plain `let` derived from `introDone` flips to false on that re-init *mid
-    /// cascade* — which disables the reveal animation and snaps every remaining
-    /// control in at once (the exact bug that made the controls pop while the
-    /// mini-chain, which finishes before `introDone` is touched, animated fine).
+    /// Latches "this instance plays the intro" so it survives the view re-init
+    /// that fires when `runIntro` sets the `introDone` binding (see the long note
+    /// in the previous revision — a plain `let` snapped the cascade).
     @State private var playsIntro: Bool
-    /// The running intro sequence, held so a tap can cancel it (skip-to-assembled).
     @State private var introTask: Task<Void, Never>?
+
+    @AppStorage("soundEnabled") private var soundEnabled = true
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Number of staggered control slots — badges(0), segment(1), search(2),
-    /// results(3). See `controls`.
+    /// Staggered slots for the intro cascade: start button(0), hint(1),
+    /// shuffle(2), search link(3).
     private static let controlSlotCount = 4
 
     init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
         self.engine = engine
         self.collection = collection
         self._introDone = introDone
-        // If the intro already played this launch, start fully assembled so a
-        // "Play again" re-entry settles instantly under the carousel push.
         let done = introDone.wrappedValue
         _playsIntro = State(initialValue: !done)
         _chainBuilt = State(initialValue: done)
@@ -77,42 +67,34 @@ struct SeedView: View {
         _revealedControls = State(initialValue: done ? Self.controlSlotCount : 0)
     }
 
-    /// The hero folds (mini-chain / tagline / stat chips out, padding tight) once
-    /// the player engages the search — either the field is focused or they've
-    /// typed something. Keying it to the query too keeps the hero compact after an
-    /// interactive scroll-to-dismiss (keyboard gone but results still on screen),
-    /// so the list doesn't jump when focus is lost mid-browse.
-    private var heroCollapsed: Bool {
-        searchFocused || !query.isEmpty
-    }
-
     var body: some View {
         GeometryReader { geo in
             VStack(spacing: Theme.Spacing.lg) {
-                // Animatable centering spacer: pushes the lockup toward the middle
-                // during the intro, collapses to nothing once assembled.
+                // Animatable centering spacer for the intro; collapses to nothing
+                // once the lockup has risen.
                 Color.clear.frame(height: topInset(geo.size.height))
 
                 titleLockup
 
-                // Always mounted (like the mini-chain tiles) so each control's
-                // reveal animates on a view that's been on screen since launch;
-                // hidden + inert until its slot is dealt in. Gating this behind an
-                // `if` makes SwiftUI snap them in instead.
-                controls
-                    .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
+                Group {
+                    if searching {
+                        searchSection
+                    } else {
+                        dealSection
+                            .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
+                    }
+                }
             }
             .padding(.horizontal)
-            .padding(.top, heroCollapsed ? Theme.Spacing.sm : Theme.Spacing.xl)
+            .padding(.top, searching ? Theme.Spacing.sm : Theme.Spacing.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .animation(Theme.Motion.standard, value: heroCollapsed)
+            .animation(Theme.Motion.standard, value: searching)
         }
         .background(Theme.Color.canvas.ignoresSafeArea())
-        // Tap-to-skip: while the intro is still playing, a tap anywhere collapses
-        // it to the assembled screen. The controls are inert (`allowsHitTesting`)
-        // during the intro, so this catcher owns every touch until assembly — and
-        // it's gone the instant assembly completes, so it never eats a real tap.
+        .overlay(alignment: .topTrailing) { reelButton }
         .overlay {
+            // Tap-to-skip while the intro plays (controls are inert until assembly,
+            // so this never eats a real tap and is gone the instant it completes).
             if introRunning {
                 Color.clear
                     .contentShape(Rectangle())
@@ -122,14 +104,28 @@ struct SeedView: View {
             }
         }
         .sheet(isPresented: $showReel) {
-            CollectionView(store: collection)
+            CollectionView(store: collection, bestChain: engine.bestChain)
         }
+        // Deal a fresh start on every appearance (cold launch and "Play again").
+        .task { await engine.prepareSeeds() }
+        // Warm the haptic/audio engines HERE, on the seed screen, rather than in
+        // GameView. `AVAudioEngine.start()` briefly blocks the main actor, and
+        // doing it in GameView.task landed that block right on the seed->play
+        // push. We wait until the entrance animation (cold-launch intro, or the
+        // carousel push on a Play-again re-entry) has settled so the warm never
+        // lands on an animation.
+        .task { await warmFeedbackWhenIdle() }
         .onAppear {
             if introTask == nil { introTask = Task { await runIntro() } }
         }
+        .onChange(of: searching) { _, now in
+            // Focus the field when the search flow opens; drop it when it closes.
+            searchFocused = now
+            if !now { searchTask?.cancel(); query = ""; results = [] }
+        }
         .onDisappear {
             introTask?.cancel()
-            searchTask?.cancel()   // a pending debounced search must not outlive the screen
+            searchTask?.cancel()
         }
     }
 
@@ -137,62 +133,18 @@ struct SeedView: View {
         revealed ? 0 : max(Theme.Spacing.xl, height * 0.30)
     }
 
-    /// True while the scripted intro is mid-flight — drives the skip-catcher.
-    /// Once the last control is dealt in, assembly is complete and this is false.
     private var introRunning: Bool {
         playsIntro && revealedControls < Self.controlSlotCount
     }
 
-    // MARK: Intro sequence
-
-    private func runIntro() async {
-        // Already played (ever), or motion is reduced: show it assembled.
-        if introDone || reduceMotion {
-            chainBuilt = true
-            revealed = true
-            revealedControls = Self.controlSlotCount
-            introDone = true
-            return
-        }
-        chainBuilt = true                                        // 1. mini-chain drops in
-        try? await Task.sleep(for: .milliseconds(950))            //    build + hold
-        if Task.isCancelled { return }                            //    (tapped to skip)
-        withAnimation(Theme.Motion.intro) { revealed = true }     // 2. lockup rises
-        try? await Task.sleep(for: .milliseconds(500))            //    let the rise settle
-        if Task.isCancelled { return }
-        for slot in 0..<Self.controlSlotCount {                   // 3. controls deal in one-by-one
-            withAnimation(Theme.Motion.cascade) { revealedControls = slot + 1 }
-            try? await Task.sleep(for: .milliseconds(100))
-            if Task.isCancelled { return }
-        }
-        introDone = true                                          //    (re-inits the view — must be last)
-    }
-
-    /// Collapse the running intro straight to the assembled screen. Cancels the
-    /// sequence (so its remaining steps bail at the next `Task.isCancelled` check)
-    /// and settles every stage at once on a single quick spring.
-    private func skipIntro() {
-        guard playsIntro, !introDone else { return }
-        introTask?.cancel()
-        withAnimation(Theme.Motion.cascade) {
-            chainBuilt = true
-            revealed = true
-            revealedControls = Self.controlSlotCount
-        }
-        introDone = true
-    }
-
     // MARK: Title lockup — mini-chain · serif wordmark · tagline
     //
-    // Collapses on `heroCollapsed`: the mini-chain and tagline fold away (the
-    // wordmark stays — it's the identity) so the search + results clear the
-    // keyboard. Both are always mounted during the intro (`heroCollapsed` is
-    // false throughout it), so their intro entrance still animates via `TileBuild`
-    // and the lockup rise; the collapse fade only fires later, on focus/typing.
+    // In search mode the mini-chain and tagline fold away (the wordmark stays —
+    // it's the identity) so the field + results clear the keyboard.
 
     private var titleLockup: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            if !heroCollapsed {
+            if !searching {
                 chainLockup
                     .transition(.scale(scale: 0.7, anchor: .bottom).combined(with: .opacity))
             }
@@ -204,7 +156,7 @@ struct SeedView: View {
                 .minimumScaleFactor(0.7)
                 .scaleEffect(revealed ? 1 : 1.1)
 
-            if !heroCollapsed {
+            if !searching {
                 Text("How long can you keep the chain alive?")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -213,8 +165,6 @@ struct SeedView: View {
             }
         }
     }
-
-    // MARK: Chain lockup — an ambient mini-chain that telegraphs the game
 
     private var chainLockup: some View {
         HStack(spacing: 5) {
@@ -236,69 +186,165 @@ struct SeedView: View {
         }
     }
 
-    // MARK: Controls — assembled beneath the lockup on reveal
+    // MARK: Deal section — the dealt start, Play, Shuffle, and the search link
 
-    // The controls deal in one at a time *after* the lockup has risen — each
-    // rises + grows into place on the smooth `cascade` spring (a gentle
-    // overshoot). The stagger is real time, not a baked-in `.delay`: `runIntro`
-    // bumps `revealedControls` one slot at a time inside its own `withAnimation`,
-    // spaced by a 100ms sleep, so each control springs in on its own transaction
-    // and reads as a distinct beat.
-    private func cascade<V: View>(_ view: V, _ index: Int) -> some View {
-        view.modifier(ControlReveal(visible: revealedControls > index, enabled: playsIntro))
-    }
-
-    @ViewBuilder private var controls: some View {
-        // The stat chips are part of the hero, so they fold with it. Mounted
-        // throughout the intro (`heroCollapsed` stays false there) so slot 0 still
-        // cascades in; removed only later when the hero collapses.
-        if !heroCollapsed {
-            cascade(badges, 0)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+    private var dealSection: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Spacer(minLength: Theme.Spacing.md)
+            cascade(startButton, 0)
+            cascade(hintLine, 1)
+            cascade(shuffleButton, 2)
+            Spacer(minLength: Theme.Spacing.md)
+            cascade(searchLink, 3)
         }
-        cascade(segment, 1)
-        cascade(searchField, 2)
-        cascade(resultsSection, 3)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: Stat chips (personal best · Your Reel)
-
-    private var badges: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            if engine.bestChain > 0 {
-                Text("Your best · \(engine.bestChain) links")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.xs + 2)
-                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+    // Play + seed as one button. The chrome ("START WITH") and the button frame
+    // stay fixed; only the inner seed content deals in/out, so the button never
+    // jumps. Disabled until the first deal lands (pool still loading).
+    private var startButton: some View {
+        Button { play() } label: {
+            VStack(spacing: Theme.Spacing.sm) {
+                Text("START WITH")
+                    .font(.system(size: 12, weight: .heavy))
+                    .tracking(1.8)
+                    .foregroundStyle(Theme.Color.onInk.opacity(0.5))
+                seedContent
             }
-            if collection.total > 0 {
-                Button { showReel = true } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "film.stack")
-                        Text("Your Reel · \(collection.total)")
+        }
+        .buttonStyle(StartButtonStyle())
+        .disabled(engine.dealtSeed == nil)
+    }
+
+    private var seedContent: some View {
+        ZStack {
+            if let seed = engine.dealtSeed {
+                HStack(spacing: Theme.Spacing.sm) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(seed.accent)
+                        .frame(width: 12, height: 12)
+                    Text(seed.matchText)                 // bare name/title, no year
+                        .font(.system(size: 25, weight: .bold))
+                        .foregroundStyle(Theme.Color.onInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)          // shrink to fit, never clip
+                }
+                .id(seed.id)
+                .transition(reduceMotion ? .opacity : .dealDrop)
+            } else {
+                Text("Dealing…")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Theme.Color.onInk.opacity(0.45))
+            }
+        }
+        .frame(height: 40)                                // fixed one-line height
+        .animation(reduceMotion ? nil : Theme.Motion.drop, value: engine.dealtSeed)
+    }
+
+    private var hintLine: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.right")
+                .font(.caption.weight(.bold))
+            Text(engine.dealtSeed?.nextKind.prompt ?? " ")
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .contentTransition(.opacity)
+        .animation(reduceMotion ? nil : Theme.Motion.standard, value: engine.dealtSeed)
+    }
+
+    private var shuffleButton: some View {
+        Button {
+            Haptics.selection()
+            engine.shuffleSeed()
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "shuffle")
+                Text("Shuffle")
+            }
+        }
+        .buttonStyle(.ghost)
+        .disabled(engine.dealtSeed == nil)
+    }
+
+    private var searchLink: some View {
+        Button {
+            withAnimation(Theme.Motion.standard) { searching = true }
+        } label: {
+            Text("or search for your own start")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .underline(true, pattern: .solid)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func play() {
+        guard let seed = engine.dealtSeed else { return }
+        searchTask?.cancel()
+        Task { await engine.startGame(with: seed) }
+    }
+
+    // MARK: Reel — a single corner button (also the route to the TMDB attribution)
+
+    // Always reachable (not gated on `collection.total > 0`): the Reel sheet holds
+    // the required TMDB attribution, so a first-run player — who is already being
+    // served TMDB-powered dealt seeds — must be able to open it before logging any
+    // chain. The count only appears once there's something to count, so an empty
+    // Reel reads as a quiet "open your collection / about" affordance, keeping the
+    // home play-first while the attribution stays one tap away.
+    @ViewBuilder private var reelButton: some View {
+        if !searching, !introRunning {
+            Button { showReel = true } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "film.stack")
+                    if collection.total > 0 {
+                        Text("\(collection.total)")
+                            .monospacedDigit()
                     }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.Color.ink)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.xs + 2)
-                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.Color.ink)
+                .padding(.horizontal, Theme.Spacing.sm + 2)
+                .padding(.vertical, Theme.Spacing.xs + 2)
+                .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.xs)
+            .transition(.opacity)
+            .accessibilityLabel(collection.total > 0 ? "Your Reel, \(collection.total) logged" : "Your Reel")
+        }
+    }
+
+    // MARK: Search section — the demoted "pick your own start" flow
+
+    private var searchSection: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            HStack {
+                Button {
+                    withAnimation(Theme.Motion.standard) { searching = false }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Deal a start")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                Spacer()
             }
+            segment
+            searchField
+            resultsSection
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: Start choice — an actor/movie toggle
+    // MARK: Start-kind segment (actor / movie)
 
-    // The two big category tiles from the old landing shrink to a compact
-    // segmented toggle: it names the choice and carries the category accents
-    // without eating the vertical room the hero + results now want. The active
-    // side fills solid with its category color (blue = actor, purple = movie) so
-    // the on/off state reads at a glance. Switching side re-points the search (and
-    // re-runs it if there's a query) but does not force-focus, so it never yanks
-    // the keyboard up on its own.
     private var segment: some View {
         HStack(spacing: 4) {
             segmentButton(.actor)
@@ -314,9 +360,6 @@ struct SeedView: View {
 
     private func segmentButton(_ kind: NodeKind) -> some View {
         Button {
-            // Only act on a real change: keeps the detent haptic honest (no tick
-            // for re-tapping the side you're already on) and avoids a redundant
-            // search kick.
             guard engine.seedKind != kind else { return }
             Haptics.selection()
             engine.seedKind = kind
@@ -356,10 +399,6 @@ struct SeedView: View {
     }
 
     // MARK: Results — warm-tile rows with a category dot
-    //
-    // The flexible region: it fills the space between the search field and the
-    // bottom safe area, so when the keyboard raises that inset the list shrinks to
-    // fit and the field + first rows stay clear of the keys.
 
     @ViewBuilder private var resultsSection: some View {
         if results.isEmpty {
@@ -415,7 +454,7 @@ struct SeedView: View {
         .padding(.top, Theme.Spacing.lg)
     }
 
-    // MARK: Search
+    // MARK: Search plumbing
 
     private func runSearch() {
         searchTask?.cancel()
@@ -431,20 +470,113 @@ struct SeedView: View {
     }
 
     private func start(with node: ChainNode) {
-        searchTask?.cancel()   // don't let a still-pending debounced search resume into the round
+        searchTask?.cancel()
         Task { await engine.startGame(with: node) }
+    }
+
+    // MARK: Intro sequence
+
+    private func cascade<V: View>(_ view: V, _ index: Int) -> some View {
+        view.modifier(ControlReveal(visible: revealedControls > index, enabled: playsIntro))
+    }
+
+    private func runIntro() async {
+        if introDone || reduceMotion {
+            chainBuilt = true
+            revealed = true
+            revealedControls = Self.controlSlotCount
+            introDone = true
+            return
+        }
+        chainBuilt = true                                        // 1. mini-chain drops in
+        try? await Task.sleep(for: .milliseconds(950))
+        if Task.isCancelled { return }
+        withAnimation(Theme.Motion.intro) { revealed = true }     // 2. lockup rises
+        try? await Task.sleep(for: .milliseconds(500))
+        if Task.isCancelled { return }
+        for slot in 0..<Self.controlSlotCount {                   // 3. controls deal in
+            withAnimation(Theme.Motion.cascade) { revealedControls = slot + 1 }
+            try? await Task.sleep(for: .milliseconds(100))
+            if Task.isCancelled { return }
+        }
+        introDone = true                                          // (re-inits the view — last)
+    }
+
+    /// Warm haptics + audio once the screen is idle. Polls `introRunning` (false
+    /// after the intro completes *or* is skipped, and immediately on a re-entry),
+    /// then waits out the entrance/push settle before paying the briefly-blocking
+    /// `AVAudioEngine.start()` — keeping that cost off every animation, especially
+    /// the seed->play transition (GameView no longer warms).
+    private func warmFeedbackWhenIdle() async {
+        var waited = 0
+        while introRunning, waited < 4000, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100)); waited += 100
+        }
+        try? await Task.sleep(for: .milliseconds(700))   // clear the settle / carousel push
+        guard !Task.isCancelled else { return }
+        Haptics.prepare()
+        if soundEnabled { SoundPlayer.shared.warm() }
+    }
+
+    private func skipIntro() {
+        guard playsIntro, !introDone else { return }
+        introTask?.cancel()
+        withAnimation(Theme.Motion.cascade) {
+            chainBuilt = true
+            revealed = true
+            revealedControls = Self.controlSlotCount
+        }
+        introDone = true
+    }
+}
+
+// MARK: - Start button style (the ink "Start with …" pill)
+
+/// The home's primary action: an ink-filled rounded card carrying the "START
+/// WITH" label + the dealt seed. Its own style (not `PrimaryButtonStyle`) because
+/// it hosts custom multi-line content and a taller card radius.
+private struct StartButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.md + 2)
+            .padding(.horizontal, Theme.Spacing.md)
+            .background(Theme.Color.ink, in: RoundedRectangle(cornerRadius: Theme.Radius.card + 4))
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(Theme.Motion.standard, value: configuration.isPressed)
+    }
+}
+
+// MARK: - Deal transition
+//
+// The single "deal": the old start drops out downward while the new one drops in
+// from above — the same falling motion a chain tile lands on in-game. Because the
+// name is always one line (auto-sized), the button height is fixed, so this reads
+// as a clean replacement with no reflow. Reduce Motion uses a plain cross-fade.
+
+private struct DealShift: ViewModifier {
+    var y: CGFloat
+    var opacity: Double
+    func body(content: Content) -> some View {
+        content.offset(y: y).opacity(opacity)
+    }
+}
+
+private extension AnyTransition {
+    static var dealDrop: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(active: DealShift(y: -13, opacity: 0), identity: DealShift(y: 0, opacity: 1)),
+            removal: .modifier(active: DealShift(y: 12, opacity: 0), identity: DealShift(y: 0, opacity: 1))
+        )
     }
 }
 
 // MARK: - Segment toggle button style
 
-/// One side of the actor/movie toggle. A `ButtonStyle` (not a `.plain` button)
-/// for two reasons: it exposes `configuration.isPressed` for the press-down
-/// squish, and its `contentShape` makes the *entire* padded width tappable —
-/// `.plain` only hit-tests the opaque label glyphs, which is why the old toggle
-/// dropped touches that landed on the empty padding. The active side fills solid
-/// with its category accent (near-black glyphs on the pastel); the inactive side
-/// is a quiet, tinted glyph on the track. Both transitions animate.
+/// One side of the actor/movie toggle (search flow). A `ButtonStyle` so the whole
+/// padded width is tappable and the press squish reads; active side fills solid
+/// with its category accent.
 private struct SegmentButtonStyle: ButtonStyle {
     let kind: NodeKind
     let selected: Bool
@@ -459,45 +591,30 @@ private struct SegmentButtonStyle: ButtonStyle {
                     .fill(selected ? kind.accent : Color.clear)
                     .shadow(color: selected ? .black.opacity(0.14) : .clear, radius: 3, y: 1)
             }
-            // The whole padded frame is the hit target, so a touch anywhere on the
-            // half registers — no more dead padding.
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .animation(Theme.Motion.standard, value: configuration.isPressed)
             .animation(Theme.Motion.emphasized, value: selected)
-            // Expose on/off to VoiceOver like a real segmented control, so the
-            // active side is announced "selected" rather than just looking filled.
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
 // MARK: - Control cascade reveal
 
-/// Rises + grows + fades one control into place once its slot is dealt in. The
-/// animation itself lives in `runIntro`'s `withAnimation` loop, not here — this
-/// just declares the hidden vs shown geometry. Shown at once (no stagger) on a
-/// "Play again" re-entry (`enabled == false`) and under Reduce Motion.
+/// Rises + grows + fades one control into place once its slot is dealt in (intro
+/// only). Shown at once on a "Play again" re-entry (`enabled == false`) and under
+/// Reduce Motion.
 private struct ControlReveal: ViewModifier {
-    /// Whether this control's slot has been dealt in yet.
     let visible: Bool
-    /// False on a "Play again" re-entry — the controls arrive solid, no stagger.
     var enabled = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        // No implicit `.animation` here — the spring comes from the `withAnimation`
-        // in `runIntro` that flips this slot on, so the reveal and its animation
-        // ride the same transaction (an implicit one would be silently dropped
-        // when `introDone` re-inits the view mid-cascade).
         let shown = visible || !enabled || reduceMotion
         return content
             .opacity(shown ? 1 : 0)
             .scaleEffect(shown ? 1 : 0.94, anchor: .bottom)
             .offset(y: shown ? 0 : 26)
-            // Keep the reveal gate honest across every input path: a slot that's
-            // visually hidden is also removed from the accessibility tree and
-            // disabled, so VoiceOver/Switch Control can't focus or activate a
-            // control that isn't on screen yet during the cold-launch intro.
             .disabled(!shown)
             .accessibilityHidden(!shown)
     }
@@ -505,9 +622,9 @@ private struct ControlReveal: ViewModifier {
 
 // MARK: - Mini-chain tile build
 
-/// Drops one lockup tile in — scaling up from just above its slot — with a delay
-/// keyed to its position, so the mini-chain assembles left-to-right like the
-/// in-game stack landing. No-op under Reduce Motion.
+/// Drops one lockup tile in — scaling up from just above its slot — delayed by
+/// its position, so the mini-chain assembles left-to-right like the in-game
+/// stack landing. No-op under Reduce Motion.
 private struct TileBuild: ViewModifier {
     let shown: Bool
     let index: Int
