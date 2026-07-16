@@ -13,7 +13,11 @@ struct GameOverView: View {
     @Bindable var engine: GameEngine
     var collection: CollectionStore
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showReel = false
+    /// Bumped once to fire the one-shot score bounce on a new best. The score's
+    /// resting scale is always 1, so nothing here can leave it stuck oversized.
+    @State private var scorePop = 0
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -35,7 +39,17 @@ struct GameOverView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
         .onAppear {
-            if engine.isNewBest { Haptics.celebrate() }
+            guard engine.isNewBest else { return }
+            // Reduce Motion: the celebratory haptic still fires, but no visual pop.
+            if reduceMotion { Haptics.celebrate(); return }
+            Task {
+                // Wait out the screen-push carousel (Theme.Motion.screen, ~0.45s)
+                // so the bounce reads as a landing beat rather than overlapping the
+                // horizontal push. Haptic + pop fire together, after the settle.
+                try? await Task.sleep(for: .milliseconds(450))
+                Haptics.celebrate()
+                scorePop += 1
+            }
         }
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain)
@@ -97,6 +111,16 @@ struct GameOverView: View {
                 .font(.system(size: 72, weight: .bold, design: .serif))
                 .monospacedDigit()
                 .contentTransition(.numericText())
+                // One-shot bounce (up then settle) fired by `scorePop` on a new
+                // best. Resting scale is 1, so it can never get stuck oversized.
+                .keyframeAnimator(initialValue: 1.0, trigger: scorePop) { view, scale in
+                    view.scaleEffect(scale)
+                } keyframes: { _ in
+                    KeyframeTrack {
+                        CubicKeyframe(1.12, duration: 0.18)
+                        SpringKeyframe(1.0, duration: 0.42, spring: .bouncy)
+                    }
+                }
 
             Text("\(engine.points) pts")
                 .font(.headline)
@@ -160,7 +184,7 @@ struct GameOverView: View {
                 .tracking(1.5)
                 .foregroundStyle(.tertiary)
             ScrollView {
-                ChainStack(chain: engine.chain, numbered: true, showKind: false)
+                ChainStack(chain: engine.chain, numbered: true, showKind: false, staggered: true)
                     .padding(.bottom, Theme.Spacing.sm)
             }
         }

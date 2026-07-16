@@ -340,7 +340,9 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   that was duplicated across views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
   `PrimaryButtonStyle` (`.buttonStyle(.primary)`, an ink-filled pill),
-  `GhostButtonStyle` (`.ghost`, outlined), `CardModifier` (`.card()`), `NodeTile`
+  `GhostButtonStyle` (`.ghost`, outlined), `PressScaleStyle` (`.pressScale` — a
+  near-imperceptible press squish+dim for buttons that carry their own chrome but
+  lacked an `isPressed` state, e.g. the in-game "Go"), `CardModifier` (`.card()`), `NodeTile`
   (the Connections category tile — the atom of the chain), `NodeDot` (small
   category chip), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
   answer), `FloatingGain` (the rising "+N"), and `StaggeredAppear` (`.appear(i)` —
@@ -356,7 +358,10 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   is the signature visual — the chain as a **rising Tetris-style stack of category
   tiles**: each accepted link drops in from the top and the column builds; in the
   play window older links collapse into "+N earlier" to fit the band above the
-  keyboard, while the game-over recap shows the whole chain numbered.
+  keyboard, while the game-over recap shows the whole chain numbered and, via
+  `staggered:`, reveals its tiles one-after-another (through `StaggeredAppear`) as
+  a rare end-of-run delight beat — a no-op during play, where tiles land
+  individually on the `drop` transition.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
   (drains in ink, shifts to a warning red in the final quarter).
 - App-wide `.tint(.accentColor)` (ink) is applied once at the root in

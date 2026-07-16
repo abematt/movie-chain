@@ -89,11 +89,15 @@ struct GameView: View {
     private var header: some View {
         HStack {
             Button {
-                soundEnabled.toggle()
+                withAnimation(Theme.Motion.standard) { soundEnabled.toggle() }
             } label: {
                 Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .contentTransition(.symbolEffect(.replace))
+                    // Fixed slot: the two speaker glyphs differ in width, so let the
+                    // symbol swap inside a stable box rather than nudging the header.
+                    .frame(width: 24)
             }
             .buttonStyle(.plain)
 
@@ -196,7 +200,7 @@ struct GameView: View {
                         .padding(.vertical, Theme.Spacing.sm + 4)
                         .background(Theme.Color.ink, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.pressScale)
                 .disabled(!canSubmit)
                 .opacity(canSubmit ? 1 : 0.4)
             }

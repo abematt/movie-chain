@@ -50,9 +50,42 @@ struct GhostButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Press-scale style
+//
+// The lightest touch of press feedback: a subtle squish + dim, no chrome of its
+// own. For buttons that already carry their own background/label (the in-game
+// "Go") but were missing an `isPressed` state — deliberately near-imperceptible,
+// since it sits on a frequently-tapped control.
+
+struct PressScaleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PressBody(configuration: configuration)
+    }
+
+    // A nested view so the style can read the environment: under Reduce Motion we
+    // drop the scale (that's the motion) and keep only the opacity dim, which
+    // still confirms the press without animating position/size.
+    private struct PressBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+                .opacity(configuration.isPressed ? 0.85 : 1)
+                .animation(Theme.Motion.standard, value: configuration.isPressed)
+        }
+    }
+}
+
 extension ButtonStyle where Self == PrimaryButtonStyle {
     /// Usage: `.buttonStyle(.primary)`
     static var primary: PrimaryButtonStyle { .init() }
+}
+
+extension ButtonStyle where Self == PressScaleStyle {
+    /// Usage: `.buttonStyle(.pressScale)`
+    static var pressScale: PressScaleStyle { .init() }
 }
 
 extension ButtonStyle where Self == GhostButtonStyle {

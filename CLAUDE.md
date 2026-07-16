@@ -146,7 +146,8 @@ always reachable, count hidden when empty, because the Reel sheet hosts the
 required **TMDB attribution**). Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, purple = movie**) and
-`Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`, `.card()`,
+`Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`,
+`PressScaleStyle` = `.pressScale` subtle press feedback, `.card()`,
 `NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
 (`.appear(i)`)), all built on the
 warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
@@ -155,7 +156,9 @@ ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
 tiles** — a new link drops in and older ones collapse into "+N earlier". The play
 screen is laid out around the **always-present keyboard** (the input is docked via
 `.safeAreaInset(.bottom)` above the keys, with `TimerBar.swift` as a slim linear
-countdown); the full chain is revealed as a numbered recap at game over. App-wide
+countdown); the full chain is revealed as a numbered recap at game over, its tiles
+staggering in (`ChainStack(staggered:)`) and the score popping when the run set a
+new best. App-wide
 tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the
 system serif wordmark with the default sans). Prefer reusing these over hardcoded
 values.

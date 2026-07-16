@@ -25,6 +25,10 @@ struct ChainStack: View {
     var numbered = false
     /// Show the "ACTOR" / "MOVIE" kind label on each tile.
     var showKind = true
+    /// Reveal the tiles one-after-another on appear (the game-over recap). Off
+    /// during play, where tiles land individually via the `drop` transition as
+    /// the chain grows — there, this is a transparent passthrough.
+    var staggered = false
 
     private var visible: [(index: Int, node: ChainNode)] {
         let all = chain.enumerated().map { (index: $0.offset, node: $0.element) }
@@ -46,7 +50,7 @@ struct ChainStack: View {
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
             }
-            ForEach(visible, id: \.node.id) { item in
+            ForEach(Array(visible.enumerated()), id: \.element.node.id) { pos, item in
                 NodeTile(
                     node: item.node,
                     showKind: showKind,
@@ -56,6 +60,7 @@ struct ChainStack: View {
                     insertion: .move(edge: .top).combined(with: .opacity),
                     removal: .opacity
                 ))
+                .appear(pos, animation: Theme.Motion.cascade, offset: 14, enabled: staggered)
             }
         }
         .animation(Theme.Motion.drop, value: chain.count)
