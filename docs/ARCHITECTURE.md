@@ -493,6 +493,100 @@ data is forward-compatible with a future sync). The rule of thumb: **keep the
 engine/provider split clean.** New rules live in `GameEngine`; new data sources
 implement `MovieDataProvider`; new screens read observable state and call methods.
 
+### Direction: "Pass & Play" — a chain you shuttle between friends
+
+The mode we most want to build next is an **asynchronous, pass-the-chain
+multiplayer**: when your run ends you hand the chain to a friend, who continues it
+and passes it on — **one shared chain that bounces between any number of players,
+indefinitely** (a round-robin), each keeping it alive on their turn. It's the
+social hook the single-player loop is missing, and it fits the architecture almost
+suspiciously well — noting the intended shape here so it's not re-derived from
+scratch:
+
+- **Transport is a deep link, not a backend.** A finished chain encodes into a
+  `moviechain://` link shared via the system share sheet (the same surface as
+  today's `shareSummary` card). No accounts, no server — the link *is* the game
+  state. This keeps the login-free, offline-friendly character of the app.
+- **The payload is a pure `Codable` value + a codec**, in the same family as
+  `FuzzyMatch`/`SeedDeal`/`CollectedEntity`: a versioned wire type (a `players`
+  roster, a `turn` counter, and the ordered chain with each link tagged by its
+  owner) plus a pure URL⇄payload transform (base64url in a query param),
+  unit-tested for round-trip / malformed→nil / newer-version-rejected. Nothing
+  UIKit- or network-bound.
+- **The handoff is pass-on-run-end.** No separate "mode" to pick up front and no
+  new turn logic: you play a normal run, and game-over simply offers "Pass to a
+  friend" alongside "Share". Receiving a link (via `onOpenURL`) is what puts you
+  into a pass game.
+- **Continuing reuses the existing loop verbatim.** A new engine entry point
+  rebuilds `chain` + `usedIds` from the payload and drops into `.playing` — so the
+  no-repeat rule and bounded-set validation automatically span the **whole shared
+  history**, and the receiver's app re-validates every link locally (no trust
+  problem: a lie in the link just fails validation on arrival). The stale-load
+  `generation` guard and clock-pause behaviour carry over unchanged.
+- **Attribution is "hybrid" and keyed on a stable per-device id, not a name or a
+  roster index** — so the same person coming back around the round-robin isn't
+  duplicated and the per-player contribution split stays correct after any number
+  of handoffs. Ownership lives on the *pass payload / engine*, **not** on
+  `ChainNode` (which stays a pure domain link).
+- **Two rules keep the existing stats honest.** A shared chain must **never write
+  the solo best** (`bestChain`/`bestPoints`) — a co-op effort isn't a personal
+  record. And the Reel ("Your Reel" is a "how many *you* know" hook) must log
+  **only the links you personally added**, never a friend's — i.e. filter the
+  chain by owner before recording.
+- **Known gotchas to plan for.** (1) Registering a custom URL scheme needs a
+  `CFBundleURLTypes` entry, which can't be expressed as an `INFOPLIST_KEY_*`
+  build setting — it requires a real `Info.plist`, and that plist must live
+  **outside** the synchronized `movie-quiz/` group (e.g. the project root) or the
+  `PBXFileSystemSynchronizedRootGroup` also copies it into the bundle as a resource
+  and the build fails with "Multiple commands produce … Info.plist". Keep
+  `GENERATE_INFOPLIST_FILE = YES` — it merges the generated keys on top of the
+  partial plist. (2) A **custom scheme** is the cheap path but has real UX limits:
+  Messages shows a system "open in app?" prompt and no rich preview, and the link
+  is dead for anyone without the app installed. **Universal Links** (a real domain
+  + an `apple-app-site-association` file) fix both and are the eventual target —
+  and since the codec already speaks URLs, only the transport changes.
+
+Leaderboards remain the natural place to add accounts; the per-device player id
+this mode introduces, plus the local session/collection data, are all
+forward-compatible with a future sync.
+
+### Direction: sociality as a core gamification axis
+
+Pass & Play is really the first step of a larger bet: **the strongest retention
+and gamification lever for this game is other people, not just points.** A recall
+game is inherently social — the fun of "wait, who else was in that?" is a shared
+fun — so the roadmap should treat sociality as a spectrum to build across, not a
+single feature:
+
+- **Hyper-local — friends & direct handoffs.** The tightest loop: you and people
+  you actually know. Pass & Play (above), a shared chain between a small named
+  group, "beat my chain" challenges sent to a specific friend, seeing a friend's
+  daily result. Low stakes, high trust, no discovery problem — this is where the
+  first social features should land, because the deep-link handoff needs no
+  accounts or backend to work.
+- **Local/area & affinity groups.** A middle tier: a regional or cohort
+  leaderboard (your city, your campus, a film-club group code), a "chain of the
+  day" that a bounded community all plays and compares. Enough of a crowd to feel
+  alive, small enough that a good run can actually top the board — which keeps it
+  motivating in a way a global list rarely is for most players.
+- **Global — the whole player base.** All-time and daily global leaderboards, a
+  shared daily seed everyone plays (a Connections/Wordle-style "same puzzle for
+  everyone today" that makes the 🟦🟪 share card comparable), longest-chain halls
+  of fame, spectating record chains. High ceiling, but on its own it's motivating
+  mostly for the top few — which is exactly why the local/affinity tier matters.
+
+These tiers stack rather than compete: the same finished-run data feeds a friend
+handoff, a group board, and a global daily. Practically, this is **the point where
+accounts + a backend become worth it** (identity that persists across devices,
+authoritative leaderboards, anti-cheat via server-side re-validation of a chain) —
+and it's the reason the app already resolves everything to stable TMDB ids and
+keeps the engine/provider/UI split clean and re-validatable: a submitted chain can
+be verified server-side with the same bounded-set logic the client uses. The local
+collection, best scores, and the per-device player id are all forward-compatible
+with that sync. **Design principle to preserve as this grows:** the game must stay
+fully playable and fun *solo and offline* — every social layer is additive on top
+of the login-free core, never a gate in front of it.
+
 ## Dev workflow
 
 - Day to day: Xcode — ⌘B build, ⌘R run, ⌘U test. `#Preview` blocks drive canvas.
