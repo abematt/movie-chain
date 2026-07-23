@@ -45,6 +45,18 @@ enum Config {
     /// Seconds allowed per turn before the game ends.
     static let secondsPerTurn = 30
 
+    // MARK: Assist (Assisted difficulty)
+
+    /// How many options to present each turn in Assisted mode — 1 correct answer
+    /// (drawn from the bounded candidate set) plus `optionCount - 1` recognizable
+    /// distractors (drawn from the popularity pools). See `Choices.build`.
+    static let optionCount = 3
+
+    /// Seconds docked from the turn clock for a wrong tap in Assisted mode. The
+    /// only stake in a multiple-choice turn: guessing costs time, so a wrong tap
+    /// can still run the clock out — but you can pick again.
+    static let assistedWrongPenalty = 8
+
     // MARK: Seed deal
 
     /// Probability (0…1) that a dealt home-screen start is an *actor* rather than

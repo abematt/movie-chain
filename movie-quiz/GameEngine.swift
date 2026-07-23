@@ -10,6 +10,25 @@
 import Foundation
 import Observation
 
+/// How a run is played. Chosen once per run on the home screen (a *session-level*
+/// choice, not per-turn) and fixed for the whole game.
+/// - `hardcore`: the recall game — type the answer from memory, fuzzy-matched.
+/// - `assisted`: recognition — every turn presents `Config.optionCount` options
+///   (1 correct + distractors) and you tap. A wrong tap docks the clock.
+///
+/// The two never share a leaderboard: an assisted run writes only the assisted
+/// record track and never touches the hardcore best. The flag rides along so a
+/// future split-leaderboard backend can separate the boards server-side.
+enum Difficulty: String, CaseIterable, Sendable, Identifiable {
+    case hardcore
+    case assisted
+
+    var id: String { rawValue }
+    var label: String { self == .hardcore ? "Hardcore" : "Assisted" }
+    /// Whether the turn is answered by tapping an option rather than typing.
+    var isAssisted: Bool { self == .assisted }
+}
+
 @MainActor
 @Observable
 final class GameEngine {
@@ -38,16 +57,35 @@ final class GameEngine {
     /// What the current turn expects (actor or movie).
     private(set) var expectedKind: NodeKind = .actor
 
+    /// How this run is being played, fixed at `startGame`. Drives whether the UI
+    /// docks the keyboard (hardcore) or shows tappable options (assisted), and
+    /// which record track the run writes.
+    private(set) var difficulty: Difficulty = .hardcore
+
+    /// The multiple-choice option set for the current turn in Assisted mode
+    /// (1 correct + distractors, shuffled). Empty in Hardcore. Rebuilt whenever the
+    /// candidate set changes (`loadCandidates`).
+    private(set) var currentOptions: [ChainNode] = []
+
     /// Transient feedback for a rejected / off-list answer.
     private(set) var feedback: String?
     private(set) var isChecking = false
 
     // MARK: Records & recap
 
-    /// Best chain length ever, persisted across launches.
+    /// Best chain length ever in **Hardcore**, persisted across launches.
     private(set) var bestChain: Int
-    /// Best point total ever, persisted across launches.
+    /// Best point total ever in **Hardcore**, persisted across launches.
     private(set) var bestPoints: Int
+    /// Best chain length / points ever in **Assisted** — a separate track, so an
+    /// easy-mode run never clobbers the hardcore record and vice versa.
+    private(set) var bestChainAssisted: Int
+    private(set) var bestPointsAssisted: Int
+
+    /// The best chain / points for the mode the current run is (or just was)
+    /// played in — what the game-over screen shows as "your best".
+    var bestChainForRun: Int { difficulty.isAssisted ? bestChainAssisted : bestChain }
+    var bestPointsForRun: Int { difficulty.isAssisted ? bestPointsAssisted : bestPoints }
     /// Set at game over when this run beat the previous best chain — the trigger
     /// for the celebration on the game-over screen.
     private(set) var isNewBest = false
@@ -111,6 +149,8 @@ final class GameEngine {
 
     private static let bestChainKey = "bestChain"
     private static let bestPointsKey = "bestPoints"
+    private static let bestChainAssistedKey = "bestChainAssisted"
+    private static let bestPointsAssistedKey = "bestPointsAssisted"
 
     init(provider: MovieDataProvider? = nil, collection: CollectionStore? = nil) {
         // Resolve the default in the init body (which is @MainActor-isolated),
@@ -121,6 +161,8 @@ final class GameEngine {
         self.collection = collection
         self.bestChain = UserDefaults.standard.integer(forKey: Self.bestChainKey)
         self.bestPoints = UserDefaults.standard.integer(forKey: Self.bestPointsKey)
+        self.bestChainAssisted = UserDefaults.standard.integer(forKey: Self.bestChainAssistedKey)
+        self.bestPointsAssisted = UserDefaults.standard.integer(forKey: Self.bestPointsAssistedKey)
     }
 
     var current: ChainNode? { chain.last }
@@ -131,7 +173,11 @@ final class GameEngine {
     var shareSummary: String {
         let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
         let linkWord = score == 1 ? "link" : "links"
-        return "Movie Chain 🎬\n\(score) \(linkWord) · \(points) pts\n\(squares)"
+        // Tag assisted runs so the shared 🟦🟪 card stays comparable — an assisted
+        // score isn't a hardcore score, and the daily-seed social layer relies on
+        // like-for-like comparison.
+        let mode = difficulty.isAssisted ? " · assisted" : ""
+        return "Movie Chain 🎬\n\(score) \(linkWord) · \(points) pts\(mode)\n\(squares)"
     }
 
     // MARK: Seed selection
@@ -243,9 +289,11 @@ final class GameEngine {
         }
     }
 
-    func startGame(with seed: ChainNode) async {
+    func startGame(with seed: ChainNode, difficulty: Difficulty = .hardcore) async {
         generation += 1                            // invalidate any prior run's in-flight load
         let token = generation
+        self.difficulty = difficulty
+        currentOptions = []
         chain = [seed]
         usedIds = [seed.id]
         score = 0
@@ -289,9 +337,33 @@ final class GameEngine {
             feedback = "\(node.displayName) is already in your chain."
             return
         }
+        await accept(node, token: token)
+    }
 
-        // Accept the link. Pause the timer during the network fetch so a slow
-        // candidate load can't fire game-over on an answer submitted in time.
+    /// Tap-to-answer for Assisted mode. The tapped option is either the one valid
+    /// answer (a member of the bounded candidate set) or a distractor. A correct
+    /// tap advances exactly like a typed answer; a wrong tap docks the clock and
+    /// keeps the turn alive so the player can pick again.
+    func select(_ node: ChainNode) async {
+        guard phase == .playing, difficulty.isAssisted, !isChecking else { return }
+        let token = generation
+
+        // Correct = a valid, not-yet-used answer. `currentOptions` already excludes
+        // used ids and excludes every candidate from its distractors, so this
+        // membership check is exactly the accept/reject decision.
+        guard candidates.contains(where: { $0.id == node.id }), !usedIds.contains(node.id) else {
+            applyWrongTapPenalty()
+            return
+        }
+        await accept(node, token: token)
+    }
+
+    /// Commit an accepted link (shared by typed `submit` and tapped `select`):
+    /// pause the clock across the fetch, score, extend the chain, load the next
+    /// candidate set, then resume — unless the run was reset/quit mid-await.
+    private func accept(_ node: ChainNode, token: Int) async {
+        // Pause the timer during the network fetch so a slow candidate load can't
+        // fire game-over on an answer submitted in time.
         stopCountdown()
         feedback = nil
         // Score before the clock is reset by the next turn: fast answers and
@@ -311,6 +383,15 @@ final class GameEngine {
         startCountdown()
     }
 
+    /// A wrong tap in Assisted mode: dock the clock (the only stake in a
+    /// multiple-choice turn) and keep the turn alive. If the penalty runs the
+    /// clock out, the turn ends just as a natural timeout would.
+    private func applyWrongTapPenalty() {
+        feedback = "Not quite — −\(Config.assistedWrongPenalty)s"
+        secondsRemaining = max(0, secondsRemaining - Config.assistedWrongPenalty)
+        if secondsRemaining == 0 { endGame() }
+    }
+
     /// End the current run in place (the player tapped Quit): stop the clock and
     /// show the game-over summary for the chain as it stands — *not* a reset back
     /// to the seed picker. Records are committed just as a timeout would.
@@ -326,6 +407,7 @@ final class GameEngine {
         chain = []
         usedIds = []
         candidates = []
+        currentOptions = []
         score = 0
         points = 0
         lastGain = 0
@@ -359,13 +441,33 @@ final class GameEngine {
             // corrupt the current round.
             guard generation == token else { return }
             candidates = loaded
+            rebuildOptions()
             isChecking = false
         } catch {
             guard generation == token else { return }
             candidates = []
+            currentOptions = []
             feedback = error.localizedDescription
             isChecking = false
         }
+    }
+
+    /// Rebuild the Assisted-mode option set from the freshly loaded candidates and
+    /// the popularity pool of the kind the turn now expects. No-op (and clears the
+    /// options) in Hardcore. Distractors come from the same cached deal pools the
+    /// home screen uses — zero extra network.
+    private func rebuildOptions() {
+        guard difficulty.isAssisted else { currentOptions = []; return }
+        let pool: [ChainNode] = expectedKind == .actor
+            ? actorPool.map(ChainNode.actor)
+            : moviePool.map(ChainNode.movie)
+        currentOptions = Choices.build(
+            correctFrom: candidates,
+            distractorsFrom: pool,
+            count: Config.optionCount,
+            excluding: usedIds,
+            using: &systemRNG
+        )
     }
 
     // MARK: Timer
@@ -389,6 +491,10 @@ final class GameEngine {
     }
 
     private func endGame(quit: Bool = false) {
+        // Guard against a double end: a wrong-tap penalty that zeroes the clock
+        // ends the run directly, and the (now-cancelled) countdown task must not
+        // end it again.
+        guard phase == .playing else { return }
         generation += 1                            // drop any in-flight candidate load
         countdownTask?.cancel()
         countdownTask = nil
@@ -399,15 +505,29 @@ final class GameEngine {
         // manual quit: there was no missed turn.
         missedAnswer = quit ? nil : candidates.first { !usedIds.contains($0.id) }
 
-        // Commit records.
-        if score > bestChain {
-            bestChain = score
-            isNewBest = true
-            UserDefaults.standard.set(bestChain, forKey: Self.bestChainKey)
-        }
-        if points > bestPoints {
-            bestPoints = points
-            UserDefaults.standard.set(bestPoints, forKey: Self.bestPointsKey)
+        // Commit records to the track for this run's difficulty. Assisted and
+        // Hardcore never cross: an easy-mode run can't set the hardcore best (and
+        // vice versa), so each leaderboard stays honest.
+        if difficulty.isAssisted {
+            if score > bestChainAssisted {
+                bestChainAssisted = score
+                isNewBest = true
+                UserDefaults.standard.set(bestChainAssisted, forKey: Self.bestChainAssistedKey)
+            }
+            if points > bestPointsAssisted {
+                bestPointsAssisted = points
+                UserDefaults.standard.set(bestPointsAssisted, forKey: Self.bestPointsAssistedKey)
+            }
+        } else {
+            if score > bestChain {
+                bestChain = score
+                isNewBest = true
+                UserDefaults.standard.set(bestChain, forKey: Self.bestChainKey)
+            }
+            if points > bestPoints {
+                bestPoints = points
+                UserDefaults.standard.set(bestPoints, forKey: Self.bestPointsKey)
+            }
         }
 
         // Log the run into the collection. A chain of length ≥ 2 means at least
