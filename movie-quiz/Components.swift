@@ -292,6 +292,64 @@ extension View {
     }
 }
 
+// MARK: - Difficulty toggle
+//
+// The session-level Hardcore / Assisted choice, as a compact segmented capsule.
+// Shared by the home screen (picked per run) and Settings (the persisted
+// default) so both stay in sync and look identical — both bind the same
+// `@AppStorage("difficulty")` key.
+
+struct DifficultyToggle: View {
+    @Binding var selection: Difficulty
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Difficulty.allCases) { difficulty in
+                Button {
+                    guard selection != difficulty else { return }
+                    Haptics.selection()
+                    withAnimation(Theme.Motion.emphasized) { selection = difficulty }
+                } label: {
+                    Text(difficulty.label)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.sm)
+                }
+                .buttonStyle(DifficultySegmentStyle(selected: selection == difficulty))
+            }
+        }
+        .padding(4)
+        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .strokeBorder(Theme.Color.hairline, lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Difficulty")
+    }
+}
+
+/// One side of the difficulty toggle: the active side fills ink (the app's
+/// primary affordance), matching `PrimaryButtonStyle` rather than a category hue
+/// (difficulty isn't an actor/movie thing).
+private struct DifficultySegmentStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(selected ? Theme.Color.onInk : Color.secondary)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(selected ? Theme.Color.ink : Color.clear)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(Theme.Motion.standard, value: configuration.isPressed)
+            .animation(Theme.Motion.emphasized, value: selected)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Components") {

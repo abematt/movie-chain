@@ -549,7 +549,7 @@ final class GameEngine {
     // play screen (and its design-system components) can be inspected without
     // typing. Triggered by the `-uiDemoChain` launch argument in `ContentView`;
     // guarded by `#if DEBUG` so it is never compiled into release builds.
-    func loadDemoChain() {
+    func loadDemoChain(assisted: Bool = false) {
         func actor(_ id: Int, _ name: String) -> ChainNode { .actor(Person(id: id, name: name)) }
         func movie(_ id: Int, _ title: String, _ year: Int) -> ChainNode {
             .movie(Movie(id: id, title: title, year: year))
@@ -565,8 +565,14 @@ final class GameEngine {
         score = chain.count - 1
         points = score * 24
         lastGain = 24
+        difficulty = assisted ? .assisted : .hardcore
         expectedKind = chain.last?.nextKind ?? .movie
-        candidates = [.actor(Person(id: 9, name: "Jack Nicholson"))]
+        candidates = [.movie(Movie(id: 1003, title: "Inception", year: 2010))]
+        currentOptions = assisted
+            ? [movie(1003, "Inception", 2010),
+               movie(1004, "Gladiator", 2000),
+               movie(1005, "Whiplash", 2014)]
+            : []
         feedback = nil
         secondsRemaining = 18
         phase = .playing

@@ -14,6 +14,9 @@ and each turn is on a countdown — run out of time and the game ends.
 - Bundle ID: `abe.movie-quiz`
 - No autocomplete by design — you type from memory; spelling is forgiven, but
   the answer is not.
+- A session-level **difficulty** picked before each run: **Hardcore** (the recall
+  game above) or **Assisted** (recognition — tap one of three options per turn),
+  scored on separate record tracks. See `Choices`/`Difficulty` below.
 
 ## Stack & platform
 
@@ -174,6 +177,19 @@ home-screen deal policy is unit-tested with a seeded RNG — no network.
   other kind if the chosen pool is empty). Returns `nil` only if both pools are
   empty. Tunables live in `Config` (`seedActorBias = 0.6`, `seedRecentWindow = 8`).
 
+### Assist options — [`Choices.swift`](../movie-quiz/Choices.swift)
+Pure, stateless (same family as `SeedDeal`/`FuzzyMatch`/`ActorRanking`/`Scoring`),
+so the **Assisted** difficulty's multiple-choice policy is unit-tested with a
+seeded RNG. `build(correctFrom:distractorsFrom:count:excluding:using:)` assembles
+a turn's option set: **1 correct answer** drawn from the engine's bounded
+`candidates` (minus `usedIds`) plus recognizable **distractors** drawn from the
+cached deal pool — **zero extra network**, because both halves are state the
+engine already owns. The key invariant: distractors exclude **every** candidate
+id (not just the used ones), so a "wrong" option can never secretly be right. A
+pool too thin to fill `count` degrades to fewer options (never padded/duplicated);
+no unused valid answer → empty set. See `Difficulty` / the engine's Assisted play
+below, and `Config.optionCount` / `assistedWrongPenalty`.
+
 ### Scoring & feedback (the gamification layer)
 The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and
@@ -216,7 +232,24 @@ function of it.
 - **State:** `phase` (`.seed`/`.playing`/`.gameOver`), `chain: [ChainNode]`,
   `score` (chain length), `points`, `lastGain`/`lastAnswerFast` (for the "+N"
   flourish), `secondsRemaining`, `expectedKind`, transient `feedback`, `isChecking`.
-- **Records & recap:** `bestChain`/`bestPoints` (persisted via `UserDefaults`),
+- **Difficulty & Assisted play:** `difficulty` (`.hardcore`/`.assisted`) is a
+  *session-level* choice fixed at `startGame(with:difficulty:)`. **Hardcore** is
+  the recall game — type an answer, fuzzy-matched (`submit`). **Assisted** is
+  recognition — each turn exposes `currentOptions` (built by `Choices.build` in
+  `rebuildOptions`, called from `loadCandidates` so it refreshes with the
+  candidate set), answered by tapping (`select`). A correct tap and a typed answer
+  both funnel through a shared private `accept(_:)`; a wrong tap runs
+  `applyWrongTapPenalty` — it docks `Config.assistedWrongPenalty` seconds and keeps
+  the turn alive, and if that zeroes the clock it ends the run (so `endGame` now
+  guards `phase == .playing` against the countdown task also firing).
+- **Records & recap:** `bestChain`/`bestPoints` (the **Hardcore** track, persisted
+  via `UserDefaults`) and `bestChainAssisted`/`bestPointsAssisted` (the **Assisted**
+  track). `endGame` writes only the track matching `difficulty` — an easy-mode run
+  never clobbers the hardcore best and vice versa (`bestChainForRun`/`bestPointsForRun`
+  expose the current run's track to the UI), mirroring the Pass & Play rule that a
+  shared chain must never write the solo best. `shareSummary` tags assisted runs
+  (`· assisted`) so the 🟦🟪 card stays comparable. The flag is forward-compatible
+  with the planned split leaderboards.
   `isNewBest` (celebration trigger), `missedAnswer` (a valid answer left ungiven on
   the turn that timed out — the "you were one away" near-miss, captured in
   `endGame()` from the still-loaded `candidates`; `nil` on a manual quit),
@@ -353,7 +386,9 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   ordinary re-insertions — the seed controls stagger during the cold-launch intro
   yet arrive **solid** on a "Play again" re-entry, so they don't run their own
   motion *while the carousel is already pushing the screen in* (that clash read as
-  whiplash).
+  whiplash). `DifficultyToggle` (the Hardcore/Assisted segmented capsule, active
+  side filled ink) also lives here so the home and Settings render the identical
+  control off one `@AppStorage("difficulty")` binding.
 - Feature components in their own files: [`ChainStack.swift`](../movie-quiz/ChainStack.swift)
   is the signature visual — the chain as a **rising Tetris-style stack of category
   tiles**: each accepted link drops in from the top and the column builds; in the
@@ -397,11 +432,16 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   + tagline hero, then the signature control — a single ink **"Start with ·
   ⟨name⟩" button** (Play and the seed fused into one; the dealt seed is a category
   dot + name, blue = actor / purple = movie) that starts the round on tap — a
-  **"→ Name a movie they were in" hint** (reuses `NodeKind.prompt`), and a
-  **Shuffle** ghost button. A quiet **"or search for your own start"** link drops
-  down to the (now demoted) search flow, and **Your Reel** shrinks to a single
-  top-trailing corner pill (shown once the player has logged art; personal best
-  folded into that sheet via `CollectionView(bestChain:)`, off the hero).
+  **"→ Name a movie they were in" hint** (reuses `NodeKind.prompt`), a
+  **Hardcore / Assisted `DifficultyToggle`** (the session mode, chosen right where
+  the run starts; persisted to `@AppStorage("difficulty")` and passed into
+  `startGame(with:difficulty:)`), and a **Shuffle** ghost button. A quiet
+  **"or search for your own start"** link drops down to the (now demoted) search
+  flow. A **gear pill** (top-leading) opens the new `SettingsView` sheet, and
+  **Your Reel** shrinks to a single top-trailing corner pill (shown once the player
+  has logged art; personal best folded into that sheet via
+  `CollectionView(bestChain:)`, off the hero). The intro cascade now assembles five
+  control slots (start → hint → difficulty → shuffle → search link).
   - **The deal** is owned by the engine (`engine.dealtSeed`, dealt on every
     appearance and on resume — see the engine's "Seed deal" note). The name lives
     on **one line, auto-sized to fit** (`lineLimit(1)` + `minimumScaleFactor`, like
@@ -427,20 +467,36 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
     a Play-again re-entry starts fully assembled. Reduce Motion shows it at once,
     and a full-screen tap catcher lets a tap **skip to the assembled screen** (the
     controls are inert until assembly, so the catcher never eats a real tap).
-- [`GameView.swift`](../movie-quiz/GameView.swift) — the turn, laid out around the
+- [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·
+  seconds · quit) + `TimerBar`, the centered **serif score hero** (chain number +
+  points), the rising `ChainStack`, and the next-up hint are shared; the **bottom
+  band branches on `engine.difficulty`**. **Hardcore** is laid out around the
   **always-present software keyboard** (the dominant constraint of a typing game):
-  compact chrome (sound · seconds · quit) + `TimerBar` up top, a centered **serif
-  score hero** (chain number + points) filling the band above the rising
-  `ChainStack`, a "Name a movie X was in" hint, and the answer input **docked via
-  `.safeAreaInset(.bottom)`** directly above the keys (auto-focused; the keyboard's
-  Go submits). Reacts to `engine.score` / `engine.feedback` to fire haptics, sound,
-  the "+N" pop and the shake.
+  the answer input **docked via `.safeAreaInset(.bottom)`** directly above the keys
+  (auto-focused; the keyboard's Go submits). **Assisted** swaps that dock for a
+  panel of `engine.currentOptions` tap tiles (no keyboard — the focus `.task` is
+  skipped); all options wear the turn's one category color so the dot never leaks
+  the answer, a wrong tap shakes the whole panel. Both react to `engine.score` /
+  `engine.feedback` to fire haptics, sound, the "+N" pop and the shake. The hint
+  rephrases for tapping ("Who was in X?"). The sound toggle still lives in the
+  chrome (and now also in Settings). DEBUG `loadDemoChain(assisted:)` + an
+  "Assisted" `#Preview` inspect the tap layout.
 - [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score (serif) +
   points, a quiet "a new best" mark (a serif-italic green pill, no confetti), the
-  **Personal best fenced between hairlines** so it never reads as this run, the
+  best **fenced between hairlines** so it never reads as this run, the
   "you were one away" near-miss, **a "+N new to your Reel" line that opens the
   collection sheet**, the full chain revealed as a numbered `ChainStack`
-  recap, and **Play again** + **Share** (the 🟦🟪 card).
+  recap, and **Play again** + **Share** (the 🟦🟪 card). Keyed to the run's
+  difficulty: the result caption tags "· Assisted", and the fenced best reads the
+  matching track ("Assisted best" / `bestChainForRun`) so it lines up with the
+  tagged share card.
+- [`SettingsView.swift`](../movie-quiz/SettingsView.swift) — the app's first real
+  settings surface, a `.sheet` opened from a **gear pill** on `SeedView` (mirroring
+  the Reel pill on the opposite corner). A small on-brand card layout (not a stock
+  grouped `Form`), all `@AppStorage`-backed: the **default difficulty**
+  (`DifficultyToggle`, sharing the `"difficulty"` key with the home so they stay in
+  sync) with a mode explainer, and the **sound toggle** (which also still lives
+  inline in the game chrome).
 
 ### Config & secrets — [`Config.swift`](../movie-quiz/Config.swift)
 - `secondsPerTurn = 30` and other tunables.
@@ -608,7 +664,12 @@ of the login-free core, never a gate in front of it.
   `ScoringTests` locks the point math + flame-tier thresholds,
   `GameEngineTests` locks the stale-load safety with a gated stub provider (and
   the per-side seed-pool retry: a failed/empty side isn't cached as loaded and is
-  retried, a loaded side isn't re-fetched),
+  retried, a loaded side isn't re-fetched; plus the **Assisted** path: a turn
+  offers 1 correct + distractors, a correct tap advances, a wrong tap docks time /
+  can run out the clock, and an assisted run writes only the assisted best),
+  `ChoicesTests` locks the option policy (correct always offered, distractors never
+  secretly valid, used ids excluded, thin pool degrades, empty when no unused
+  correct),
   `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
   counted once a link lands, dedup by id, `timesLogged` per-chain), and
   `SeedDealTests` locks the home-screen deal policy (actor/movie bias, recent-id

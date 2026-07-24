@@ -95,7 +95,14 @@ Malkovic" resolve correctly without global fuzzy search or false positives.
 `phase` (seed → playing → gameOver), the `chain`, `score` (chain length) +
 `points` (base + speed + obscurity bonuses), per-turn countdown, the current
 candidate set, `usedIds` (no-repeat rule), persisted `bestChain`/`bestPoints`,
-and the `missedAnswer` near-miss. It also owns the **home-screen deal**: the
+and the `missedAnswer` near-miss. A session-level `difficulty` (fixed at
+`startGame(with:difficulty:)`) selects **Hardcore** (type → `submit` → fuzzy match)
+or **Assisted** (tap `currentOptions`, built each turn by the pure `Choices.build`
+from the candidate set + cached pools; `select` accepts or docks time via
+`applyWrongTapPenalty`). Both accept paths share a private `accept(_:)`. Records
+split by difficulty — assisted runs write only `bestChainAssisted`/`bestPointsAssisted`,
+never the hardcore best (`shareSummary` tags them; forward-compatible with split
+leaderboards). It also owns the **home-screen deal**: the
 cached popularity pools, the `dealtSeed` the home renders, and a `recentSeedIds`
 ring buffer — `prepareSeeds()`/`shuffleSeed()`/`dealFreshOnResume()` all route
 through a private `deal()` that delegates the *policy* to the pure
@@ -104,7 +111,7 @@ recent-id avoidance). Every entity resolves to a stable TMDB id, so
 validation and dedup are exact. Async candidate loads are guarded by a monotonic
 `generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
 or quit game can't install stale candidates into a new round. `Config.swift` holds
-tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`) and loads the TMDB credential at runtime from a
+tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `optionCount`, `assistedWrongPenalty`) and loads the TMDB credential at runtime from a
 **gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
 and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
@@ -140,7 +147,9 @@ first-run cold-launch intro (the title lockup starts centered, the mini-chain dr
 it rises as the controls assemble). `SeedView` is **play-first**: it leads with a
 *dealt start* — one ink **"Start with ⟨name⟩" button** (Play + seed fused; the
 name auto-fits one line so Shuffle can deal it in/out on `.dealDrop` without
-reflow) + a **Shuffle** button, with search demoted to an opt-in link and **Your
+reflow) + a **Hardcore/Assisted `DifficultyToggle`** + a **Shuffle** button, with
+search demoted to an opt-in link, a **gear pill** opening the new `SettingsView`
+sheet (default difficulty + sound), and **Your
 Reel** shrunk to a corner pill (personal best folded into that sheet; the pill is
 always reachable, count hidden when empty, because the Reel sheet hosts the
 required **TMDB attribution**). Styling is a
@@ -148,15 +157,16 @@ small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, purple = movie**) and
 `Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`,
 `PressScaleStyle` = `.pressScale` subtle press feedback, `.card()`,
-`NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
+`NodeTile`/`NodeDot`, `DifficultyToggle`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
 (`.appear(i)`)), all built on the
 warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
 ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
 `ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category
 tiles** — a new link drops in and older ones collapse into "+N earlier". The play
-screen is laid out around the **always-present keyboard** (the input is docked via
-`.safeAreaInset(.bottom)` above the keys, with `TimerBar.swift` as a slim linear
-countdown); the full chain is revealed as a numbered recap at game over, its tiles
+screen's bottom band branches on difficulty: **Hardcore** docks the text input via
+`.safeAreaInset(.bottom)` above the **always-present keyboard**, **Assisted** swaps
+it for a keyboard-free panel of tappable option tiles (with `TimerBar.swift` as a
+slim linear countdown either way); the full chain is revealed as a numbered recap at game over, its tiles
 staggering in (`ChainStack(staggered:)`) and the score popping when the run set a
 new best. App-wide
 tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the

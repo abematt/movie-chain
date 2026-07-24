@@ -48,13 +48,18 @@ struct SeedView: View {
     @State private var playsIntro: Bool
     @State private var introTask: Task<Void, Never>?
 
+    @State private var showSettings = false
+
     @AppStorage("soundEnabled") private var soundEnabled = true
+    /// The session difficulty picked for the next run (persisted default; also
+    /// editable in Settings — both bind this same key).
+    @AppStorage("difficulty") private var difficulty: Difficulty = .hardcore
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Staggered slots for the intro cascade: start button(0), hint(1),
-    /// shuffle(2), search link(3).
-    private static let controlSlotCount = 4
+    /// difficulty(2), shuffle(3), search link(4).
+    private static let controlSlotCount = 5
 
     init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
         self.engine = engine
@@ -91,6 +96,7 @@ struct SeedView: View {
             .animation(Theme.Motion.standard, value: searching)
         }
         .background(Theme.Color.canvas.ignoresSafeArea())
+        .overlay(alignment: .topLeading) { settingsButton }
         .overlay(alignment: .topTrailing) { reelButton }
         .overlay {
             // Tap-to-skip while the intro plays (controls are inert until assembly,
@@ -105,6 +111,9 @@ struct SeedView: View {
         }
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
         // Deal a fresh start on every appearance (cold launch and "Play again").
         .task { await engine.prepareSeeds() }
@@ -193,9 +202,10 @@ struct SeedView: View {
             Spacer(minLength: Theme.Spacing.md)
             cascade(startButton, 0)
             cascade(hintLine, 1)
-            cascade(shuffleButton, 2)
+            cascade(difficultyToggle, 2)
+            cascade(shuffleButton, 3)
             Spacer(minLength: Theme.Spacing.md)
-            cascade(searchLink, 3)
+            cascade(searchLink, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -254,6 +264,12 @@ struct SeedView: View {
         .animation(reduceMotion ? nil : Theme.Motion.standard, value: engine.dealtSeed)
     }
 
+    // The session difficulty, chosen right where the run starts so the player is
+    // deliberate about which mode (and which record track) this run counts for.
+    private var difficultyToggle: some View {
+        DifficultyToggle(selection: $difficulty)
+    }
+
     private var shuffleButton: some View {
         Button {
             Haptics.selection()
@@ -283,7 +299,7 @@ struct SeedView: View {
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         searchTask?.cancel()
-        Task { await engine.startGame(with: seed) }
+        Task { await engine.startGame(with: seed, difficulty: difficulty) }
     }
 
     // MARK: Reel — a single corner button (also the route to the TMDB attribution)
@@ -294,6 +310,27 @@ struct SeedView: View {
     // chain. The count only appears once there's something to count, so an empty
     // Reel reads as a quiet "open your collection / about" affordance, keeping the
     // home play-first while the attribution stays one tap away.
+    // A quiet gear that mirrors the Reel pill on the opposite corner — the route
+    // to the (new) settings sheet. Hidden during search and the intro, exactly
+    // like the Reel pill, so the home stays clean.
+    @ViewBuilder private var settingsButton: some View {
+        if !searching, !introRunning {
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.Color.ink)
+                    .padding(.horizontal, Theme.Spacing.sm + 2)
+                    .padding(.vertical, Theme.Spacing.xs + 2)
+                    .overlay(Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.xs)
+            .transition(.opacity)
+            .accessibilityLabel("Settings")
+        }
+    }
+
     @ViewBuilder private var reelButton: some View {
         if !searching, !introRunning {
             Button { showReel = true } label: {
@@ -471,7 +508,7 @@ struct SeedView: View {
 
     private func start(with node: ChainNode) {
         searchTask?.cancel()
-        Task { await engine.startGame(with: node) }
+        Task { await engine.startGame(with: node, difficulty: difficulty) }
     }
 
     // MARK: Intro sequence
