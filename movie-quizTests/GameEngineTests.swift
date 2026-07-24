@@ -196,6 +196,50 @@ final class GameEngineTests: XCTestCase {
         XCTAssertEqual(engine.score, 0)
     }
 
+    // MARK: Candidate-load resilience (the "stuck turn" fix)
+
+    /// Fails the first N candidate fetches (a transient rate limit / timeout), then
+    /// succeeds — to exercise `loadCandidates`' retry and the manual `retryTurn`.
+    @MainActor
+    final class FlakyCandidateProvider: MovieDataProvider {
+        var failFilmographyTimes = 1
+        private(set) var filmographyCalls = 0
+
+        func searchActors(_ query: String) async throws -> [Person] { [] }
+        func searchMovies(_ query: String) async throws -> [Movie] { [] }
+        func popularActors() async throws -> [Person] { [] }
+        func popularMovies() async throws -> [Movie] { [] }
+        func cast(of movie: Movie) async throws -> [Person] { [] }
+        func filmography(of actor: Person) async throws -> [Movie] {
+            filmographyCalls += 1
+            if filmographyCalls <= failFilmographyTimes { throw DataProviderError.badResponse(429) }
+            return [Movie(id: 100, title: "Film 100", year: 2001)]
+        }
+    }
+
+    func testCandidateLoadRetriesTransientFailure() async {
+        let provider = FlakyCandidateProvider()   // first fetch throws, then succeeds
+        let engine = GameEngine(provider: provider)
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+
+        XCTAssertFalse(engine.awaitingRetry, "a transient failure should be retried, not surfaced")
+        await engine.submit("Film 100")   // candidates loaded → a valid answer is accepted
+        XCTAssertEqual(engine.score, 1, "the turn was not stuck")
+    }
+
+    func testRetryTurnRecoversAfterExhaustedRetries() async {
+        let provider = FlakyCandidateProvider()
+        provider.failFilmographyTimes = Config.candidateLoadAttempts   // all initial attempts fail
+        let engine = GameEngine(provider: provider)
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+
+        XCTAssertTrue(engine.awaitingRetry, "an exhausted load must surface the Retry affordance")
+        await engine.retryTurn()           // next fetch succeeds
+        XCTAssertFalse(engine.awaitingRetry)
+        await engine.submit("Film 100")
+        XCTAssertEqual(engine.score, 1)
+    }
+
     func testAssistedRunWritesOnlyTheAssistedBest() async {
         // Isolate the record keys from any prior run — the engine reads them in init.
         for key in ["bestChain", "bestPoints", "bestChainAssisted", "bestPointsAssisted"] {

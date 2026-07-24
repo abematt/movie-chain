@@ -102,7 +102,11 @@ from the candidate set + cached pools; `select` accepts or docks time via
 `applyWrongTapPenalty`). Both accept paths share a private `accept(_:)`. Records
 split by difficulty — assisted runs write only `bestChainAssisted`/`bestPointsAssisted`,
 never the hardcore best (`shareSummary` tags them; forward-compatible with split
-leaderboards). It also owns the **home-screen deal**: the
+leaderboards). The assisted correct answer is picked from the *recognizable* end of
+the candidates (cast billing order / popularity-sorted filmography) so it doesn't
+stand out among famous distractors. `loadCandidates` **retries** transient fetch
+failures (+ a short request timeout) so a rate-limit/stall can't freeze a turn; an
+exhausted load surfaces a manual `retryTurn` (`awaitingRetry`). It also owns the **home-screen deal**: the
 cached popularity pools, the `dealtSeed` the home renders, and a `recentSeedIds`
 ring buffer — `prepareSeeds()`/`shuffleSeed()`/`dealFreshOnResume()` all route
 through a private `deal()` that delegates the *policy* to the pure
@@ -111,7 +115,7 @@ recent-id avoidance). Every entity resolves to a stable TMDB id, so
 validation and dedup are exact. Async candidate loads are guarded by a monotonic
 `generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
 or quit game can't install stale candidates into a new round. `Config.swift` holds
-tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `optionCount`, `assistedWrongPenalty`) and loads the TMDB credential at runtime from a
+tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `optionCount`, `assistedWrongPenalty`, `assistCorrectPoolSize`, `requestTimeout`, `candidateLoadAttempts`) and loads the TMDB credential at runtime from a
 **gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
 and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
@@ -165,8 +169,8 @@ ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
 tiles** — a new link drops in and older ones collapse into "+N earlier". The play
 screen's bottom band branches on difficulty: **Hardcore** docks the text input via
 `.safeAreaInset(.bottom)` above the **always-present keyboard**, **Assisted** swaps
-it for a keyboard-free panel of tappable option tiles (with `TimerBar.swift` as a
-slim linear countdown either way); the full chain is revealed as a numbered recap at game over, its tiles
+it for a keyboard-free panel of tappable option tiles (each with a `NodeThumbnail`
+headshot/poster; with `TimerBar.swift` as a slim linear countdown either way); the full chain is revealed as a numbered recap at game over, its tiles
 staggering in (`ChainStack(staggered:)`) and the score popping when the run set a
 new best. App-wide
 tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the

@@ -428,28 +428,63 @@ final class GameEngine {
         // these are never stale writes — only the post-fetch writes below can be.
         expectedKind = node.nextKind
         isChecking = true
-        do {
-            let loaded: [ChainNode]
-            switch node {
-            case .movie(let movie):
-                loaded = try await provider.cast(of: movie).map(ChainNode.actor)
-            case .actor(let actor):
-                loaded = try await provider.filmography(of: actor).map(ChainNode.movie)
+        // Retry a transient failure (a shared-key rate limit or a stalled request —
+        // see `Config.makeProvider`'s TODO and `requestTimeout`). The clock is paused
+        // across this load, so retries cost the player no time. Without this, one
+        // hiccup empties `candidates` and leaves the turn with nothing to answer —
+        // in Assisted, no options at all (the reported "stuck turn").
+        for attempt in 0..<max(1, Config.candidateLoadAttempts) {
+            do {
+                let loaded: [ChainNode]
+                switch node {
+                case .movie(let movie):
+                    loaded = try await provider.cast(of: movie).map(ChainNode.actor)
+                case .actor(let actor):
+                    loaded = try await provider.filmography(of: actor).map(ChainNode.movie)
+                }
+                // Drop a superseded result: a reset/quit/new game moved the token on
+                // while this fetch was in flight, so installing its candidates would
+                // corrupt the current round.
+                guard generation == token else { return }
+                candidates = loaded
+                rebuildOptions()
+                feedback = nil
+                isChecking = false
+                return
+            } catch {
+                guard generation == token else { return }
+                if attempt < Config.candidateLoadAttempts - 1 {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard generation == token else { return }
+                    continue
+                }
+                // Exhausted retries: leave an empty set the player can retry by hand
+                // (`retryTurn`), rather than a silently dead turn.
+                candidates = []
+                currentOptions = []
+                feedback = "Couldn't load the next round — tap Retry."
+                isChecking = false
             }
-            // Drop a superseded result: a reset/quit/new game moved the token on
-            // while this fetch was in flight, so installing its candidates would
-            // corrupt the current round.
-            guard generation == token else { return }
-            candidates = loaded
-            rebuildOptions()
-            isChecking = false
-        } catch {
-            guard generation == token else { return }
-            candidates = []
-            currentOptions = []
-            feedback = error.localizedDescription
-            isChecking = false
         }
+    }
+
+    /// Whether the turn has no answers to give because the candidate load failed —
+    /// the signal for the UI's manual Retry affordance (both modes). Distinct from
+    /// a load still in flight (`isChecking`).
+    var awaitingRetry: Bool {
+        phase == .playing && !isChecking && candidates.isEmpty && !chain.isEmpty
+    }
+
+    /// Re-fetch the current turn's candidates after a load failure and restart the
+    /// clock fresh (the failed load wasn't the player's fault, so it shouldn't have
+    /// burned their time). Same turn/node, so it rides the current `generation`.
+    func retryTurn() async {
+        guard phase == .playing, !isChecking, let node = chain.last else { return }
+        stopCountdown()
+        let token = generation
+        await loadCandidates(for: node, token: token)
+        guard phase == .playing, generation == token else { return }
+        startCountdown()
     }
 
     /// Rebuild the Assisted-mode option set from the freshly loaded candidates and
@@ -466,6 +501,7 @@ final class GameEngine {
             distractorsFrom: pool,
             count: Config.optionCount,
             excluding: usedIds,
+            correctPoolSize: Config.assistCorrectPoolSize,
             using: &systemRNG
         )
     }

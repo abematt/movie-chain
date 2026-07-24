@@ -195,30 +195,34 @@ struct GameView: View {
                     .transition(.opacity)
             }
 
-            HStack(spacing: Theme.Spacing.sm) {
-                TextField(engine.expectedKind.placeholder, text: $answer)
-                    .textFieldStyle(.plain)
-                    .autocorrectionDisabled()
-                    .focused($fieldFocused)
-                    .submitLabel(.go)
-                    .onSubmit(submit)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm + 4)
-                    .background(Theme.Color.tile, in: Capsule())
-
-                Button(action: submit) {
-                    Text("Go")
-                        .font(.headline)
-                        .foregroundStyle(Theme.Color.onInk)
-                        .padding(.horizontal, Theme.Spacing.md + 2)
+            if engine.awaitingRetry {
+                retryButton
+            } else {
+                HStack(spacing: Theme.Spacing.sm) {
+                    TextField(engine.expectedKind.placeholder, text: $answer)
+                        .textFieldStyle(.plain)
+                        .autocorrectionDisabled()
+                        .focused($fieldFocused)
+                        .submitLabel(.go)
+                        .onSubmit(submit)
+                        .padding(.horizontal, Theme.Spacing.md)
                         .padding(.vertical, Theme.Spacing.sm + 4)
-                        .background(Theme.Color.ink, in: Capsule())
+                        .background(Theme.Color.tile, in: Capsule())
+
+                    Button(action: submit) {
+                        Text("Go")
+                            .font(.headline)
+                            .foregroundStyle(Theme.Color.onInk)
+                            .padding(.horizontal, Theme.Spacing.md + 2)
+                            .padding(.vertical, Theme.Spacing.sm + 4)
+                            .background(Theme.Color.ink, in: Capsule())
+                    }
+                    .buttonStyle(.pressScale)
+                    .disabled(!canSubmit)
+                    .opacity(canSubmit ? 1 : 0.4)
                 }
-                .buttonStyle(.pressScale)
-                .disabled(!canSubmit)
-                .opacity(canSubmit ? 1 : 0.4)
+                .shake(shakeToken)
             }
-            .shake(shakeToken)
         }
         .padding(.horizontal)
         .padding(.top, Theme.Spacing.sm)
@@ -239,15 +243,19 @@ struct GameView: View {
                     .transition(.opacity)
             }
 
-            // All options share the turn's category color (they're all the same
-            // kind), so the tinted dot never leaks which is correct. A wrong tap
-            // shakes the whole panel.
-            VStack(spacing: Theme.Spacing.sm) {
-                ForEach(engine.currentOptions) { node in
-                    optionButton(node)
+            if engine.awaitingRetry {
+                retryButton
+            } else {
+                // All options share the turn's category color (they're all the same
+                // kind), so nothing leaks which is correct. A wrong tap shakes the
+                // whole panel.
+                VStack(spacing: Theme.Spacing.sm) {
+                    ForEach(engine.currentOptions) { node in
+                        optionButton(node)
+                    }
                 }
+                .shake(shakeToken)
             }
-            .shake(shakeToken)
         }
         .padding(.horizontal)
         .padding(.top, Theme.Spacing.sm)
@@ -260,16 +268,16 @@ struct GameView: View {
     private func optionButton(_ node: ChainNode) -> some View {
         Button { select(node) } label: {
             HStack(spacing: Theme.Spacing.md) {
-                NodeDot(kind: node.kind, size: 11)
+                NodeThumbnail(node: node, size: 46)
                 Text(node.displayName)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.Color.ink)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.7)
+                    .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(Theme.Spacing.sm)
             .frame(maxWidth: .infinity)
             .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.tile))
             .overlay(
@@ -279,6 +287,20 @@ struct GameView: View {
         }
         .buttonStyle(.pressScale)
         .disabled(engine.isChecking)
+    }
+
+    // Shown in place of options when a candidate load failed (both modes surface
+    // this; the panel just hosts it in Assisted). Retrying reloads and restarts
+    // the turn clock fresh.
+    private var retryButton: some View {
+        Button { Task { await engine.retryTurn() } } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "arrow.clockwise")
+                Text("Retry").frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.primary)
     }
 
     private func select(_ node: ChainNode) {

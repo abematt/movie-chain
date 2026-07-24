@@ -123,7 +123,12 @@ talk-show and documentary appearances are not film roles and must not be valid
 chain links (e.g. Jack Black's "Making of School of Rock" was being accepted for
 a typed "School of Rock"). Note this lives in `TMDBProvider`, not the protocol —
 a new provider must apply the same rule itself (the stub graph simply has no
-such credits).
+such credits). `filmography` is also **sorted most-popular first** (`cast` is left
+in TMDB **billing order**): both are a *recognizability* ordering, which Assisted
+mode relies on to pick a familiar correct answer (see `Choices`) and which makes
+the Hardcore near-miss surface a known film. Every TMDB request also carries a
+short `Config.requestTimeout` so a stalled fetch fails fast instead of freezing a
+turn (the clock is paused across candidate loads — see the engine's retry note).
 
 - [`TMDBProvider.swift`](../movie-quiz/TMDBProvider.swift) — live over
   `https://api.themoviedb.org/3`. Supports both v4 Bearer tokens and v3 `api_key`
@@ -185,9 +190,12 @@ a turn's option set: **1 correct answer** drawn from the engine's bounded
 `candidates` (minus `usedIds`) plus recognizable **distractors** drawn from the
 cached deal pool — **zero extra network**, because both halves are state the
 engine already owns. The key invariant: distractors exclude **every** candidate
-id (not just the used ones), so a "wrong" option can never secretly be right. A
-pool too thin to fill `count` degrades to fewer options (never padded/duplicated);
-no unused valid answer → empty set. See `Difficulty` / the engine's Assisted play
+id (not just the used ones), so a "wrong" option can never secretly be right. The
+correct answer is picked from the **top `correctPoolSize`** of the (recognizability-
+ordered) candidates rather than uniformly (`Config.assistCorrectPoolSize`), so a
+bit-part actor or deep-cut film doesn't stand out as the odd one among famous
+distractors — familiar but still varied. A pool too thin to fill `count` degrades
+to fewer options (never padded/duplicated); no unused valid answer → empty set. See `Difficulty` / the engine's Assisted play
 below, and `Config.optionCount` / `assistedWrongPenalty`.
 
 ### Scoring & feedback (the gamification layer)
@@ -291,6 +299,15 @@ function of it.
   set after each accepted link. `quit()` ends the run in place — it routes through
   `endGame()` to the game-over summary (committing records) rather than resetting
   to the seed picker.
+- **Candidate-load resilience:** `loadCandidates` **retries** a failed fetch
+  (`Config.candidateLoadAttempts`, short backoff) — a shared-key rate limit or a
+  stalled request would otherwise empty `candidates` and leave the turn with
+  nothing to answer (in Assisted, no options at all — the "stuck turn" bug). Retries
+  run while the clock is paused, so they cost no time; combined with the per-request
+  `requestTimeout`, a hiccup self-heals instead of freezing. If retries are
+  exhausted, `awaitingRetry` flips true and the UI shows a manual **Retry**
+  (`retryTurn`, which reloads and restarts the turn clock fresh — the failure
+  wasn't the player's fault), rather than a silently dead turn.
 - **Timer correctness:** the countdown is a cancellable `Task`. `submit` **stops
   the clock during the candidate fetch** so a slow network load can't fire
   game-over on an answer that was submitted in time, and re-checks `phase ==
@@ -377,7 +394,9 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   near-imperceptible press squish+dim for buttons that carry their own chrome but
   lacked an `isPressed` state, e.g. the in-game "Go"), `CardModifier` (`.card()`), `NodeTile`
   (the Connections category tile — the atom of the chain), `NodeDot` (small
-  category chip), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
+  category chip), `NodeThumbnail` (a small rounded headshot/poster with a
+  category-tinted glyph placeholder — the Reel's `AsyncImage` treatment sized for
+  an inline row; used on the Assisted option tiles), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
   answer), `FloatingGain` (the rising "+N"), and `StaggeredAppear` (`.appear(i)` —
   fades + lifts a view in on appear, delayed by its position, so a group of
   siblings assembles one-after-another; drives both the seed intro's control
@@ -475,8 +494,11 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   the answer input **docked via `.safeAreaInset(.bottom)`** directly above the keys
   (auto-focused; the keyboard's Go submits). **Assisted** swaps that dock for a
   panel of `engine.currentOptions` tap tiles (no keyboard — the focus `.task` is
-  skipped); all options wear the turn's one category color so the dot never leaks
-  the answer, a wrong tap shakes the whole panel. Both react to `engine.score` /
+  skipped), each with a `NodeThumbnail` headshot/poster; all options wear the
+  turn's one category color so nothing leaks the answer, a wrong tap shakes the
+  whole panel. Both modes show a **Retry** button (in place of the input/options)
+  when `engine.awaitingRetry` — a candidate load failed and typing/tapping would be
+  futile. Both react to `engine.score` /
   `engine.feedback` to fire haptics, sound, the "+N" pop and the shake. The hint
   rephrases for tapping ("Who was in X?"). The sound toggle still lives in the
   chrome (and now also in Settings). DEBUG `loadDemoChain(assisted:)` + an
@@ -664,12 +686,14 @@ of the login-free core, never a gate in front of it.
   `ScoringTests` locks the point math + flame-tier thresholds,
   `GameEngineTests` locks the stale-load safety with a gated stub provider (and
   the per-side seed-pool retry: a failed/empty side isn't cached as loaded and is
-  retried, a loaded side isn't re-fetched; plus the **Assisted** path: a turn
+  retried, a loaded side isn't re-fetched; the **Assisted** path: a turn
   offers 1 correct + distractors, a correct tap advances, a wrong tap docks time /
-  can run out the clock, and an assisted run writes only the assisted best),
-  `ChoicesTests` locks the option policy (correct always offered, distractors never
-  secretly valid, used ids excluded, thin pool degrades, empty when no unused
-  correct),
+  can run out the clock, and an assisted run writes only the assisted best; and the
+  **candidate-load retry**: a transient failure is retried transparently, an
+  exhausted load flips `awaitingRetry` and `retryTurn` recovers),
+  `ChoicesTests` locks the option policy (correct always offered from the
+  recognizable top, distractors never secretly valid, used ids excluded, thin pool
+  degrades, empty when no unused correct),
   `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
   counted once a link lands, dedup by id, `timesLogged` per-chain), and
   `SeedDealTests` locks the home-screen deal policy (actor/movie bias, recent-id

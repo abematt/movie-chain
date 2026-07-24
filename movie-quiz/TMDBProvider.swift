@@ -28,6 +28,7 @@ struct TMDBProvider: MovieDataProvider {
         comps.queryItems = items
 
         var req = URLRequest(url: comps.url!)
+        req.timeoutInterval = Config.requestTimeout   // fail fast; a stalled fetch must not freeze a turn
         req.setValue("application/json", forHTTPHeaderField: "accept")
         if Config.usesBearerToken {
             req.setValue("Bearer \(Config.tmdbToken)", forHTTPHeaderField: "Authorization")
@@ -168,9 +169,17 @@ struct TMDBProvider: MovieDataProvider {
         // featurettes where the person appears as themselves (e.g. "Making of
         // School of Rock", character "Self") — those aren't film roles and must
         // not be valid chain links, so drop any credit played as "Self".
+        //
+        // Sorted most-popular first so the *recognizable* films lead. This is the
+        // recognizability ordering Assisted mode relies on to pick a familiar
+        // correct answer (`Choices.build` biases toward the top), and it makes the
+        // Hardcore "you were one away" near-miss surface a known film too. Cast
+        // (above) is left in TMDB billing order — that's already its recognizability
+        // signal, and `popularActors` derives the actor pool from those leads.
         return credits.cast
             .filter { !$0.isSelfAppearance }
             .map { $0.toMovie() }
+            .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
     }
 }
 

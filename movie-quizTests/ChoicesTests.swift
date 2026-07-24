@@ -72,6 +72,24 @@ final class ChoicesTests: XCTestCase {
         XCTAssertTrue(opts.isEmpty)
     }
 
+    /// The correct answer is drawn from the recognizable end of the (ordered)
+    /// candidates, never the obscure tail — so it doesn't stand out among the
+    /// famous distractors.
+    func testCorrectPickPrefersRecognizableEnd() {
+        var g = SystemRandomNumberGenerator()
+        // Ordered most-recognizable first (m1…), with a long obscure tail.
+        let candidates = movieNodes(Array(1...20))
+        let pool = movieNodes(Array(100...120))
+        for _ in 0..<80 {
+            let opts = Choices.build(correctFrom: candidates, distractorsFrom: pool,
+                                     count: 3, excluding: [], correctPoolSize: 3, using: &g)
+            let correct = opts.first { (1...20).map { "m\($0)" }.contains($0.id) }
+            XCTAssertNotNil(correct)
+            XCTAssertTrue(["m1", "m2", "m3"].contains(correct!.id),
+                          "correct must come from the top-3 recognizable candidates, got \(correct!.id)")
+        }
+    }
+
     /// A pool too thin to fill `count` still returns the correct answer plus
     /// whatever distractors exist — never a padded or duplicated set.
     func testThinPoolDegradesGracefully() {

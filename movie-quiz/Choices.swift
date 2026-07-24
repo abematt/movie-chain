@@ -21,14 +21,21 @@ enum Choices {
     /// Build a shuffled option set: one valid answer plus recognizable distractors.
     ///
     /// - Parameters:
-    ///   - candidates: the bounded valid-answer set for the turn (cast/filmography).
-    ///     The one correct option is drawn from here (minus `usedIds`).
+    ///   - candidates: the bounded valid-answer set for the turn (cast/filmography),
+    ///     **assumed ordered most-recognizable first** (cast = billing order;
+    ///     filmography = popularity-sorted). The one correct option is drawn from
+    ///     here (minus `usedIds`).
     ///   - pool: the recognizable-name pool of the *same kind* as the turn expects
     ///     (the deal pool). Distractors are drawn from here, excluding anything that
     ///     is actually a valid answer — so a "wrong" option is never secretly right.
     ///   - count: total options wanted (e.g. `Config.optionCount`). The result may
     ///     be smaller if the pool can't supply enough distinct distractors.
     ///   - usedIds: `ChainNode.id`s already in the chain — never offered again.
+    ///   - correctPoolSize: how far down the recognizability-ordered candidates the
+    ///     correct answer may be picked from. The correct option is chosen at random
+    ///     within the top `correctPoolSize` unused candidates, so it stays familiar
+    ///     (not a bit-part actor / deep-cut film standing out among famous
+    ///     distractors) while still varying turn-to-turn. `.max` = uniform over all.
     ///   - generator: injected so tests are deterministic.
     /// - Returns: up to `count` options, shuffled, the correct one always included
     ///   when the turn has any unused valid answer. Empty only if it does not.
@@ -37,13 +44,16 @@ enum Choices {
         distractorsFrom pool: [ChainNode],
         count: Int,
         excluding usedIds: Set<String>,
+        correctPoolSize: Int = .max,
         using generator: inout G
     ) -> [ChainNode] {
-        // The one correct option: a valid answer not already used. If there is
-        // none, the turn is unwinnable anyway — return nothing and let the clock
-        // run (mirrors an exhausted candidate set in the typed game).
-        guard let correct = candidates
-            .filter({ !usedIds.contains($0.id) })
+        // The one correct option: a valid answer not already used, biased toward the
+        // recognizable end (the top `correctPoolSize`). If there is none, the turn
+        // is unwinnable anyway — return nothing and let the clock run (mirrors an
+        // exhausted candidate set in the typed game).
+        let unusedCorrect = candidates.filter { !usedIds.contains($0.id) }
+        guard let correct = unusedCorrect
+            .prefix(max(1, correctPoolSize))
             .randomElement(using: &generator)
         else { return [] }
 

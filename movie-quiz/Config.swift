@@ -57,6 +57,25 @@ enum Config {
     /// can still run the clock out — but you can pick again.
     static let assistedWrongPenalty = 8
 
+    /// The correct Assisted option is drawn from the most *recognizable* end of
+    /// the candidate set (cast is billing-ordered; filmography is popularity-sorted)
+    /// rather than uniformly, so a bit-part actor or deep-cut film doesn't stand out
+    /// as the odd one among famous distractors. This caps how far down that ordered
+    /// set the correct answer can come from — small enough to stay familiar, big
+    /// enough to vary turn-to-turn. See `Choices.build`.
+    static let assistCorrectPoolSize = 8
+
+    /// Per-request network timeout. Kept short so a stalled candidate fetch fails
+    /// fast (and retries) instead of freezing a turn — the clock is paused across
+    /// the fetch, so without this a hung connection would hang the game on
+    /// URLSession's ~60s default. See `GameEngine.loadCandidates`.
+    static let requestTimeout: TimeInterval = 12
+
+    /// How many times `GameEngine.loadCandidates` retries a failed candidate fetch
+    /// (transient rate-limit / timeout) before giving up. Retries happen while the
+    /// clock is paused, so they don't cost the player time.
+    static let candidateLoadAttempts = 3
+
     // MARK: Seed deal
 
     /// Probability (0…1) that a dealt home-screen start is an *actor* rather than

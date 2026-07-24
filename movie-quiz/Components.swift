@@ -127,6 +127,47 @@ struct NodeDot: View {
     }
 }
 
+// MARK: - Node thumbnail
+//
+// A small rounded headshot/poster for a node (actor `profile_path` / movie
+// `poster_path`), streamed via `AsyncImage` (system-cached, never stored) with a
+// category-tinted glyph placeholder while it loads or when there's no art — the
+// same treatment as the Reel grid, sized for an inline row (the Assisted options).
+
+struct NodeThumbnail: View {
+    let node: ChainNode
+    var size: CGFloat = 44
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            node.accent.opacity(0.22)
+            if let url = Config.imageURL(path: node.imagePath, size: "w185") {
+                AsyncImage(url: url, transaction: Transaction(animation: reduceMotion ? nil : .easeIn(duration: 0.25))) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    case .empty, .failure:
+                        glyph
+                    @unknown default:
+                        glyph
+                    }
+                }
+            } else {
+                glyph
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+    }
+
+    private var glyph: some View {
+        Image(systemName: node.kind.symbol)
+            .font(.system(size: size * 0.38))
+            .foregroundStyle(node.accent)
+    }
+}
+
 // MARK: - Node tile
 //
 // One link rendered as a Connections group-tile: a solid category-colored bar
