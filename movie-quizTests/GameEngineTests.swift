@@ -125,12 +125,11 @@ final class GameEngineTests: XCTestCase {
         XCTAssertNotNil(engine.dealtSeed)
     }
 
-    // MARK: Assisted difficulty (tap-to-answer)
+    // MARK: Reel logging
 
-    /// A small, fully-connected graph plus popularity pools, so an Assisted run has
-    /// both a valid candidate set (cast/filmography) and recognizable distractors.
+    /// A small connected graph so a run can actually complete a link.
     @MainActor
-    final class AssistProvider: MovieDataProvider {
+    final class SimpleGraphProvider: MovieDataProvider {
         func searchActors(_ query: String) async throws -> [Person] { [] }
         func searchMovies(_ query: String) async throws -> [Movie] { [] }
         func popularActors() async throws -> [Person] { (1...5).map { Person(id: $0, name: "Actor \($0)") } }
@@ -142,119 +141,16 @@ final class GameEngineTests: XCTestCase {
         }
     }
 
-    private static let validFilmIds: Set<String> = ["m100", "m101"]
-
-    /// A "drift" graph: the seed actor's filmography is one globally-seen film buried
-    /// in regional-only titles — the shape that used to strand an assisted chain.
-    @MainActor
-    final class DriftProvider: MovieDataProvider {
-        func searchActors(_ query: String) async throws -> [Person] { [] }
-        func searchMovies(_ query: String) async throws -> [Movie] { [] }
-        func popularActors() async throws -> [Person] { (1...5).map { Person(id: $0, name: "Actor \($0)") } }
-        func popularMovies() async throws -> [Movie] {
-            (10...14).map { Movie(id: $0, title: "Pool Movie \($0)", year: 2000, voteCount: 20_000) }
-        }
-        func cast(of movie: Movie) async throws -> [Person] { (1...4).map { Person(id: $0, name: "Actor \($0)") } }
-        func filmography(of actor: Person) async throws -> [Movie] {
-            [Movie(id: 200, title: "Regional Hit", year: 2001, voteCount: 300),
-             Movie(id: 201, title: "Another Regional", year: 2002, voteCount: 150),
-             Movie(id: 202, title: "Global Blockbuster", year: 2003, voteCount: 25_000),
-             Movie(id: 203, title: "Local Drama", year: 2004, voteCount: 90)]
-        }
-    }
-
-    /// End-to-end: the assisted turn must offer the widely-seen film as the answer,
-    /// not one of the regional-only titles that top the local set.
-    func testAssistedGateKeepsChainInFamiliarTerritory() async {
-        let engine = GameEngine(provider: DriftProvider())
-        await engine.prepareSeeds()
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        let validIds: Set<String> = ["m200", "m201", "m202", "m203"]
-        let correct = engine.currentOptions.filter { validIds.contains($0.id) }
-        XCTAssertEqual(correct.count, 1)
-        XCTAssertEqual(correct.first?.id, "m202",
-                       "the assisted answer must be the widely-seen film, not a regional-only one")
-    }
-
-    // MARK: Reel logging is Hardcore-only
-
-    func testAssistedRunDoesNotLogToTheReel() async {
+    func testCompletedChainLogsToTheReel() async {
         let store = CollectionStore(fileURL: nil)      // no disk
-        let engine = GameEngine(provider: AssistProvider(), collection: store)
-        await engine.prepareSeeds()
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        let correct = engine.currentOptions.first { Self.validFilmIds.contains($0.id) }!
-        await engine.select(correct)                   // a 2-link chain — would normally log
-        engine.quit()
-
-        XCTAssertEqual(store.total, 0, "an assisted run must not pollute the Reel")
-        XCTAssertEqual(engine.reelAdditions, 0)
-    }
-
-    func testHardcoreRunStillLogsToTheReel() async {
-        let store = CollectionStore(fileURL: nil)
-        let engine = GameEngine(provider: AssistProvider(), collection: store)
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))   // hardcore
+        let engine = GameEngine(provider: SimpleGraphProvider(), collection: store)
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
 
         await engine.submit("Film 100")
         engine.quit()
 
-        XCTAssertEqual(store.total, 2, "a hardcore chain of 2 logs both nodes")
+        XCTAssertEqual(store.total, 2, "a chain of 2 logs both nodes")
         XCTAssertEqual(engine.reelAdditions, 2)
-    }
-
-    func testAssistedTurnOffersCorrectPlusDistractors() async {
-        let engine = GameEngine(provider: AssistProvider())
-        await engine.prepareSeeds()   // load the pools so distractors are available
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        XCTAssertEqual(engine.currentOptions.count, Config.optionCount)
-        let valid = engine.currentOptions.filter { Self.validFilmIds.contains($0.id) }
-        XCTAssertEqual(valid.count, 1, "exactly one option is a real answer")
-    }
-
-    func testAssistedCorrectTapAdvances() async {
-        let engine = GameEngine(provider: AssistProvider())
-        await engine.prepareSeeds()
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        let correct = engine.currentOptions.first { Self.validFilmIds.contains($0.id) }
-        XCTAssertNotNil(correct)
-        await engine.select(correct!)
-
-        XCTAssertEqual(engine.score, 1)
-        XCTAssertEqual(engine.chain.last?.id, correct!.id)
-        XCTAssertEqual(engine.phase, .playing)
-    }
-
-    func testAssistedWrongTapDocksTimeAndStays() async {
-        let engine = GameEngine(provider: AssistProvider())
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        let before = engine.secondsRemaining
-        // A node that isn't in the candidate set — i.e. a wrong option.
-        await engine.select(.movie(Movie(id: 999, title: "Not A Film", year: 2000)))
-
-        XCTAssertEqual(engine.score, 0, "a wrong tap must not advance the chain")
-        XCTAssertEqual(engine.secondsRemaining, before - Config.assistedWrongPenalty)
-        XCTAssertNotNil(engine.feedback)
-        XCTAssertEqual(engine.phase, .playing, "a wrong tap keeps the turn alive")
-    }
-
-    func testAssistedWrongTapsRunOutTheClock() async {
-        let engine = GameEngine(provider: AssistProvider())
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        let wrong = ChainNode.movie(Movie(id: 999, title: "Not A Film", year: 2000))
-        var taps = 0
-        while engine.phase == .playing, taps < 20 {
-            await engine.select(wrong)
-            taps += 1
-        }
-        XCTAssertEqual(engine.phase, .gameOver, "repeated wrong taps must eventually zero the clock")
-        XCTAssertEqual(engine.score, 0)
     }
 
     // MARK: Candidate-load resilience (the "stuck turn" fix)
@@ -301,26 +197,4 @@ final class GameEngineTests: XCTestCase {
         XCTAssertEqual(engine.score, 1)
     }
 
-    func testAssistedRunWritesOnlyTheAssistedBest() async {
-        // Isolate the record keys from any prior run — the engine reads them in init.
-        for key in ["bestChain", "bestPoints", "bestChainAssisted", "bestPointsAssisted"] {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-        let engine = GameEngine(provider: AssistProvider())
-        await engine.prepareSeeds()
-        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")), difficulty: .assisted)
-
-        let correct = engine.currentOptions.first { Self.validFilmIds.contains($0.id) }!
-        await engine.select(correct)
-        engine.quit()   // end the run in place, committing records
-
-        XCTAssertGreaterThanOrEqual(engine.bestChainAssisted, 1)
-        XCTAssertGreaterThan(engine.bestPointsAssisted, 0)
-        XCTAssertEqual(engine.bestChain, 0, "an assisted run must not touch the hardcore best")
-        XCTAssertEqual(engine.bestPoints, 0)
-
-        for key in ["bestChain", "bestPoints", "bestChainAssisted", "bestPointsAssisted"] {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-    }
 }

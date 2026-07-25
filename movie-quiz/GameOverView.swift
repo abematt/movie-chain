@@ -85,18 +85,11 @@ struct GameOverView: View {
         return "View your Reel · \(collection.total)"
     }
 
-    // The result caption, tagged with the mode so an assisted result never reads
-    // as a hardcore one (matching the tagged share card).
-    private var topCaption: String {
-        let base = engine.endedByQuit ? "Chain ended" : "Time's up"
-        return engine.difficulty.isAssisted ? "\(base) · Assisted" : base
-    }
-
     // MARK: Score header
 
     private var scoreHeader: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            Text(topCaption)
+            Text(engine.endedByQuit ? "Chain ended" : "Time's up")
                 .font(.footnote.weight(.semibold))
                 .textCase(.uppercase)
                 .tracking(1.5)
@@ -145,12 +138,12 @@ struct GameOverView: View {
                 Image(systemName: "star.fill")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                Text(engine.difficulty.isAssisted ? "Assisted best" : "Personal best")
+                Text("Personal best")
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .tracking(1)
                     .foregroundStyle(Theme.Color.ink)
-                Text("\(engine.bestChainForRun) links · \(engine.bestPointsForRun) pts")
+                Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
                     .font(.footnote)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

@@ -127,47 +127,6 @@ struct NodeDot: View {
     }
 }
 
-// MARK: - Node thumbnail
-//
-// A small rounded headshot/poster for a node (actor `profile_path` / movie
-// `poster_path`), streamed via `AsyncImage` (system-cached, never stored) with a
-// category-tinted glyph placeholder while it loads or when there's no art — the
-// same treatment as the Reel grid, sized for an inline row (the Assisted options).
-
-struct NodeThumbnail: View {
-    let node: ChainNode
-    var size: CGFloat = 44
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        ZStack {
-            node.accent.opacity(0.22)
-            if let url = Config.imageURL(path: node.imagePath, size: "w185") {
-                AsyncImage(url: url, transaction: Transaction(animation: reduceMotion ? nil : .easeIn(duration: 0.25))) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .empty, .failure:
-                        glyph
-                    @unknown default:
-                        glyph
-                    }
-                }
-            } else {
-                glyph
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
-    }
-
-    private var glyph: some View {
-        Image(systemName: node.kind.symbol)
-            .font(.system(size: size * 0.38))
-            .foregroundStyle(node.accent)
-    }
-}
-
 // MARK: - Node tile
 //
 // One link rendered as a Connections group-tile: a solid category-colored bar
@@ -330,64 +289,6 @@ extension View {
                 scaleFrom: CGFloat = 1,
                 enabled: Bool = true) -> some View {
         modifier(StaggeredAppear(index: index, step: step, animation: animation, offset: offset, scaleFrom: scaleFrom, enabled: enabled))
-    }
-}
-
-// MARK: - Difficulty toggle
-//
-// The session-level Hardcore / Assisted choice, as a compact segmented capsule.
-// Shared by the home screen (picked per run) and Settings (the persisted
-// default) so both stay in sync and look identical — both bind the same
-// `@AppStorage("difficulty")` key.
-
-struct DifficultyToggle: View {
-    @Binding var selection: Difficulty
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(Difficulty.allCases) { difficulty in
-                Button {
-                    guard selection != difficulty else { return }
-                    Haptics.selection()
-                    withAnimation(Theme.Motion.emphasized) { selection = difficulty }
-                } label: {
-                    Text(difficulty.label)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.sm)
-                }
-                .buttonStyle(DifficultySegmentStyle(selected: selection == difficulty))
-            }
-        }
-        .padding(4)
-        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .strokeBorder(Theme.Color.hairline, lineWidth: 1)
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Difficulty")
-    }
-}
-
-/// One side of the difficulty toggle: the active side fills ink (the app's
-/// primary affordance), matching `PrimaryButtonStyle` rather than a category hue
-/// (difficulty isn't an actor/movie thing).
-private struct DifficultySegmentStyle: ButtonStyle {
-    let selected: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(selected ? Theme.Color.onInk : Color.secondary)
-            .background {
-                RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                    .fill(selected ? Theme.Color.ink : Color.clear)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(Theme.Motion.standard, value: configuration.isPressed)
-            .animation(Theme.Motion.emphasized, value: selected)
-            .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

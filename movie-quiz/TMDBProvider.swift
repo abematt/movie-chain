@@ -95,8 +95,8 @@ struct TMDBProvider: MovieDataProvider {
         // `popular` is a right-now metric that surfaces viral-but-obscure titles,
         // so we use `discover` sorted by **vote count** — the most-rated films are
         // the ones the most people have actually seen (Inception, The Dark Knight,
-        // Fight Club, …). Several pages keep shuffling — and the Assisted distractor
-        // set — from recycling the same few titles.
+        // Fight Club, …). Several pages keep a run of shuffles from recycling the
+        // same few titles.
         try await mostWatchedMovies(pages: Config.seedMoviePoolPages)
     }
 
@@ -171,12 +171,12 @@ struct TMDBProvider: MovieDataProvider {
         // School of Rock", character "Self") — those aren't film roles and must
         // not be valid chain links, so drop any credit played as "Self".
         //
-        // Sorted most-popular first so the *recognizable* films lead. This is the
-        // recognizability ordering Assisted mode relies on to pick a familiar
-        // correct answer (`Choices.build` biases toward the top), and it makes the
-        // Hardcore "you were one away" near-miss surface a known film too. Cast
-        // (above) is left in TMDB billing order — that's already its recognizability
-        // signal, and `popularActors` derives the actor pool from those leads.
+        // Sorted most-popular first so the *recognizable* films lead — which is what
+        // makes the "you were one away" near-miss at game over surface a film the
+        // player would actually know (`endGame` takes the first unused candidate)
+        // rather than an arbitrary deep cut. Cast (above) is left in TMDB billing
+        // order — that's already its recognizability signal, and `popularActors`
+        // derives the actor pool from those leads.
         return credits.cast
             .filter { !$0.isSelfAppearance }
             .map { $0.toMovie() }
@@ -265,8 +265,6 @@ nonisolated private struct MovieDTO: Decodable {
     let release_date: String?
     let popularity: Double?
     let poster_path: String?
-    /// How many TMDB users rated the film — the app's "how widely seen" signal.
-    let vote_count: Int?
     /// Role name, present on person `movie_credits` (nil on movie search results).
     let character: String?
 
@@ -283,6 +281,6 @@ nonisolated private struct MovieDTO: Decodable {
     func toMovie() -> Movie {
         let year = release_date.flatMap { Int($0.prefix(4)) }
         return Movie(id: id, title: title ?? "Untitled", year: year,
-                     popularity: popularity, imagePath: poster_path, voteCount: vote_count)
+                     popularity: popularity, imagePath: poster_path)
     }
 }

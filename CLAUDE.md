@@ -95,21 +95,7 @@ Malkovic" resolve correctly without global fuzzy search or false positives.
 `phase` (seed → playing → gameOver), the `chain`, `score` (chain length) +
 `points` (base + speed + obscurity bonuses), per-turn countdown, the current
 candidate set, `usedIds` (no-repeat rule), persisted `bestChain`/`bestPoints`,
-and the `missedAnswer` near-miss. A session-level `difficulty` (fixed at
-`startGame(with:difficulty:)`) selects **Hardcore** (type → `submit` → fuzzy match)
-or **Assisted** (tap `currentOptions`, built each turn by the pure `Choices.build`
-from the candidate set + cached pools; `select` accepts or docks time via
-`applyWrongTapPenalty`). Both accept paths share a private `accept(_:)`. Records
-split by difficulty — assisted runs write only `bestChainAssisted`/`bestPointsAssisted`,
-never the hardcore best (`shareSummary` tags them; forward-compatible with split
-leaderboards). The assisted correct answer must clear a **`Choices.FamiliarityGate`**
-— top-billed leads on actor turns, a TMDB `voteCount` floor on movie turns — so an
-assisted chain only ever *steps to* a node the player plausibly knows (the same
-standard the seed deal applies at step 0, applied at every step; self-reinforcing,
-and it relaxes rather than stalling at a dead end). This is what stops the walk
-drifting into a film region the player can't recognize. Assisted runs are also
-**never logged to the Reel** (it's a "how many you *know*" hook and the answer was
-shown). `loadCandidates` **retries** transient fetch
+and the `missedAnswer` near-miss. `loadCandidates` **retries** transient fetch
 failures (+ a short request timeout) so a rate-limit/stall can't freeze a turn; an
 exhausted load surfaces a manual `retryTurn` (`awaitingRetry`). It also owns the **home-screen deal**: the
 cached popularity pools, the `dealtSeed` the home renders, and a `recentSeedIds`
@@ -120,7 +106,7 @@ recent-id avoidance). Every entity resolves to a stable TMDB id, so
 validation and dedup are exact. Async candidate loads are guarded by a monotonic
 `generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
 or quit game can't install stale candidates into a new round. `Config.swift` holds
-tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `optionCount`, `assistedWrongPenalty`, `assistMinVoteCount`, `assistTopBilled`, `seedMoviePoolPages`, `requestTimeout`, `candidateLoadAttempts`) and loads the TMDB credential at runtime from a
+tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `seedMoviePoolPages`, `requestTimeout`, `candidateLoadAttempts`) and loads the TMDB credential at runtime from a
 **gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
 and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
@@ -157,9 +143,9 @@ first-run cold-launch intro (the title lockup starts centered, the mini-chain dr
 it rises as the controls assemble). `SeedView` is **play-first**: it leads with a
 *dealt start* — one ink **"Start with ⟨name⟩" button** (Play + seed fused; the
 name auto-fits one line so Shuffle can deal it in/out on `.dealDrop` without
-reflow) + a **Hardcore/Assisted `DifficultyToggle`** + a **Shuffle** button, with
-search demoted to an opt-in link, a **gear pill** opening the new `SettingsView`
-sheet (default difficulty + sound), and **Your
+reflow) + a **Shuffle** button, with
+search demoted to an opt-in link, a **gear pill** opening the `SettingsView`
+sheet (sound), and **Your
 Reel** shrunk to a corner pill (personal best folded into that sheet; the pill is
 always reachable, count hidden when empty, because the Reel sheet hosts the
 required **TMDB attribution**). Styling is a
@@ -167,16 +153,16 @@ small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, purple = movie**) and
 `Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`,
 `PressScaleStyle` = `.pressScale` subtle press feedback, `.card()`,
-`NodeTile`/`NodeDot`, `DifficultyToggle`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
+`NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
 (`.appear(i)`)), all built on the
 warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
 ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
 `ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category
 tiles** — a new link drops in and older ones collapse into "+N earlier". The play
-screen's bottom band branches on difficulty: **Hardcore** docks the text input via
-`.safeAreaInset(.bottom)` above the **always-present keyboard**, **Assisted** swaps
-it for a keyboard-free panel of tappable option tiles (each with a `NodeThumbnail`
-headshot/poster; with `TimerBar.swift` as a slim linear countdown either way); the full chain is revealed as a numbered recap at game over, its tiles
+screen docks the text input via `.safeAreaInset(.bottom)` above the
+**always-present keyboard** (with `TimerBar.swift` as a slim linear countdown), and
+swaps it for a **Retry** button if a candidate load failed
+(`engine.awaitingRetry`); the full chain is revealed as a numbered recap at game over, its tiles
 staggering in (`ChainStack(staggered:)`) and the score popping when the run set a
 new best. App-wide
 tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the
@@ -187,6 +173,13 @@ Remaining fan-out modes (genre locks, memory-recall every Nth link, leaderboards
 all layer on this same engine — keep the engine/provider split clean. Leaderboards
 are the natural point to add accounts; the local collection/session data is
 forward-compatible with a future sync.
+
+A multiple-choice **Assisted mode was built, playtested, and removed** (it served
+neither the newcomer nor the enthusiast). Read
+[`docs/ASSISTED-MODE.md`](docs/ASSISTED-MODE.md) before building anything that picks
+chain links *for* the player (easier mode, tutorial, daily seeded chain) — it records
+the reasoning, the **drift** trap such features inherit, and the hint-shaped design
+to build instead. The code is recoverable from git (SHAs in that doc).
 
 ## Running it
 

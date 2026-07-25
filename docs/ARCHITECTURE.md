@@ -14,9 +14,9 @@ and each turn is on a countdown — run out of time and the game ends.
 - Bundle ID: `abe.movie-quiz`
 - No autocomplete by design — you type from memory; spelling is forgiven, but
   the answer is not.
-- A session-level **difficulty** picked before each run: **Hardcore** (the recall
-  game above) or **Assisted** (recognition — tap one of three options per turn),
-  scored on separate record tracks. See `Choices`/`Difficulty` below.
+- A multiple-choice "Assisted" mode was built and **removed** after playtesting —
+  see [`ASSISTED-MODE.md`](ASSISTED-MODE.md) for why (it served neither audience)
+  and what to build instead if assistance returns.
 
 ## Stack & platform
 
@@ -63,15 +63,12 @@ All source is in [`movie-quiz/`](../movie-quiz/).
 
 ### Domain types — [`Models.swift`](../movie-quiz/Models.swift)
 - `Person { id: Int, name, popularity?, imagePath? }` and `Movie { id: Int, title,
-  year?, popularity?, imagePath?, voteCount? }` — `id` is the stable **TMDB id**, which is what
+  year?, popularity?, imagePath? }` — `id` is the stable **TMDB id**, which is what
   makes validation and dedup exact (equality/hashing are **id-only**, so the same
   entity compares equal regardless of fetched metadata). `popularity` is optional
   TMDB popularity, used only for the obscurity scoring bonus (`nil` on the offline
   stub graph). `imagePath` is the TMDB `profile_path`/`poster_path` (nil-safe), used
-  to render the collection grid; `nil` → typographic placeholder tile. `voteCount` is
-  TMDB `vote_count` — a *stable, all-time* "how widely seen" signal (unlike the
-  right-now `popularity` metric), which is what the Assisted familiarity gate keys
-  on; `nil` on the stub graph, which is why the gate degrades to `.none` there.
+  to render the collection grid; `nil` → typographic placeholder tile.
 - `ChainNode` — enum `.actor(Person) | .movie(Movie)`, one link in the chain.
   - `id: String` → `"p<id>"` / `"m<id>"` (namespaced so actors and movies never
     collide in `usedIds`).
@@ -100,7 +97,7 @@ with the closest public signal — **vote count**:
 - **Movies** come from `discover/movie?sort_by=vote_count.desc` (the most-rated
   films ≈ the most widely seen), `Config.seedMoviePoolPages` pages (~100). Loaded
   once per session, so the extra pages are cheap and buy real variety — at two pages
-  the same ~40 titles recycled as Assisted distractors.
+  a run of shuffles recycled the same ~40 titles.
 - **Actors** have no all-time endpoint, so the pool is **derived from the casts of
   the most-watched films**: the top-billed few (`Config.seedTopBilledPerMovie`) of
   the top `Config.seedActorSourceMovies` titles, deduped by id (highest popularity
@@ -129,9 +126,9 @@ chain links (e.g. Jack Black's "Making of School of Rock" was being accepted for
 a typed "School of Rock"). Note this lives in `TMDBProvider`, not the protocol —
 a new provider must apply the same rule itself (the stub graph simply has no
 such credits). `filmography` is also **sorted most-popular first** (`cast` is left
-in TMDB **billing order**): both are a *recognizability* ordering, which Assisted
-mode relies on to pick a familiar correct answer (see `Choices`) and which makes
-the Hardcore near-miss surface a known film. Every TMDB request also carries a
+in TMDB **billing order** — already its recognizability signal): this is what makes
+the "you were one away" near-miss at game over surface a film the player would
+actually know, since `endGame` takes the first unused candidate. Every TMDB request also carries a
 short `Config.requestTimeout` so a stalled fetch fails fast instead of freezing a
 turn (the clock is paused across candidate loads — see the engine's retry note).
 
@@ -187,43 +184,6 @@ home-screen deal policy is unit-tested with a seeded RNG — no network.
   other kind if the chosen pool is empty). Returns `nil` only if both pools are
   empty. Tunables live in `Config` (`seedActorBias = 0.6`, `seedRecentWindow = 8`).
 
-### Assist options — [`Choices.swift`](../movie-quiz/Choices.swift)
-Pure, stateless (same family as `SeedDeal`/`FuzzyMatch`/`ActorRanking`/`Scoring`),
-so the **Assisted** difficulty's multiple-choice policy is unit-tested with a
-seeded RNG. `build(correctFrom:distractorsFrom:count:excluding:using:)` assembles
-a turn's option set: **1 correct answer** drawn from the engine's bounded
-`candidates` (minus `usedIds`) plus recognizable **distractors** drawn from the
-cached deal pool — **zero extra network**, because both halves are state the
-engine already owns. The key invariant: distractors exclude **every** candidate
-id (not just the used ones), so a "wrong" option can never secretly be right. A
-pool too thin to fill `count` degrades to fewer options (never padded/duplicated);
-no unused valid answer → empty set.
-
-**`FamiliarityGate` — the rule that keeps an assisted chain playable.** The correct
-answer must clear a familiarity bar, so an assisted chain only ever *steps to* a
-node the player plausibly knows — **the same standard the seed deal applies at step
-0, now applied at every step.** That inconsistency was the mode's core bug: a
-globally-known actor whose filmography is almost entirely regional cinema would
-strand the chain in a region the player couldn't recognize, and *ordering that
-node's own candidates* can't escape it (ordering a set that is 95% unfamiliar still
-yields something unfamiliar). Two cases, one per turn kind:
-- `.topBilled(n)` (**actor turns**) — only the current film's **leads**. The film
-  itself already cleared the gate, so its top-billed cast are recognizable by
-  construction; billing order is the actor-side familiarity signal (the same one the
-  deal pool is derived from).
-- `.minVoteCount(n)` (**movie turns**) — only films a lot of people have actually
-  *seen*, by TMDB `vote_count` (`Config.assistMinVoteCount`, tuned to keep the
-  globally canonical catalogue *including* non-English films — Parasite, Spirited
-  Away, Amélie, City of God all clear it — while excluding regional-only hits).
-
-The gate is **self-reinforcing**: widely-seen films have widely-known leads and vice
-versa, so a walk that never leaves the mainstream component of the graph stays in
-it. If *nothing* clears the gate (a rare dead end — an actor whose only widely-seen
-film is already in the chain), it **relaxes** to the ungated set rather than
-stalling: better a less-familiar option than a turn with nothing to tap. `.none` is
-Hardcore / the stub graph (no vote counts). See `Difficulty` / the engine's Assisted play
-below, and `Config.optionCount` / `assistedWrongPenalty`.
-
 ### Scoring & feedback (the gamification layer)
 The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and
@@ -266,39 +226,18 @@ function of it.
 - **State:** `phase` (`.seed`/`.playing`/`.gameOver`), `chain: [ChainNode]`,
   `score` (chain length), `points`, `lastGain`/`lastAnswerFast` (for the "+N"
   flourish), `secondsRemaining`, `expectedKind`, transient `feedback`, `isChecking`.
-- **Difficulty & Assisted play:** `difficulty` (`.hardcore`/`.assisted`) is a
-  *session-level* choice fixed at `startGame(with:difficulty:)`. **Hardcore** is
-  the recall game — type an answer, fuzzy-matched (`submit`). **Assisted** is
-  recognition — each turn exposes `currentOptions` (built by `Choices.build` in
-  `rebuildOptions`, called from `loadCandidates` so it refreshes with the
-  candidate set), answered by tapping (`select`). A correct tap and a typed answer
-  both funnel through a shared private `accept(_:)`; a wrong tap runs
-  `applyWrongTapPenalty` — it docks `Config.assistedWrongPenalty` seconds and keeps
-  the turn alive, and if that zeroes the clock it ends the run (so `endGame` now
-  guards `phase == .playing` against the countdown task also firing).
-- **Records & recap:** `bestChain`/`bestPoints` (the **Hardcore** track, persisted
-  via `UserDefaults`) and `bestChainAssisted`/`bestPointsAssisted` (the **Assisted**
-  track). `endGame` writes only the track matching `difficulty` — an easy-mode run
-  never clobbers the hardcore best and vice versa (`bestChainForRun`/`bestPointsForRun`
-  expose the current run's track to the UI), mirroring the Pass & Play rule that a
-  shared chain must never write the solo best. `shareSummary` tags assisted runs
-  (`· assisted`) so the 🟦🟪 card stays comparable. The flag is forward-compatible
-  with the planned split leaderboards.
+- **Records & recap:** `bestChain`/`bestPoints` (persisted via `UserDefaults`),
   `isNewBest` (celebration trigger), `missedAnswer` (a valid answer left ungiven on
   the turn that timed out — the "you were one away" near-miss, captured in
   `endGame()` from the still-loaded `candidates`; `nil` on a manual quit),
   `endedByQuit` (so the summary shows "Chain ended" rather than "Time's up"), and
   `reelAdditions` (how many brand-new entities this run added to the collection —
   the "+N to your Reel" figure).
-- **Collection recording:** in `endGame()`, when `chain.count >= 2` **and the run is
-  Hardcore**, the run is logged into the injected `CollectionStore` (see below). The
-  `>= 2` guard means at least one link validated, so the seed (chain[0]) counts only
-  once a real combination lands off it, and a seed-then-quit logs nothing. The
-  **Hardcore-only** guard is the second half of the rule: "Your Reel" is a "look how
-  many you *know*" hook, and in Assisted the answer was *shown* — tapping a
-  recognized name isn't recall, so logging it inflates the Reel with entities the
-  player couldn't have produced. Same principle as the split record tracks (and the
-  Pass & Play rule that the Reel logs only links *you* added).
+- **Collection recording:** in `endGame()`, when `chain.count >= 2`, the run is
+  logged into the injected `CollectionStore` (see below). The `>= 2` guard is the
+  whole logging rule: it means at least one link validated, so the seed (chain[0])
+  counts only once a real combination lands off it, and a seed-then-quit logs
+  nothing.
 - **Private:** injected `provider`, current `candidates`, `usedIds: Set<String>`
   (no-repeat rule), the `countdownTask`, and a monotonic `generation` token that
   guards async candidate loads (see below).
@@ -332,7 +271,8 @@ function of it.
 - **Candidate-load resilience:** `loadCandidates` **retries** a failed fetch
   (`Config.candidateLoadAttempts`, short backoff) — a shared-key rate limit or a
   stalled request would otherwise empty `candidates` and leave the turn with
-  nothing to answer (in Assisted, no options at all — the "stuck turn" bug). Retries
+  nothing to answer — nothing validates, so the run is stuck (the reported "stuck
+  turn"). Retries
   run while the clock is paused, so they cost no time; combined with the per-request
   `requestTimeout`, a hiccup self-heals instead of freezing. If retries are
   exhausted, `awaitingRetry` flips true and the UI shows a manual **Retry**
@@ -376,10 +316,9 @@ pure-value + observable-store split as the rest of the app:
 - **The one logging rule** lives in `record(chain:)`: every node upserted once
   (so `timesLogged` counts distinct chains, never submissions), deduped by id,
   returning the count of brand-new additions. Called only from `endGame()` on
-  **Hardcore** chains of length ≥ 2 — see the engine's "Collection recording" note
-  for why those two conditions encode "successful combinations only; seeds count
-  once a link lands; nothing logged on a bare seed; and nothing logged for a run
-  where the answers were shown to you".
+  chains of length ≥ 2 — see the engine's "Collection recording" note for why
+  that single condition encodes "successful combinations only; seeds count once a
+  link lands; nothing logged on a bare seed".
 - `CollectionView` — the grid screen, presented as a `.sheet` from `SeedView`
   (a top-trailing corner pill) and `GameOverView` ("+N new to your Reel"). Takes
   `bestChain:` and shows **personal best** here (a trophy line under the category
@@ -425,9 +364,7 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   near-imperceptible press squish+dim for buttons that carry their own chrome but
   lacked an `isPressed` state, e.g. the in-game "Go"), `CardModifier` (`.card()`), `NodeTile`
   (the Connections category tile — the atom of the chain), `NodeDot` (small
-  category chip), `NodeThumbnail` (a small rounded headshot/poster with a
-  category-tinted glyph placeholder — the Reel's `AsyncImage` treatment sized for
-  an inline row; used on the Assisted option tiles), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
+  category chip), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
   answer), `FloatingGain` (the rising "+N"), and `StaggeredAppear` (`.appear(i)` —
   fades + lifts a view in on appear, delayed by its position, so a group of
   siblings assembles one-after-another; drives both the seed intro's control
@@ -436,9 +373,7 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   ordinary re-insertions — the seed controls stagger during the cold-launch intro
   yet arrive **solid** on a "Play again" re-entry, so they don't run their own
   motion *while the carousel is already pushing the screen in* (that clash read as
-  whiplash). `DifficultyToggle` (the Hardcore/Assisted segmented capsule, active
-  side filled ink) also lives here so the home and Settings render the identical
-  control off one `@AppStorage("difficulty")` binding.
+  whiplash).
 - Feature components in their own files: [`ChainStack.swift`](../movie-quiz/ChainStack.swift)
   is the signature visual — the chain as a **rising Tetris-style stack of category
   tiles**: each accepted link drops in from the top and the column builds; in the
@@ -483,15 +418,13 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   ⟨name⟩" button** (Play and the seed fused into one; the dealt seed is a category
   dot + name, blue = actor / purple = movie) that starts the round on tap — a
   **"→ Name a movie they were in" hint** (reuses `NodeKind.prompt`), a
-  **Hardcore / Assisted `DifficultyToggle`** (the session mode, chosen right where
-  the run starts; persisted to `@AppStorage("difficulty")` and passed into
-  `startGame(with:difficulty:)`), and a **Shuffle** ghost button. A quiet
+  **Shuffle** ghost button. A quiet
   **"or search for your own start"** link drops down to the (now demoted) search
-  flow. A **gear pill** (top-leading) opens the new `SettingsView` sheet, and
+  flow. A **gear pill** (top-leading) opens the `SettingsView` sheet, and
   **Your Reel** shrinks to a single top-trailing corner pill (shown once the player
   has logged art; personal best folded into that sheet via
-  `CollectionView(bestChain:)`, off the hero). The intro cascade now assembles five
-  control slots (start → hint → difficulty → shuffle → search link).
+  `CollectionView(bestChain:)`, off the hero). The intro cascade assembles four
+  control slots (start → hint → shuffle → search link).
   - **The deal** is owned by the engine (`engine.dealtSeed`, dealt on every
     appearance and on resume — see the engine's "Seed deal" note). The name lives
     on **one line, auto-sized to fit** (`lineLimit(1)` + `minimumScaleFactor`, like
@@ -519,37 +452,24 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
     controls are inert until assembly, so the catcher never eats a real tap).
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·
   seconds · quit) + `TimerBar`, the centered **serif score hero** (chain number +
-  points), the rising `ChainStack`, and the next-up hint are shared; the **bottom
-  band branches on `engine.difficulty`**. **Hardcore** is laid out around the
-  **always-present software keyboard** (the dominant constraint of a typing game):
-  the answer input **docked via `.safeAreaInset(.bottom)`** directly above the keys
-  (auto-focused; the keyboard's Go submits). **Assisted** swaps that dock for a
-  panel of `engine.currentOptions` tap tiles (no keyboard — the focus `.task` is
-  skipped), each with a `NodeThumbnail` headshot/poster; all options wear the
-  turn's one category color so nothing leaks the answer, a wrong tap shakes the
-  whole panel. Both modes show a **Retry** button (in place of the input/options)
-  when `engine.awaitingRetry` — a candidate load failed and typing/tapping would be
-  futile. Both react to `engine.score` /
-  `engine.feedback` to fire haptics, sound, the "+N" pop and the shake. The hint
-  rephrases for tapping ("Who was in X?"). The sound toggle still lives in the
-  chrome (and now also in Settings). DEBUG `loadDemoChain(assisted:)` + an
-  "Assisted" `#Preview` inspect the tap layout.
+  points), the rising `ChainStack`, and the next-up hint, with the answer input
+  **docked via `.safeAreaInset(.bottom)`** directly above the keys (auto-focused;
+  the keyboard's Go submits) — laid out around the **always-present software
+  keyboard**, the dominant constraint of a typing game. A **Retry** button replaces
+  the input when `engine.awaitingRetry` (a candidate load failed, so typing would be
+  futile — nothing would validate). Reacts to `engine.score` /
+  `engine.feedback` to fire haptics, sound, the "+N" pop and the shake.
 - [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score (serif) +
   points, a quiet "a new best" mark (a serif-italic green pill, no confetti), the
-  best **fenced between hairlines** so it never reads as this run, the
+  **Personal best fenced between hairlines** so it never reads as this run, the
   "you were one away" near-miss, **a "+N new to your Reel" line that opens the
   collection sheet**, the full chain revealed as a numbered `ChainStack`
-  recap, and **Play again** + **Share** (the 🟦🟪 card). Keyed to the run's
-  difficulty: the result caption tags "· Assisted", and the fenced best reads the
-  matching track ("Assisted best" / `bestChainForRun`) so it lines up with the
-  tagged share card.
-- [`SettingsView.swift`](../movie-quiz/SettingsView.swift) — the app's first real
-  settings surface, a `.sheet` opened from a **gear pill** on `SeedView` (mirroring
-  the Reel pill on the opposite corner). A small on-brand card layout (not a stock
-  grouped `Form`), all `@AppStorage`-backed: the **default difficulty**
-  (`DifficultyToggle`, sharing the `"difficulty"` key with the home so they stay in
-  sync) with a mode explainer, and the **sound toggle** (which also still lives
-  inline in the game chrome).
+  recap, and **Play again** + **Share** (the 🟦🟪 card).
+- [`SettingsView.swift`](../movie-quiz/SettingsView.swift) — the app's settings
+  surface, a `.sheet` opened from a **gear pill** on `SeedView` (mirroring the Reel
+  pill on the opposite corner). A small on-brand card layout (not a stock grouped
+  `Form`), `@AppStorage`-backed: currently the **sound toggle** (which also still
+  lives inline in the game chrome), and the established home for settings to come.
 
 ### Config & secrets — [`Config.swift`](../movie-quiz/Config.swift)
 - `secondsPerTurn = 30` and other tunables.
@@ -601,6 +521,13 @@ and leaderboards (the natural point to add accounts — local session/collection
 data is forward-compatible with a future sync). The rule of thumb: **keep the
 engine/provider split clean.** New rules live in `GameEngine`; new data sources
 implement `MovieDataProvider`; new screens read observable state and call methods.
+
+> **Read [`ASSISTED-MODE.md`](ASSISTED-MODE.md) before building any feature that
+> picks chain links on the player's behalf** (a daily seeded chain, a tutorial, an
+> easier mode). A multiple-choice Assisted difficulty was built, playtested, and
+> removed; that doc records why it served neither audience, the **drift** trap any
+> link-picking feature inherits (and why local ordering can't fix it), and the
+> hint-shaped design to build instead.
 
 ### Direction: "Pass & Play" — a chain you shuttle between friends
 
@@ -717,19 +644,9 @@ of the login-free core, never a gate in front of it.
   `ScoringTests` locks the point math + flame-tier thresholds,
   `GameEngineTests` locks the stale-load safety with a gated stub provider (and
   the per-side seed-pool retry: a failed/empty side isn't cached as loaded and is
-  retried, a loaded side isn't re-fetched; the **Assisted** path: a turn
-  offers 1 correct + distractors, a correct tap advances, a wrong tap docks time /
-  can run out the clock, and an assisted run writes only the assisted best; and the
-  **candidate-load retry**: a transient failure is retried transparently, an
-  exhausted load flips `awaitingRetry` and `retryTurn` recovers; the **familiarity
-  gate** end-to-end on a "drift" graph — the assisted answer is the widely-seen film,
-  not a regional-only one; and **Reel logging is Hardcore-only** — an assisted run
-  logs nothing, a hardcore run still logs),
-  `ChoicesTests` locks the option policy (correct always offered, distractors never
-  secretly valid, used ids excluded, thin pool degrades, empty when no unused
-  correct) **and the familiarity gate** (movie turns offer only widely-seen films,
-  actor turns only top-billed leads, a gated-out turn relaxes rather than stalling,
-  and the gate never resurrects a used id),
+  retried, a loaded side isn't re-fetched; the **candidate-load retry**: a transient
+  failure is retried transparently, an exhausted load flips `awaitingRetry` and
+  `retryTurn` recovers; and Reel logging on a completed chain),
   `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
   counted once a link lands, dedup by id, `timesLogged` per-chain), and
   `SeedDealTests` locks the home-screen deal policy (actor/movie bias, recent-id

@@ -51,15 +51,12 @@ struct SeedView: View {
     @State private var showSettings = false
 
     @AppStorage("soundEnabled") private var soundEnabled = true
-    /// The session difficulty picked for the next run (persisted default; also
-    /// editable in Settings — both bind this same key).
-    @AppStorage("difficulty") private var difficulty: Difficulty = .hardcore
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Staggered slots for the intro cascade: start button(0), hint(1),
-    /// difficulty(2), shuffle(3), search link(4).
-    private static let controlSlotCount = 5
+    /// shuffle(2), search link(3).
+    private static let controlSlotCount = 4
 
     init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
         self.engine = engine
@@ -202,10 +199,9 @@ struct SeedView: View {
             Spacer(minLength: Theme.Spacing.md)
             cascade(startButton, 0)
             cascade(hintLine, 1)
-            cascade(difficultyToggle, 2)
-            cascade(shuffleButton, 3)
+            cascade(shuffleButton, 2)
             Spacer(minLength: Theme.Spacing.md)
-            cascade(searchLink, 4)
+            cascade(searchLink, 3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -264,12 +260,6 @@ struct SeedView: View {
         .animation(reduceMotion ? nil : Theme.Motion.standard, value: engine.dealtSeed)
     }
 
-    // The session difficulty, chosen right where the run starts so the player is
-    // deliberate about which mode (and which record track) this run counts for.
-    private var difficultyToggle: some View {
-        DifficultyToggle(selection: $difficulty)
-    }
-
     private var shuffleButton: some View {
         Button {
             Haptics.selection()
@@ -299,7 +289,7 @@ struct SeedView: View {
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         searchTask?.cancel()
-        Task { await engine.startGame(with: seed, difficulty: difficulty) }
+        Task { await engine.startGame(with: seed) }
     }
 
     // MARK: Reel — a single corner button (also the route to the TMDB attribution)
@@ -508,7 +498,7 @@ struct SeedView: View {
 
     private func start(with node: ChainNode) {
         searchTask?.cancel()
-        Task { await engine.startGame(with: node, difficulty: difficulty) }
+        Task { await engine.startGame(with: node) }
     }
 
     // MARK: Intro sequence

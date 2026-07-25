@@ -36,8 +36,6 @@ struct GameView: View {
         !answer.trimmingCharacters(in: .whitespaces).isEmpty && !engine.isChecking
     }
 
-    private var isAssisted: Bool { engine.difficulty.isAssisted }
-
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             header
@@ -62,16 +60,8 @@ struct GameView: View {
         .padding(.top, Theme.Spacing.xs)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Hardcore types (docked above the keyboard); Assisted taps one of
-            // three options (no keyboard).
-            if isAssisted { optionsPanel } else { answerDock }
-        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { answerDock }
         .task {
-            // Assisted mode has no text field to raise — skip the keyboard focus
-            // entirely (otherwise the docked options would sit above an unwanted
-            // keyboard).
-            guard !isAssisted else { return }
             // Feedback warm-up (haptics + audio) now happens on the seed screen,
             // OFF this transition — `AVAudioEngine.start()` briefly blocks the main
             // actor and was hitching the seed->play push. Here we only raise the
@@ -174,12 +164,8 @@ struct GameView: View {
     private var hintText: String {
         guard let current = engine.current else { return engine.expectedKind.prompt }
         switch engine.expectedKind {
-        case .actor:
-            return isAssisted ? "Who was in \(current.matchText)?"
-                              : "Name an actor from \(current.matchText)"
-        case .movie:
-            return isAssisted ? "Which was \(current.matchText) in?"
-                              : "Name a movie \(current.matchText) was in"
+        case .actor: return "Name an actor from \(current.matchText)"
+        case .movie: return "Name a movie \(current.matchText) was in"
         }
     }
 
@@ -231,67 +217,9 @@ struct GameView: View {
         .animation(.snappy, value: engine.feedback)
     }
 
-    // MARK: Options panel (Assisted mode — tap one of three)
-
-    private var optionsPanel: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            if let feedback = engine.feedback {
-                Text(feedback)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity)
-            }
-
-            if engine.awaitingRetry {
-                retryButton
-            } else {
-                // All options share the turn's category color (they're all the same
-                // kind), so nothing leaks which is correct. A wrong tap shakes the
-                // whole panel.
-                VStack(spacing: Theme.Spacing.sm) {
-                    ForEach(engine.currentOptions) { node in
-                        optionButton(node)
-                    }
-                }
-                .shake(shakeToken)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.top, Theme.Spacing.sm)
-        .padding(.bottom, Theme.Spacing.xs)
-        .background(Theme.Color.canvas)
-        .animation(.snappy, value: engine.feedback)
-        .animation(Theme.Motion.drop, value: engine.currentOptions)
-    }
-
-    private func optionButton(_ node: ChainNode) -> some View {
-        Button { select(node) } label: {
-            HStack(spacing: Theme.Spacing.md) {
-                NodeThumbnail(node: node, size: 46)
-                Text(node.displayName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.Color.ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-            }
-            .padding(Theme.Spacing.sm)
-            .frame(maxWidth: .infinity)
-            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.tile))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.tile)
-                    .strokeBorder(Theme.Color.hairline, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.pressScale)
-        .disabled(engine.isChecking)
-    }
-
-    // Shown in place of options when a candidate load failed (both modes surface
-    // this; the panel just hosts it in Assisted). Retrying reloads and restarts
-    // the turn clock fresh.
+    // Shown in place of the input when a candidate load failed — typing would be
+    // futile with no candidate set to validate against. Retrying reloads and
+    // restarts the turn clock fresh (the failure wasn't the player's fault).
     private var retryButton: some View {
         Button { Task { await engine.retryTurn() } } label: {
             HStack(spacing: Theme.Spacing.sm) {
@@ -301,10 +229,6 @@ struct GameView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.primary)
-    }
-
-    private func select(_ node: ChainNode) {
-        Task { await engine.select(node) }
     }
 
     // MARK: Feedback reactions
@@ -329,14 +253,8 @@ struct GameView: View {
     }
 }
 
-#Preview("Hardcore") {
+#Preview {
     let engine = GameEngine()
     engine.loadDemoChain()
-    return GameView(engine: engine)
-}
-
-#Preview("Assisted") {
-    let engine = GameEngine()
-    engine.loadDemoChain(assisted: true)
     return GameView(engine: engine)
 }
