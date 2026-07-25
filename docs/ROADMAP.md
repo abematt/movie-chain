@@ -49,12 +49,33 @@ rather than a rewrite of every screen:
 and a motion re-tune to match.
 
 **Decide before starting:**
-- **Is the rising tile-stack the right metaphor for a chain at all?** It reads as
-  Tetris rather than *chain*; alternatives (a literal linked thread, a filmstrip, a
-  constellation) change `ChainStack` fundamentally. This is the highest-leverage
-  visual question in the app.
+
+- **The central visual question: is it even a chain?** The rising tile-stack reads as
+  Tetris rather than *chain*, and the metaphor itself is open — **a stack of cards is a
+  live candidate**, as are a filmstrip, a literal linked thread, or a constellation.
+  This is the highest-leverage decision in the overhaul; everything else follows from it.
+
+  **Cards have a real structural argument in their favour:** the app already fetches
+  poster and headshot art for every node (`imagePath` → `Config.imageURL`), and a card
+  is the natural container for art in a way a coloured bar is not. Today that art only
+  appears in the Reel; a card metaphor would put the *film* on screen during play,
+  which is more on-genre for a movie game. It also composes better with the 0.9.0
+  share-image milestone — a shareable "hand of cards" is a stronger artefact than a
+  column of bars. The cost is layout: cards need much more room per node than a 44pt
+  bar, which collides with the play screen's keyboard docking (see the portrait-only
+  constraint below), so the "how many previous links stay visible" question gets harder.
+
+  **Naming note, so this doesn't become a false blocker:** "chain" is the *domain*
+  vocabulary (`ChainNode`, `chain`, `bestChain`) and it stays accurate regardless — the
+  data genuinely is an ordered sequence where each link is validated against the
+  previous one. Presentation is independent: cards can render a chain. Only
+  `ChainStack.swift` is presentation-named and would be renamed. The app *name* ("Movie
+  Chain") is a separate, larger question — worth deciding deliberately rather than
+  drifting into.
+
 - Does the app keep the "puzzle page" register, or move toward something cinematic?
-  The former is calmer and differentiated; the latter is more on-genre.
+  The former is calmer and differentiated; the latter is more on-genre — and pairs
+  naturally with a card/poster direction.
 
 **Traps (all previously paid for — don't rediscover):**
 - Every color needs **light + dark** variants in `Assets.xcassets`. `OnAccent` exists
@@ -166,19 +187,22 @@ candidate.
 
 ### Share images
 
-Today `GameEngine.shareSummary` is a **text** 🟦🟪 card handed to `ShareLink`. The goal
-is rendered **images** for a finished run and for the Reel.
+**Nothing is built yet — there is no image renderer in the app today.** Sharing is
+text only: `GameEngine.shareSummary` builds the 🟦🟪 card and hands it to `ShareLink`,
+which works fine. This milestone *adds* rendered **images** for a finished run and for
+the Reel. The notes below are traps to design around before writing that code, not
+descriptions of existing bugs.
 
 **The tool is SwiftUI `ImageRenderer`** — build the share card as a normal SwiftUI view
-(reusing `NodeTile`/`ChainStack`) and rasterize it. Keep the text card too; it's a good
+(reusing the node components) and rasterize it. Keep the text card too; it's a good
 fallback and pastes nicely.
 
-**The trap that will cost you an afternoon if unknown:** `ImageRenderer` renders
-**synchronously**, so **`AsyncImage` content will be missing** from the snapshot —
-poster/headshot tiles come out empty. Art must be fetched into memory *first* and
-handed to the view as a concrete `Image`. This affects any Reel share card, since the
-whole appeal is the grid of posters. `ImageRenderer` is also `@MainActor`, and you
-should set `scale` to the display scale or the output looks soft.
+**The trap to plan for:** `ImageRenderer` renders **synchronously**, so any
+`AsyncImage` in the rendered view will still be in its placeholder state — poster and
+headshot tiles come out **empty**. Art has to be fetched into memory *first* and handed
+to the view as a concrete `Image`. This matters most for a Reel share card, where the
+grid of posters is the entire appeal. Also: `ImageRenderer` is `@MainActor`, and set
+`scale` to the display scale or the output looks soft.
 
 **Decide:** does the image stay **spoiler-free** like the text card (squares only), or
 is showing the actual chain the point? The Reel card and the score card probably answer
@@ -203,9 +227,36 @@ engine change. If 0.8.0 already brought a backend, this rides on it.
 
 Not a feature milestone — the shipping checklist.
 
-- **Reconsider the deployment target.** It's currently **iOS 26.2**, which is
-  extremely restrictive; at launch it excludes most of the installed base. Lowering it
-  is close to mandatory, and it means auditing the iOS-26-only APIs in use.
+- **Lower the deployment target — it's free.** It's currently **iOS 26.2**, which was
+  never a requirement: it's just Xcode's default (the current SDK) at project creation.
+  **Audited 2026-07-25 by building at successively lower targets:**
+
+  | Target | Result |
+  |---|---|
+  | 18.0 | ✅ builds clean, zero availability errors |
+  | 17.0 | ✅ builds clean, zero availability errors |
+  | 16.0 | ❌ `'Observable()' is only available in iOS 17.0 or newer` — `GameEngine.swift`, `Collection.swift` |
+
+  So **iOS 17.0 is the true floor**, and the only thing holding it there is
+  `@Observable` (the Observation framework) — which is load-bearing and not worth
+  giving up. Note `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` is a *compiler* setting,
+  not an OS requirement, so it doesn't constrain this.
+
+  **Recommendation: iOS 18.0.** Going to 17.0 buys almost no extra *devices* (17 and 18
+  support the same hardware), only users who declined two updates — while 18.0 keeps
+  iOS 18 APIs available. Since Apple's numbering jumped 18 → 26, targeting 18.0 is
+  "current major plus one back", the conventional support window. Targeting a **point**
+  release (26.2) is strictly worse than 26.0 for no benefit either way.
+
+  Caveats before flipping it: verify Apple's current adoption and device-support lists
+  at launch time rather than trusting a stale estimate; iOS 26 also dropped some
+  devices that 18 still supports, so lowering may recover real hardware, not just
+  un-updated users. And note the ongoing cost — a lower target means new APIs need
+  `if #available` guards, and the suite should be smoke-tested on an 18.x simulator
+  (18.0/18.1/18.3 runtimes are installed locally). A runtime test on 18.x isn't
+  possible *until* the project setting is lowered: xcodebuild rejects an 18.x
+  destination while the project declares a 26.2 minimum, so a build-setting override
+  alone can't prove it.
 - **Real device testing.** Everything so far is simulator-verified. Haptics, audio
   session behaviour under the silent switch, and thermals/network on cellular need
   real hardware.
