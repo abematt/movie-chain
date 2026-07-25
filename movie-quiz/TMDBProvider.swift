@@ -95,8 +95,9 @@ struct TMDBProvider: MovieDataProvider {
         // `popular` is a right-now metric that surfaces viral-but-obscure titles,
         // so we use `discover` sorted by **vote count** — the most-rated films are
         // the ones the most people have actually seen (Inception, The Dark Knight,
-        // Fight Club, …). Two pages (~40) keeps shuffling fresh.
-        try await mostWatchedMovies(pages: 2)
+        // Fight Club, …). Several pages keep shuffling — and the Assisted distractor
+        // set — from recycling the same few titles.
+        try await mostWatchedMovies(pages: Config.seedMoviePoolPages)
     }
 
     func popularActors() async throws -> [Person] {
@@ -264,6 +265,8 @@ nonisolated private struct MovieDTO: Decodable {
     let release_date: String?
     let popularity: Double?
     let poster_path: String?
+    /// How many TMDB users rated the film — the app's "how widely seen" signal.
+    let vote_count: Int?
     /// Role name, present on person `movie_credits` (nil on movie search results).
     let character: String?
 
@@ -279,6 +282,7 @@ nonisolated private struct MovieDTO: Decodable {
 
     func toMovie() -> Movie {
         let year = release_date.flatMap { Int($0.prefix(4)) }
-        return Movie(id: id, title: title ?? "Untitled", year: year, popularity: popularity, imagePath: poster_path)
+        return Movie(id: id, title: title ?? "Untitled", year: year,
+                     popularity: popularity, imagePath: poster_path, voteCount: vote_count)
     }
 }

@@ -63,12 +63,15 @@ All source is in [`movie-quiz/`](../movie-quiz/).
 
 ### Domain types — [`Models.swift`](../movie-quiz/Models.swift)
 - `Person { id: Int, name, popularity?, imagePath? }` and `Movie { id: Int, title,
-  year?, popularity?, imagePath? }` — `id` is the stable **TMDB id**, which is what
+  year?, popularity?, imagePath?, voteCount? }` — `id` is the stable **TMDB id**, which is what
   makes validation and dedup exact (equality/hashing are **id-only**, so the same
   entity compares equal regardless of fetched metadata). `popularity` is optional
   TMDB popularity, used only for the obscurity scoring bonus (`nil` on the offline
   stub graph). `imagePath` is the TMDB `profile_path`/`poster_path` (nil-safe), used
-  to render the collection grid; `nil` → typographic placeholder tile.
+  to render the collection grid; `nil` → typographic placeholder tile. `voteCount` is
+  TMDB `vote_count` — a *stable, all-time* "how widely seen" signal (unlike the
+  right-now `popularity` metric), which is what the Assisted familiarity gate keys
+  on; `nil` on the stub graph, which is why the gate degrades to `.none` there.
 - `ChainNode` — enum `.actor(Person) | .movie(Movie)`, one link in the chain.
   - `id: String` → `"p<id>"` / `"m<id>"` (namespaced so actors and movies never
     collide in `usedIds`).
@@ -95,7 +98,9 @@ Letterboxd's "popular" instead reflects member watch activity, which we can't
 access (their API is partner-only). So we approximate "most-*watched* of all time"
 with the closest public signal — **vote count**:
 - **Movies** come from `discover/movie?sort_by=vote_count.desc` (the most-rated
-  films ≈ the most widely seen), two pages (~40).
+  films ≈ the most widely seen), `Config.seedMoviePoolPages` pages (~100). Loaded
+  once per session, so the extra pages are cheap and buy real variety — at two pages
+  the same ~40 titles recycled as Assisted distractors.
 - **Actors** have no all-time endpoint, so the pool is **derived from the casts of
   the most-watched films**: the top-billed few (`Config.seedTopBilledPerMovie`) of
   the top `Config.seedActorSourceMovies` titles, deduped by id (highest popularity
@@ -190,12 +195,33 @@ a turn's option set: **1 correct answer** drawn from the engine's bounded
 `candidates` (minus `usedIds`) plus recognizable **distractors** drawn from the
 cached deal pool — **zero extra network**, because both halves are state the
 engine already owns. The key invariant: distractors exclude **every** candidate
-id (not just the used ones), so a "wrong" option can never secretly be right. The
-correct answer is picked from the **top `correctPoolSize`** of the (recognizability-
-ordered) candidates rather than uniformly (`Config.assistCorrectPoolSize`), so a
-bit-part actor or deep-cut film doesn't stand out as the odd one among famous
-distractors — familiar but still varied. A pool too thin to fill `count` degrades
-to fewer options (never padded/duplicated); no unused valid answer → empty set. See `Difficulty` / the engine's Assisted play
+id (not just the used ones), so a "wrong" option can never secretly be right. A
+pool too thin to fill `count` degrades to fewer options (never padded/duplicated);
+no unused valid answer → empty set.
+
+**`FamiliarityGate` — the rule that keeps an assisted chain playable.** The correct
+answer must clear a familiarity bar, so an assisted chain only ever *steps to* a
+node the player plausibly knows — **the same standard the seed deal applies at step
+0, now applied at every step.** That inconsistency was the mode's core bug: a
+globally-known actor whose filmography is almost entirely regional cinema would
+strand the chain in a region the player couldn't recognize, and *ordering that
+node's own candidates* can't escape it (ordering a set that is 95% unfamiliar still
+yields something unfamiliar). Two cases, one per turn kind:
+- `.topBilled(n)` (**actor turns**) — only the current film's **leads**. The film
+  itself already cleared the gate, so its top-billed cast are recognizable by
+  construction; billing order is the actor-side familiarity signal (the same one the
+  deal pool is derived from).
+- `.minVoteCount(n)` (**movie turns**) — only films a lot of people have actually
+  *seen*, by TMDB `vote_count` (`Config.assistMinVoteCount`, tuned to keep the
+  globally canonical catalogue *including* non-English films — Parasite, Spirited
+  Away, Amélie, City of God all clear it — while excluding regional-only hits).
+
+The gate is **self-reinforcing**: widely-seen films have widely-known leads and vice
+versa, so a walk that never leaves the mainstream component of the graph stays in
+it. If *nothing* clears the gate (a rare dead end — an actor whose only widely-seen
+film is already in the chain), it **relaxes** to the ungated set rather than
+stalling: better a less-familiar option than a turn with nothing to tap. `.none` is
+Hardcore / the stub graph (no vote counts). See `Difficulty` / the engine's Assisted play
 below, and `Config.optionCount` / `assistedWrongPenalty`.
 
 ### Scoring & feedback (the gamification layer)
@@ -264,11 +290,15 @@ function of it.
   `endedByQuit` (so the summary shows "Chain ended" rather than "Time's up"), and
   `reelAdditions` (how many brand-new entities this run added to the collection —
   the "+N to your Reel" figure).
-- **Collection recording:** in `endGame()`, when `chain.count >= 2`, the run is
-  logged into the injected `CollectionStore` (see below). The `>= 2` guard is the
-  whole logging rule: it means at least one link validated, so the seed (chain[0])
-  counts only once a real combination lands off it, and a seed-then-quit logs
-  nothing.
+- **Collection recording:** in `endGame()`, when `chain.count >= 2` **and the run is
+  Hardcore**, the run is logged into the injected `CollectionStore` (see below). The
+  `>= 2` guard means at least one link validated, so the seed (chain[0]) counts only
+  once a real combination lands off it, and a seed-then-quit logs nothing. The
+  **Hardcore-only** guard is the second half of the rule: "Your Reel" is a "look how
+  many you *know*" hook, and in Assisted the answer was *shown* — tapping a
+  recognized name isn't recall, so logging it inflates the Reel with entities the
+  player couldn't have produced. Same principle as the split record tracks (and the
+  Pass & Play rule that the Reel logs only links *you* added).
 - **Private:** injected `provider`, current `candidates`, `usedIds: Set<String>`
   (no-repeat rule), the `countdownTask`, and a monotonic `generation` token that
   guards async candidate loads (see below).
@@ -346,9 +376,10 @@ pure-value + observable-store split as the rest of the app:
 - **The one logging rule** lives in `record(chain:)`: every node upserted once
   (so `timesLogged` counts distinct chains, never submissions), deduped by id,
   returning the count of brand-new additions. Called only from `endGame()` on
-  chains of length ≥ 2 — see the engine's "Collection recording" note for why
-  that single condition encodes "successful combinations only; seeds count once a
-  link lands; nothing logged on a bare seed".
+  **Hardcore** chains of length ≥ 2 — see the engine's "Collection recording" note
+  for why those two conditions encode "successful combinations only; seeds count
+  once a link lands; nothing logged on a bare seed; and nothing logged for a run
+  where the answers were shown to you".
 - `CollectionView` — the grid screen, presented as a `.sheet` from `SeedView`
   (a top-trailing corner pill) and `GameOverView` ("+N new to your Reel"). Takes
   `bestChain:` and shows **personal best** here (a trophy line under the category
@@ -690,10 +721,15 @@ of the login-free core, never a gate in front of it.
   offers 1 correct + distractors, a correct tap advances, a wrong tap docks time /
   can run out the clock, and an assisted run writes only the assisted best; and the
   **candidate-load retry**: a transient failure is retried transparently, an
-  exhausted load flips `awaitingRetry` and `retryTurn` recovers),
-  `ChoicesTests` locks the option policy (correct always offered from the
-  recognizable top, distractors never secretly valid, used ids excluded, thin pool
-  degrades, empty when no unused correct),
+  exhausted load flips `awaitingRetry` and `retryTurn` recovers; the **familiarity
+  gate** end-to-end on a "drift" graph — the assisted answer is the widely-seen film,
+  not a regional-only one; and **Reel logging is Hardcore-only** — an assisted run
+  logs nothing, a hardcore run still logs),
+  `ChoicesTests` locks the option policy (correct always offered, distractors never
+  secretly valid, used ids excluded, thin pool degrades, empty when no unused
+  correct) **and the familiarity gate** (movie turns offer only widely-seen films,
+  actor turns only top-billed leads, a gated-out turn relaxes rather than stalling,
+  and the gate never resurrects a used id),
   `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
   counted once a link lands, dedup by id, `timesLogged` per-chain), and
   `SeedDealTests` locks the home-screen deal policy (actor/movie bias, recent-id

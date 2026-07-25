@@ -496,12 +496,18 @@ final class GameEngine {
         let pool: [ChainNode] = expectedKind == .actor
             ? actorPool.map(ChainNode.actor)
             : moviePool.map(ChainNode.movie)
+        // The familiarity gate keeps an assisted chain inside the mainstream graph:
+        // step only to a lead of the (already familiar) current film, or to a film a
+        // lot of people have seen. See `Choices.FamiliarityGate`.
+        let gate: Choices.FamiliarityGate = expectedKind == .actor
+            ? .topBilled(Config.assistTopBilled)
+            : .minVoteCount(Config.assistMinVoteCount)
         currentOptions = Choices.build(
             correctFrom: candidates,
             distractorsFrom: pool,
             count: Config.optionCount,
             excluding: usedIds,
-            correctPoolSize: Config.assistCorrectPoolSize,
+            gate: gate,
             using: &systemRNG
         )
     }
@@ -571,7 +577,13 @@ final class GameEngine {
         // seed (chain[0]) counts only once a real combination lands off it, and
         // a seed-then-quit (length 1) logs nothing. `record` dedups by id, so
         // each entity is counted once per chain.
-        if chain.count >= 2 {
+        //
+        // **Hardcore only.** "Your Reel" is a "look how many you *know*" hook, and
+        // in Assisted you were shown the answer — tapping a recognized name is not
+        // recall, so logging it inflates the Reel with entities the player couldn't
+        // have produced themselves. Same principle as the split record tracks (and
+        // the Pass & Play rule that the Reel logs only links *you* added).
+        if chain.count >= 2, !difficulty.isAssisted {
             reelAdditions = collection?.record(chain: chain) ?? 0
         }
 

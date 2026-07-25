@@ -18,6 +18,45 @@ import Foundation
 
 enum Choices {
 
+    /// The rule deciding which valid answers are *familiar enough* to offer in
+    /// Assisted mode — the heart of the mode's beginner-friendliness.
+    ///
+    /// An assisted chain may only step to a node that is itself globally familiar:
+    /// the same standard the seed deal applies at step 0, applied at **every** step.
+    /// Without it the walk drifts — a globally-known actor whose filmography is
+    /// almost entirely regional cinema strands the chain in a region the player
+    /// can't recognize, and no amount of *ordering that node's own candidates* can
+    /// escape it (ordering a set that is 95% unfamiliar still yields something
+    /// unfamiliar). The gate is self-reinforcing: widely-seen films have widely-known
+    /// leads and vice versa, so a walk that never leaves the mainstream component of
+    /// the graph stays inside it.
+    enum FamiliarityGate {
+        /// Actor turns. The current node is a film that already cleared the gate, so
+        /// its **top-billed** cast are recognizable by construction — billing order
+        /// is the actor-side familiarity signal (the same one the deal pool is
+        /// derived from). Candidates are assumed in TMDB billing order.
+        case topBilled(Int)
+        /// Movie turns. Only films a lot of people have actually *seen* qualify,
+        /// measured by TMDB `vote_count` (a stable all-time signal, unlike the
+        /// right-now `popularity` metric).
+        case minVoteCount(Int)
+        /// No gate — Hardcore, or the stub graph (which carries no vote counts).
+        case none
+
+        /// Apply the gate to a turn's unused valid answers. May return an empty list
+        /// (the caller relaxes — see `build`).
+        func eligible(from unused: [ChainNode]) -> [ChainNode] {
+            switch self {
+            case .topBilled(let n):
+                return Array(unused.prefix(max(1, n)))
+            case .minVoteCount(let floor):
+                return unused.filter { ($0.voteCount ?? 0) >= floor }
+            case .none:
+                return unused
+            }
+        }
+    }
+
     /// Build a shuffled option set: one valid answer plus recognizable distractors.
     ///
     /// - Parameters:
@@ -31,11 +70,12 @@ enum Choices {
     ///   - count: total options wanted (e.g. `Config.optionCount`). The result may
     ///     be smaller if the pool can't supply enough distinct distractors.
     ///   - usedIds: `ChainNode.id`s already in the chain — never offered again.
-    ///   - correctPoolSize: how far down the recognizability-ordered candidates the
-    ///     correct answer may be picked from. The correct option is chosen at random
-    ///     within the top `correctPoolSize` unused candidates, so it stays familiar
-    ///     (not a bit-part actor / deep-cut film standing out among famous
-    ///     distractors) while still varying turn-to-turn. `.max` = uniform over all.
+    ///   - gate: the familiarity rule the correct answer must clear, so the chain
+    ///     only ever steps to a node the player plausibly knows (see
+    ///     `FamiliarityGate`). If *no* unused candidate clears it, the gate is
+    ///     relaxed rather than stalling the turn — a rare dead end (an actor whose
+    ///     only widely-seen film is already in the chain) still gets playable
+    ///     options.
     ///   - generator: injected so tests are deterministic.
     /// - Returns: up to `count` options, shuffled, the correct one always included
     ///   when the turn has any unused valid answer. Empty only if it does not.
@@ -44,16 +84,18 @@ enum Choices {
         distractorsFrom pool: [ChainNode],
         count: Int,
         excluding usedIds: Set<String>,
-        correctPoolSize: Int = .max,
+        gate: FamiliarityGate = .none,
         using generator: inout G
     ) -> [ChainNode] {
-        // The one correct option: a valid answer not already used, biased toward the
-        // recognizable end (the top `correctPoolSize`). If there is none, the turn
-        // is unwinnable anyway — return nothing and let the clock run (mirrors an
-        // exhausted candidate set in the typed game).
+        // The one correct option: a valid, unused answer that clears the familiarity
+        // gate. If there is no unused answer at all the turn is unwinnable — return
+        // nothing and let the clock run (mirrors an exhausted candidate set in the
+        // typed game).
         let unusedCorrect = candidates.filter { !usedIds.contains($0.id) }
-        guard let correct = unusedCorrect
-            .prefix(max(1, correctPoolSize))
+        let eligible = gate.eligible(from: unusedCorrect)
+        // Relax to the ungated set rather than stalling: better a less-familiar
+        // option than a turn with nothing to tap.
+        guard let correct = (eligible.isEmpty ? unusedCorrect : eligible)
             .randomElement(using: &generator)
         else { return [] }
 

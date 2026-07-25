@@ -57,13 +57,30 @@ enum Config {
     /// can still run the clock out — but you can pick again.
     static let assistedWrongPenalty = 8
 
-    /// The correct Assisted option is drawn from the most *recognizable* end of
-    /// the candidate set (cast is billing-ordered; filmography is popularity-sorted)
-    /// rather than uniformly, so a bit-part actor or deep-cut film doesn't stand out
-    /// as the odd one among famous distractors. This caps how far down that ordered
-    /// set the correct answer can come from — small enough to stay familiar, big
-    /// enough to vary turn-to-turn. See `Choices.build`.
-    static let assistCorrectPoolSize = 8
+    // The Assisted familiarity gate (see `Choices.FamiliarityGate`).
+    //
+    // The rule: an assisted chain may only ever *step to* a node that is itself
+    // globally familiar — the same standard the seed deal already applies at step 0,
+    // now applied at every step. This is what stops the walk drifting into a region
+    // the player doesn't recognize (a widely-known actor whose filmography is almost
+    // entirely regional cinema used to strand the chain there, because ordering a
+    // set that is 95% unfamiliar still yields something unfamiliar). It is
+    // self-reinforcing: widely-seen films have widely-known leads and vice versa, so
+    // a walk that never leaves the mainstream component stays in it.
+
+    /// Minimum TMDB `vote_count` for a film to be offered as an Assisted answer —
+    /// "have a lot of people actually seen this?". Tuned to keep the globally
+    /// canonical catalogue *including* non-English films (Parasite, Spirited Away,
+    /// Amélie, City of God all clear it) while excluding regional-only hits that a
+    /// general audience wouldn't place.
+    static let assistMinVoteCount = 4_000
+
+    /// How many top-billed cast members of the current film are eligible as an
+    /// Assisted answer. Because the film itself already cleared the gate, its
+    /// *leads* are by definition recognizable — billing order is the actor-side
+    /// familiarity signal (the same one that builds the deal pool). Small enough to
+    /// mean "the people on the poster", big enough to vary turn-to-turn.
+    static let assistTopBilled = 6
 
     /// Per-request network timeout. Kept short so a stalled candidate fetch fails
     /// fast (and retries) instead of freezing a turn — the clock is paused across
@@ -87,6 +104,11 @@ enum Config {
     /// How many recently-dealt starts to remember and avoid, so repeated shuffles
     /// don't keep handing back the same few faces. Small relative to the pool.
     static let seedRecentWindow = 8
+
+    /// Pages (~20 films each) of most-watched films to load for the deal/distractor
+    /// pool. Fetched once per session and cached, so a few extra requests buy real
+    /// variety — at 2 pages the same ~40 titles recurred as Assisted distractors.
+    static let seedMoviePoolPages = 5
 
     /// How many of the most-watched films to mine for the recognizable-actor pool
     /// (their top-billed casts become the actors dealt). Higher = deeper pool but

@@ -102,9 +102,14 @@ from the candidate set + cached pools; `select` accepts or docks time via
 `applyWrongTapPenalty`). Both accept paths share a private `accept(_:)`. Records
 split by difficulty — assisted runs write only `bestChainAssisted`/`bestPointsAssisted`,
 never the hardcore best (`shareSummary` tags them; forward-compatible with split
-leaderboards). The assisted correct answer is picked from the *recognizable* end of
-the candidates (cast billing order / popularity-sorted filmography) so it doesn't
-stand out among famous distractors. `loadCandidates` **retries** transient fetch
+leaderboards). The assisted correct answer must clear a **`Choices.FamiliarityGate`**
+— top-billed leads on actor turns, a TMDB `voteCount` floor on movie turns — so an
+assisted chain only ever *steps to* a node the player plausibly knows (the same
+standard the seed deal applies at step 0, applied at every step; self-reinforcing,
+and it relaxes rather than stalling at a dead end). This is what stops the walk
+drifting into a film region the player can't recognize. Assisted runs are also
+**never logged to the Reel** (it's a "how many you *know*" hook and the answer was
+shown). `loadCandidates` **retries** transient fetch
 failures (+ a short request timeout) so a rate-limit/stall can't freeze a turn; an
 exhausted load surfaces a manual `retryTurn` (`awaitingRetry`). It also owns the **home-screen deal**: the
 cached popularity pools, the `dealtSeed` the home renders, and a `recentSeedIds`
@@ -115,7 +120,7 @@ recent-id avoidance). Every entity resolves to a stable TMDB id, so
 validation and dedup are exact. Async candidate loads are guarded by a monotonic
 `generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
 or quit game can't install stale candidates into a new round. `Config.swift` holds
-tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `optionCount`, `assistedWrongPenalty`, `assistCorrectPoolSize`, `requestTimeout`, `candidateLoadAttempts`) and loads the TMDB credential at runtime from a
+tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `optionCount`, `assistedWrongPenalty`, `assistMinVoteCount`, `assistTopBilled`, `seedMoviePoolPages`, `requestTimeout`, `candidateLoadAttempts`) and loads the TMDB credential at runtime from a
 **gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
 and paste a token; absent → app falls back to `StubProvider` demo data). The
 token is never committed to source.
@@ -133,9 +138,10 @@ value (deduped by TMDB id); `CollectionStore` (`@MainActor @Observable`) owns
 the dictionary + a `chainsLogged` counter, persisted as JSON in Application
 Support (**not** SwiftData — small bounded data, matches the engine's UserDefaults
 style). The single logging rule lives in `record(chain:)`, called from
-`endGame()` only when `chain.count >= 2` — that condition alone encodes
-"successful combinations only, seed counts once a link lands, bare seed logs
-nothing". Pure count stats only (no rarity). Tiles stream art via `AsyncImage`
+`endGame()` only when `chain.count >= 2` **and the run is Hardcore** — those two
+conditions encode "successful combinations only, seed counts once a link lands, bare
+seed logs nothing, and nothing logged for a run where the answers were shown to
+you". Pure count stats only (no rarity). Tiles stream art via `AsyncImage`
 from `Config.imageURL(path:)` (system-cached, never stored on disk; nil path →
 typographic placeholder), fed by the new `imagePath` on `Person`/`Movie`. The
 store is owned at the app root and injected into the engine.

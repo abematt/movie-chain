@@ -34,6 +34,12 @@ struct Movie: Identifiable, Hashable, Sendable {
     /// TMDB `poster_path` (e.g. `/xyz.jpg`), when known. The poster shown in the
     /// collection ("Your Reel"); `nil` for the stub graph → typographic tile.
     var imagePath: String? = nil
+    /// TMDB `vote_count`, when known — how many people rated the film, the app's
+    /// proxy for "how widely *seen* it is" (the same signal the deal pool is built
+    /// on; see `TMDBProvider.popularMovies`). Unlike `popularity` (a right-now
+    /// trending metric) this is a stable, all-time familiarity measure, so it's what
+    /// Assisted mode gates a chain step on. `nil` on the stub graph.
+    var voteCount: Int? = nil
 
     var displayTitle: String {
         if let year { return "\(title) (\(year))" }
@@ -96,6 +102,16 @@ enum ChainNode: Identifiable, Hashable, Sendable {
         switch self {
         case .actor(let p): return p.imagePath
         case .movie(let m): return m.imagePath
+        }
+    }
+
+    /// How widely seen the underlying film is (`nil` for actors, which have no such
+    /// signal — their familiarity is their billing on an already-familiar film).
+    /// Used by the Assisted familiarity gate.
+    var voteCount: Int? {
+        switch self {
+        case .actor: return nil
+        case .movie(let m): return m.voteCount
         }
     }
 }

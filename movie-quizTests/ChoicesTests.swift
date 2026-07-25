@@ -72,21 +72,72 @@ final class ChoicesTests: XCTestCase {
         XCTAssertTrue(opts.isEmpty)
     }
 
-    /// The correct answer is drawn from the recognizable end of the (ordered)
-    /// candidates, never the obscure tail — so it doesn't stand out among the
-    /// famous distractors.
-    func testCorrectPickPrefersRecognizableEnd() {
+    // MARK: The familiarity gate (keeps an assisted chain out of unfamiliar regions)
+
+    private func film(_ id: Int, votes: Int?) -> ChainNode {
+        .movie(Movie(id: id, title: "Movie \(id)", year: 2000, voteCount: votes))
+    }
+
+    /// A movie turn may only step to a widely-seen film. This is the fix for the
+    /// drift bug: a filmography that is almost entirely regional cinema must not
+    /// hand the player one of those titles just because it tops that local set.
+    func testMovieGateOffersOnlyWidelySeenFilms() {
         var g = SystemRandomNumberGenerator()
-        // Ordered most-recognizable first (m1…), with a long obscure tail.
-        let candidates = movieNodes(Array(1...20))
-        let pool = movieNodes(Array(100...120))
-        for _ in 0..<80 {
+        // One globally-seen film buried in a filmography of regional-only titles.
+        let candidates = [film(1, votes: 120), film(2, votes: 300),
+                          film(3, votes: 9_000), film(4, votes: 80)]
+        let pool = movieNodes(Array(100...110))
+        for _ in 0..<60 {
             let opts = Choices.build(correctFrom: candidates, distractorsFrom: pool,
-                                     count: 3, excluding: [], correctPoolSize: 3, using: &g)
-            let correct = opts.first { (1...20).map { "m\($0)" }.contains($0.id) }
+                                     count: 3, excluding: [],
+                                     gate: .minVoteCount(4_000), using: &g)
+            let correct = opts.first { (1...4).map { "m\($0)" }.contains($0.id) }
+            XCTAssertEqual(correct?.id, "m3", "only the widely-seen film may be the answer")
+        }
+    }
+
+    /// An actor turn may only step to a *lead* of the current film — the film already
+    /// cleared the gate, so its top-billed cast are recognizable by construction.
+    func testActorGateOffersOnlyTopBilled() {
+        var g = SystemRandomNumberGenerator()
+        // Billing order: p1…p10. Only the first three are leads.
+        let candidates = (1...10).map { ChainNode.actor(Person(id: $0, name: "Actor \($0)")) }
+        let pool = (100...110).map { ChainNode.actor(Person(id: $0, name: "Pool \($0)")) }
+        for _ in 0..<60 {
+            let opts = Choices.build(correctFrom: candidates, distractorsFrom: pool,
+                                     count: 3, excluding: [],
+                                     gate: .topBilled(3), using: &g)
+            let correct = opts.first { (1...10).map { "p\($0)" }.contains($0.id) }
             XCTAssertNotNil(correct)
-            XCTAssertTrue(["m1", "m2", "m3"].contains(correct!.id),
-                          "correct must come from the top-3 recognizable candidates, got \(correct!.id)")
+            XCTAssertTrue(["p1", "p2", "p3"].contains(correct!.id),
+                          "only top-billed leads may be the answer, got \(correct!.id)")
+        }
+    }
+
+    /// A dead end (nothing clears the gate) relaxes rather than stalling the turn —
+    /// better a less-familiar option than nothing to tap.
+    func testGateRelaxesRatherThanStalling() {
+        var g = SystemRandomNumberGenerator()
+        let candidates = [film(1, votes: 50), film(2, votes: 90)]   // none clear the floor
+        let opts = Choices.build(correctFrom: candidates, distractorsFrom: movieNodes([100, 101]),
+                                 count: 3, excluding: [],
+                                 gate: .minVoteCount(4_000), using: &g)
+        XCTAssertFalse(opts.isEmpty, "a gated-out turn must still be playable")
+        XCTAssertTrue(opts.contains { ["m1", "m2"].contains($0.id) })
+    }
+
+    /// The gate never resurrects a used id (it filters *within* the unused set).
+    func testGateStillExcludesUsedIds() {
+        var g = SystemRandomNumberGenerator()
+        // m3 clears the floor but is already in the chain; m5 is the only other one.
+        let candidates = [film(3, votes: 9_000), film(5, votes: 8_000), film(4, votes: 10)]
+        for _ in 0..<40 {
+            let opts = Choices.build(correctFrom: candidates, distractorsFrom: movieNodes([100, 101]),
+                                     count: 3, excluding: ["m3"],
+                                     gate: .minVoteCount(4_000), using: &g)
+            XCTAssertFalse(opts.contains { $0.id == "m3" })
+            let correct = opts.first { ["m4", "m5"].contains($0.id) }
+            XCTAssertEqual(correct?.id, "m5")
         }
     }
 
