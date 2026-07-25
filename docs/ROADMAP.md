@@ -50,20 +50,40 @@ and a motion re-tune to match.
 
 **Decide before starting:**
 
-- **The central visual question: is it even a chain?** The rising tile-stack reads as
-  Tetris rather than *chain*, and the metaphor itself is open — **a stack of cards is a
-  live candidate**, as are a filmstrip, a literal linked thread, or a constellation.
-  This is the highest-leverage decision in the overhaul; everything else follows from it.
+- **Direction chosen: a stacked list of cards** (decided 2026-07-25 from a visual
+  reference). Not the current tile-stack, which reads as Tetris rather than *chain*, and
+  not a filmstrip / linked thread / constellation.
 
-  **Cards have a real structural argument in their favour:** the app already fetches
-  poster and headshot art for every node (`imagePath` → `Config.imageURL`), and a card
-  is the natural container for art in a way a coloured bar is not. Today that art only
-  appears in the Reel; a card metaphor would put the *film* on screen during play,
-  which is more on-genre for a movie game. It also composes better with the 0.9.0
-  share-image milestone — a shareable "hand of cards" is a stronger artefact than a
-  column of bars. The cost is layout: cards need much more room per node than a 44pt
-  bar, which collides with the play screen's keyboard docking (see the portrait-only
-  constraint below), so the "how many previous links stay visible" question gets harder.
+  **The reference shape:** cards stacked vertically with a strong overlap, each a
+  distinct saturated colour block with a bold uppercase title; the **rearward cards are
+  collapsed to just their title bar** while the **front (active) card is expanded** and
+  carries the real content — illustration/art plus small pill-shaped metadata chips and
+  a corner action button.
+
+  **Good news: the existing `ChainStack` structure already maps onto this.** It stacks,
+  collapses older entries ("+N earlier"), and emphasises the newest — the same
+  information architecture. So this is a **tile → card upgrade**, not a structural
+  rethink: richer per-card content, art, and a real collapsed/expanded distinction,
+  rather than a new layout model. That materially lowers the risk of the overhaul.
+
+  **Why cards fit this app specifically:** it already fetches poster and headshot art
+  for every node (`imagePath` → `Config.imageURL`), and a card is the natural container
+  for art where a coloured bar is not. Today that art only surfaces in the Reel — cards
+  put the *film itself* on screen during play, which is far more on-genre. It also
+  composes much better with the 0.9.0 share-image milestone: a shareable "hand of
+  cards" is a stronger artefact than a column of bars.
+
+  **The hard constraint to solve first:** cards need far more vertical room per node
+  than a 44pt bar, and the play screen's band is squeezed between the score hero and
+  the **docked keyboard** (portrait-only, see below). Decide early how many rearward
+  cards stay visible, how tightly they overlap, and whether the front card's expanded
+  content is viable at all in the play window or only in the game-over recap. The
+  reference's front card is tall — that's the part that has to give.
+
+  **What the metadata chips become:** the reference uses them for attributes
+  (`< 20 seats`, `< 5 workers`). Here the natural equivalents are year, the actor/movie
+  kind, and possibly the points that link earned — but **nothing that leaks a future
+  answer**, and the kind must stay glanceable (see the category-identity note above).
 
   **Naming note, so this doesn't become a false blocker:** "chain" is the *domain*
   vocabulary (`ChainNode`, `chain`, `bestChain`) and it stays accurate regardless — the
