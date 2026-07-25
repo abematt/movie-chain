@@ -56,6 +56,40 @@ xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
 Day-to-day development is normally done in Xcode (⌘B build, ⌘R run, ⌘U test). `#Preview` blocks
 drive SwiftUI canvas previews.
 
+## Versioning & changelog
+
+The app is versioned and every notable change is recorded in
+[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.4.0`;
+`1.0.0` means launch.** Each remaining pre-launch milestone is allocated a minor
+version — design overhaul (0.5.0), login/session (0.6.0), social/Pass & Play (0.7.0),
+leaderboards (0.8.0), share images + TMDB proxy (0.9.0) — so **check the changelog
+table before choosing a bump**. Each is documented in
+[`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
+the relevant section before starting one.
+
+> Note: the current **visual design is placeholder** (including the chain treatment) —
+> the 0.5.0 overhaul replaces it. The design-system structure (`Theme` tokens, owned
+> `Components`, per-node category identity) is what's meant to survive.
+
+- **Where the version lives:** `MARKETING_VERSION` (e.g. `0.4.0`) and
+  `CURRENT_PROJECT_VERSION` (the build number) in build settings — set in all four
+  configurations in `project.pbxproj`, so the app and test targets agree. Code reads
+  them from the bundle via `Config.appVersion` / `buildNumber` / `versionString`
+  (**never hardcode a version**), and Settings displays it.
+- **When you land a user-visible change:** add a bullet under `## [Unreleased]` in
+  the changelog, in the right category (Added / Changed / Fixed / Removed). Say what
+  changed *and why it mattered* — the existing entries set the tone.
+- **When you cut a version:** rename `[Unreleased]` to the new version + date, bump
+  `MARKETING_VERSION` (and `CURRENT_PROJECT_VERSION` for a submitted build), then
+  tag it:
+  ```bash
+  sed -i '' 's/MARKETING_VERSION = 0.4.0;/MARKETING_VERSION = 0.5.0;/g' \
+    movie-quiz.xcodeproj/project.pbxproj
+  git tag -a v0.5.0 -m "0.5.0"
+  ```
+  Bump **minor** when a roadmap milestone lands, **patch** for fixes/polish in
+  between. Pre-1.0, breaking internal changes go in a minor bump.
+
 ## Architecture
 
 > For the full module-by-module breakdown, game-loop diagram, and design

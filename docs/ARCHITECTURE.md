@@ -340,6 +340,14 @@ pure-value + observable-store split as the rest of the app:
   Motion.
 
 ### Design system — [`Theme.swift`](../movie-quiz/Theme.swift) + [`Components.swift`](../movie-quiz/Components.swift)
+
+> ⚠️ **The current visual treatment is placeholder**, including the chain rendering —
+> a full design overhaul is the next roadmap milestone (0.5.0; see the changelog).
+> Treat what follows as a description of *what exists today*, not a settled identity.
+> The **structure** is what's meant to survive: tokens in one place, owned components,
+> and per-node category identity — so a re-skin is a `Theme`/`Components` change
+> rather than a rewrite of every screen.
+
 An **editorial, puzzle-page treatment** (NYT Games / Connections): paper-warm
 neutrals, near-black ink, and two "category" accents — **blue for actors, purple
 for movies** — used the way Connections uses its group colors. A serif wordmark +
@@ -513,6 +521,12 @@ pick seed  ──▶  candidates = cast/filmography of last node
 
 ## Extending it
 
+> **The planned path to launch is [`ROADMAP.md`](ROADMAP.md)** — five milestones
+> (design overhaul, login/session, Pass & Play, leaderboards, share images + TMDB
+> proxy), each with scope, decisions to settle, and known traps. The technical designs
+> for the social/leaderboard work are the "Direction" sections below; the roadmap is
+> the planning layer over them.
+
 The collection ("Your Reel") is the first fan-out built on top of the loop —
 a local, login-free registry that layers on the engine without touching the
 engine/provider split (it's just another observable store the engine records
@@ -625,6 +639,14 @@ of the login-free core, never a gate in front of it.
 
 ## Dev workflow
 
+- **Versioning:** the app is versioned (currently **0.4.0**; **1.0.0 means launch**,
+  with each remaining pre-launch milestone allocated a minor version — see the
+  roadmap table in the changelog header) and every notable change is recorded in
+  [`CHANGELOG.md`](../CHANGELOG.md) (Keep a Changelog + SemVer). `MARKETING_VERSION`
+  / `CURRENT_PROJECT_VERSION` in build settings are the source of truth; code reads
+  them from the bundle via `Config.appVersion`/`buildNumber`/`versionString` and
+  Settings displays the result, so the shown version can't drift from the built one.
+  See "Versioning & changelog" in `CLAUDE.md` for the bump/tag steps.
 - Day to day: Xcode — ⌘B build, ⌘R run, ⌘U test. `#Preview` blocks drive canvas.
 - Run on an **iOS 26.x** simulator (the deployment target is 26.2), not 18.x.
 - **QA shortcuts (DEBUG only):** launch with `-uiDemoChain` to jump straight into

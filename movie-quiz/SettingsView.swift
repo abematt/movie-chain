@@ -24,6 +24,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
+                    aboutSection
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,6 +55,32 @@ struct SettingsView: View {
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+        }
+    }
+
+    // MARK: About — the app version
+    //
+    // Pulled from the bundle via `Config.versionString`, so it always reports the
+    // build the player is actually running (the number to quote in a bug report).
+
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("About")
+            HStack {
+                Text("Movie Chain")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.Color.ink)
+                Spacer()
+                Text(Config.versionString)
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm + 2)
+            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Movie Chain version \(Config.appVersion), build \(Config.buildNumber)")
         }
     }
 

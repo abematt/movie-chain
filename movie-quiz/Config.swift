@@ -42,6 +42,25 @@ enum Config {
 
     static var hasTMDBToken: Bool { !tmdbToken.isEmpty }
 
+    // MARK: App version
+    //
+    // Read from the bundle, never hardcoded, so what the app displays can't drift
+    // from what was actually built. The values come from `MARKETING_VERSION` and
+    // `CURRENT_PROJECT_VERSION` in build settings (see "Versioning" in CLAUDE.md).
+
+    /// Marketing version — `CFBundleShortVersionString`, e.g. `"0.4.0"`.
+    static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    /// Build number — `CFBundleVersion`, bumped per build submitted to TestFlight.
+    static var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+    }
+
+    /// `"0.4.0 (1)"` — the form shown in Settings.
+    static var versionString: String { "\(appVersion) (\(buildNumber))" }
+
     /// Seconds allowed per turn before the game ends.
     static let secondsPerTurn = 30
 
