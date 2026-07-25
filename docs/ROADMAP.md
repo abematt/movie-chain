@@ -50,17 +50,20 @@ and a motion re-tune to match.
 
 **Decide before starting:**
 
-- **Direction chosen: a stacked list of cards** (decided 2026-07-25 from a visual
-  reference). Not the current tile-stack, which reads as Tetris rather than *chain*, and
-  not a filmstrip / linked thread / constellation.
+- **Still open — leading candidate: a stacked list of cards.** ⚠️ **Not decided.** The
+  current tile-stack is the thing most likely to go (it reads as Tetris rather than
+  *chain*), and a card stack is the direction being explored as of 2026-07-25 — but a
+  filmstrip, a literal linked thread, and a constellation are all still live, and the
+  card idea itself is still being played with. Everything below is exploration notes,
+  not a spec. This remains the highest-leverage decision in the overhaul.
 
-  **The reference shape:** cards stacked vertically with a strong overlap, each a
+  **The card reference shape** (what was being looked at): cards stacked vertically with a strong overlap, each a
   distinct saturated colour block with a bold uppercase title; the **rearward cards are
   collapsed to just their title bar** while the **front (active) card is expanded** and
   carries the real content — illustration/art plus small pill-shaped metadata chips and
   a corner action button.
 
-  **Good news: the existing `ChainStack` structure already maps onto this.** It stacks,
+  **If cards win, the existing `ChainStack` structure already maps onto them.** It stacks,
   collapses older entries ("+N earlier"), and emphasises the newest — the same
   information architecture. So this is a **tile → card upgrade**, not a structural
   rethink: richer per-card content, art, and a real collapsed/expanded distinction,

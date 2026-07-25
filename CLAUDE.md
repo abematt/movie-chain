@@ -70,11 +70,11 @@ table before choosing a bump**. Each is documented in
 the relevant section before starting one.
 
 > Note: the current **visual design is placeholder** (including the chain treatment) —
-> the 0.5.0 overhaul replaces it, and the **direction is decided: a stacked list of
-> cards** (rearward cards collapsed to a title bar, front card expanded with art +
-> metadata chips). `ChainStack`'s information architecture survives — stack, collapse
-> older, emphasise newest — so it's a tile→card upgrade, not a new layout model; the
-> hard part is vertical room against the docked keyboard. The design-system structure
+> the 0.5.0 overhaul replaces it. The **direction is still open** — a stacked list of
+> cards is the leading candidate, with a filmstrip / linked thread / constellation also
+> live; don't treat any of them as settled. `ChainStack`'s information architecture
+> (stack, collapse older, emphasise newest) probably survives whichever wins, and the
+> recurring constraint is vertical room against the docked keyboard. The design-system structure
 > (`Theme` tokens, owned `Components`, per-node category identity) is also meant to
 > survive. See [`docs/ROADMAP.md`](docs/ROADMAP.md#050--design-overhaul) before
 > touching anything visual.

@@ -357,8 +357,9 @@ pure-value + observable-store split as the rest of the app:
 
 > ⚠️ **The current visual treatment is placeholder**, including the chain rendering —
 > a full design overhaul is the next milestone: **[`ROADMAP.md` →
-> 0.5.0](ROADMAP.md#050--design-overhaul)**, which is the **decided direction (a stacked
-> list of cards)** and the constraints. Read it before changing anything visual.
+> 0.5.0](ROADMAP.md#050--design-overhaul)**, which holds the options still being
+> explored (a stacked list of cards is currently leading) and the constraints. Read it
+> before changing anything visual — the direction is **not settled yet**.
 > Treat what follows as a description of *what exists today*, not a settled identity.
 > The **structure** is what's meant to survive: tokens in one place, owned components,
 > and per-node category identity — so a re-skin is a `Theme`/`Components` change
@@ -406,12 +407,12 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   `staggered:`, reveals its tiles one-after-another (through `StaggeredAppear`) as
   a rare end-of-run delight beat — a no-op during play, where tiles land
   individually on the `drop` transition.
-  **`ChainStack` is being replaced in 0.5.0** by a **stacked list of cards** (rearward
-  cards collapsed to a title bar, front card expanded with art + metadata chips) — note
-  its *information architecture* survives that change (stack, collapse older, emphasise
-  newest), so it's a tile→card upgrade rather than a new layout model. See
-  [`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul) for the direction and the
-  vertical-room constraint against the docked keyboard.
+  **`ChainStack` is the most likely casualty of the 0.5.0 overhaul** — the replacement
+  isn't decided (a stacked list of cards is the leading candidate). Worth knowing: its
+  *information architecture* (stack, collapse older, emphasise newest) probably survives
+  whatever wins, so the change may be a re-skin of this component rather than a new
+  layout model. See [`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul) for the open
+  options and the vertical-room constraint against the docked keyboard.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
   (drains in ink, shifts to a warning red in the final quarter).
 - App-wide `.tint(.accentColor)` (ink) is applied once at the root in
@@ -431,8 +432,8 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
 > ⚠️ Same caveat as the design system above: **the visuals described here are
 > placeholder.** The routing, state ownership, and layout *constraints* (keyboard
 > docking, portrait-only, Reduce Motion) are real and load-bearing; the styling is not
-> settled. See **[`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul)** — the chain
-> becomes a stacked list of cards — before changing anything visual.
+> settled, and the chain's replacement is still an open question. See **[`ROADMAP.md` →
+> 0.5.0](ROADMAP.md#050--design-overhaul)** before changing anything visual.
 
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
