@@ -21,8 +21,10 @@ that alternates actor → movie → actor → movie …, where each link must be
   MainActor`) — off-main-actor code must opt out explicitly (e.g. the
   `nonisolated` `Codable` values in `Collection.swift`; resolve `@MainActor`
   defaults in init bodies, not default arguments)
-- Deployment target: iOS 26.2 (high — only installs on a 26.x runtime; lower it
-  in build settings if broader device/simulator support is wanted)
+- Deployment target: **iOS 18.0** — the floor is actually iOS 17 (`@Observable`
+  is the only thing blocking 16); 18.0 is "current major plus one back", since
+  Apple's numbering jumped 18 → 26. New APIs above 18.0 need `if #available`.
+  macOS/visionOS minimums are still 26.2 (secondary platforms, unverified)
 - Supported platforms: iOS, iPad, macOS, visionOS
 - Orientation: **iPhone is portrait-only**; iPad keeps all orientations. The play
   screen docks the keyboard as its primary layout, so the game is portrait by design.
@@ -217,6 +219,13 @@ to build instead. The code is recoverable from git (SHAs in that doc).
 
 ## Running it
 
-Build succeeds for the simulator. Because the deployment target is iOS 26.2, run
-on a 26.x simulator runtime (e.g. iOS 26.4), not 18.x. In Xcode: pick an iOS 26+
-simulator and ⌘R.
+Build succeeds for the simulator. The deployment target is **iOS 18.0**, so any
+18.x-or-later runtime works — the suite is verified green on both **18.0** and
+**26.x**. In Xcode: pick a simulator and ⌘R. When touching anything version-sensitive,
+run the tests on an 18.x simulator too, not just the newest, since that's the floor
+the App Store build has to honour:
+
+```bash
+xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.0' test
+```

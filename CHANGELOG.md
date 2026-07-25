@@ -28,7 +28,15 @@ not a contract — if milestones land out of order, the version follows the work
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **Lowered the iOS deployment target from 26.2 to 18.0**, roughly doubling the
+  installable audience at no code cost. The 26.2 minimum was never a requirement — it
+  was Xcode's default (current SDK) from project creation. An audit at successively
+  lower targets found the true floor is **iOS 17.0**, blocked only by `@Observable`;
+  18.0 is "current major plus one back" (Apple's numbering jumped 18 → 26) and keeps
+  iOS 18 APIs available. The full suite passes on both an **18.0** and a **26.x**
+  simulator. macOS/visionOS minimums are unchanged at 26.2.
 
 ## [0.4.0] — 2026-07-25
 

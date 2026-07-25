@@ -26,7 +26,7 @@ and each turn is on a countdown — run out of time and the game ends.
 | UI | SwiftUI |
 | State | Observation framework (`@Observable`, `@State`) |
 | Concurrency | Swift structured concurrency (`async`/`await`, `Task`, `@MainActor`); builds with **MainActor-default isolation** (`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`) |
-| Min OS | iOS **26.2** deployment target (lower it in build settings for wider support) |
+| Min OS | iOS **18.0** deployment target (true floor is 17.0 — `@Observable` blocks 16; APIs above 18.0 need `if #available`). macOS/visionOS minimums remain 26.2 |
 | Platforms | iOS, iPadOS, macOS, visionOS |
 | Data | TMDB REST API (live) or a built-in stub graph (offline demo) |
 | Project | `movie-quiz.xcodeproj` (project, not workspace); app target + `movie-quizTests` unit-test target, single shared scheme |
@@ -648,7 +648,10 @@ of the login-free core, never a gate in front of it.
   Settings displays the result, so the shown version can't drift from the built one.
   See "Versioning & changelog" in `CLAUDE.md` for the bump/tag steps.
 - Day to day: Xcode — ⌘B build, ⌘R run, ⌘U test. `#Preview` blocks drive canvas.
-- Run on an **iOS 26.x** simulator (the deployment target is 26.2), not 18.x.
+- Deployment target is **iOS 18.0**, so any 18.x+ simulator works; the suite is
+  verified on both 18.0 and 26.x. Run the tests against an **18.x** simulator as well
+  as the newest when touching version-sensitive code — 18.0 is the floor the shipped
+  build must honour (command in `CLAUDE.md` → "Running it").
 - **QA shortcuts (DEBUG only):** launch with `-uiDemoChain` to jump straight into
   a mid-game `playing` state with a sample chain, or `-uiDemoGameOver` for the
   game-over summary — no typing required to inspect those screens. Wired in

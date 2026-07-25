@@ -227,9 +227,12 @@ engine change. If 0.8.0 already brought a backend, this rides on it.
 
 Not a feature milestone — the shipping checklist.
 
-- **Lower the deployment target — it's free.** It's currently **iOS 26.2**, which was
-  never a requirement: it's just Xcode's default (the current SDK) at project creation.
-  **Audited 2026-07-25 by building at successively lower targets:**
+- ~~**Lower the deployment target.**~~ ✅ **Done (2026-07-25) — now iOS 18.0.** It had
+  been **26.2**, which was never a requirement: just Xcode's default (the current SDK)
+  at project creation. Verified by running the full suite on an **18.0** simulator as
+  well as 26.x — green on both. macOS/visionOS minimums were left at 26.2 (secondary
+  platforms; visionOS isn't installed locally so it couldn't be verified).
+  **The audit, kept for the reasoning:**
 
   | Target | Result |
   |---|---|
@@ -242,21 +245,18 @@ Not a feature milestone — the shipping checklist.
   giving up. Note `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` is a *compiler* setting,
   not an OS requirement, so it doesn't constrain this.
 
-  **Recommendation: iOS 18.0.** Going to 17.0 buys almost no extra *devices* (17 and 18
+  **Why 18.0 and not 17.0:** going to 17.0 buys almost no extra *devices* (17 and 18
   support the same hardware), only users who declined two updates — while 18.0 keeps
   iOS 18 APIs available. Since Apple's numbering jumped 18 → 26, targeting 18.0 is
-  "current major plus one back", the conventional support window. Targeting a **point**
-  release (26.2) is strictly worse than 26.0 for no benefit either way.
+  "current major plus one back", the conventional support window.
 
-  Caveats before flipping it: verify Apple's current adoption and device-support lists
-  at launch time rather than trusting a stale estimate; iOS 26 also dropped some
-  devices that 18 still supports, so lowering may recover real hardware, not just
-  un-updated users. And note the ongoing cost — a lower target means new APIs need
-  `if #available` guards, and the suite should be smoke-tested on an 18.x simulator
-  (18.0/18.1/18.3 runtimes are installed locally). A runtime test on 18.x isn't
-  possible *until* the project setting is lowered: xcodebuild rejects an 18.x
-  destination while the project declares a 26.2 minimum, so a build-setting override
-  alone can't prove it.
+  **Still to confirm at launch:** Apple's then-current adoption and device-support
+  lists (don't trust a 2026-07 estimate) — iOS 26 dropped some devices that 18 still
+  supports, so this may have recovered real hardware, not just un-updated users.
+
+  **Ongoing cost now that it's lowered:** APIs newer than 18.0 need `if #available`
+  guards, and version-sensitive changes should be tested on an 18.x simulator, not just
+  the newest — 18.0 is the floor the shipped build must honour.
 - **Real device testing.** Everything so far is simulator-verified. Haptics, audio
   session behaviour under the silent switch, and thermals/network on cellular need
   real hardware.
