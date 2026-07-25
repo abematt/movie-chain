@@ -98,6 +98,12 @@ the relevant section before starting one.
 > rationale, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Keep that doc
 > current when the architecture, providers, rules, or stack change; the summary
 > below should stay lean.
+>
+> **The rest of the doc set** (each has a distinct job — keep the right one current):
+> [`docs/ROADMAP.md`](docs/ROADMAP.md) = the planned path to 1.0, milestone by
+> milestone; [`CHANGELOG.md`](CHANGELOG.md) = what changed per version;
+> [`docs/ASSISTED-MODE.md`](docs/ASSISTED-MODE.md) = postmortem of a removed mode,
+> **read it before building anything that picks chain links for the player.**
 
 The game logic is fully decoupled from both the UI and the data source.
 

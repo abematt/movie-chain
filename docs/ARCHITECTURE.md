@@ -4,6 +4,20 @@
 > auto-loaded summary; **this file is the deep reference** — point a chat here to
 > get it up to speed, and keep it current when the code changes.
 
+### The doc set
+
+| Doc | What it's for |
+|---|---|
+| [`../CLAUDE.md`](../CLAUDE.md) | Lean auto-loaded summary + commands, versioning process, conventions |
+| **this file** | How the app works today: modules, rules, design decisions, the "why" |
+| [`ROADMAP.md`](ROADMAP.md) | The planned path to 1.0 (launch) — five milestones, each with scope, decisions to settle, and known traps |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | What changed per version (Keep a Changelog + SemVer); its header holds the version↔milestone table |
+| [`ASSISTED-MODE.md`](ASSISTED-MODE.md) | Postmortem of a removed mode — **read before building anything that picks chain links for the player** |
+
+Current version **0.4.0**; **1.0.0 means launch**. When you change the architecture,
+providers, rules, or stack, update *this* file; when you land a user-visible change,
+add a changelog entry; when a plan changes, edit the roadmap.
+
 ## What the app is
 
 **Movie Chain** (`movie-quiz`) is a single-player recall game. You build a chain
