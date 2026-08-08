@@ -109,7 +109,10 @@ the relevant section before starting one.
 > [`docs/ROADMAP.md`](docs/ROADMAP.md) = the planned path to 1.0, milestone by
 > milestone; [`CHANGELOG.md`](CHANGELOG.md) = what changed per version;
 > [`docs/ASSISTED-MODE.md`](docs/ASSISTED-MODE.md) = postmortem of a removed mode,
-> **read it before building anything that picks chain links for the player.**
+> **read it before building anything that picks chain links for the player**;
+> [`docs/GROWTH.md`](docs/GROWTH.md) = growth mechanics as a **build catalog** (share
+> loop, daily chain, challenge links, chain→video), sized and mapped to the code, plus
+> the TMDB request-rate gate that constrains any acquisition push.
 
 The game logic is fully decoupled from both the UI and the data source.
 

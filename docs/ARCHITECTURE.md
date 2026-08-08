@@ -13,6 +13,7 @@
 | [`ROADMAP.md`](ROADMAP.md) | The planned path to 1.0 (launch) — five milestones, each with scope, decisions to settle, and known traps |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | What changed per version (Keep a Changelog + SemVer); its header holds the version↔milestone table |
 | [`ASSISTED-MODE.md`](ASSISTED-MODE.md) | Postmortem of a removed mode — **read before building anything that picks chain links for the player** |
+| [`GROWTH.md`](GROWTH.md) | Growth mechanics as a build catalog — the share/daily/challenge/replay features that make distribution possible, sized and mapped to the code |
 
 Current version **0.4.0**; **1.0.0 means launch**. When you change the architecture,
 providers, rules, or stack, update *this* file; when you land a user-visible change,
