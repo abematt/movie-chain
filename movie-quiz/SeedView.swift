@@ -331,6 +331,7 @@ struct SeedView: View {
                     Image(systemName: "film.stack")
                     if collection.total > 0 {
                         Text("\(collection.total)")
+                            .font(Theme.Font.numeral(.subheadline))
                             .monospacedDigit()
                     }
                 }

@@ -112,7 +112,10 @@ struct CollectionView: View {
                     Image(systemName: "trophy.fill")
                         .font(Theme.Font.label)
                         .foregroundStyle(.secondary)
-                    Text("Best chain · \(bestChain) links").metaLabel()
+                    Text("Best chain").metaLabel()
+                    Text("\(bestChain) links")
+                        .font(Theme.Font.numeral(.subheadline))
+                        .foregroundStyle(Theme.Color.ink)
                 }
             }
         }
@@ -201,6 +204,7 @@ struct CollectionView: View {
                     HStack(spacing: 5) {
                         Text(f.label)
                         Text("\(count(for: f))")
+                            .font(Theme.Font.numeral(.subheadline))
                             .opacity(0.6)
                             .monospacedDigit()
                     }
@@ -256,7 +260,10 @@ struct CollectionView: View {
                 NodeDot(kind: kind, size: 9)
                 Text(title).metaLabel()
                 Spacer()
-                Text("\(n)").monospacedDigit().metaLabel()
+                Text("\(n)")
+                    .font(Theme.Font.numeral(.subheadline))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
             LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
@@ -397,8 +404,9 @@ private struct ReelTile: View {
 
     private var countChip: some View {
         Text("×\(entity.timesLogged)")
+            .font(Theme.Font.numeral(.caption))
             .monospacedDigit()
-            .metaLabel(Theme.Color.ink)
+            .foregroundStyle(Theme.Color.ink)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(Theme.Color.tile))

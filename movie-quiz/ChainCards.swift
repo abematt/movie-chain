@@ -86,8 +86,9 @@ struct HeroChainCard: View {
                     Spacer(minLength: 0)
                     if let position {
                         Text("#\(position)")
+                            .font(Theme.Font.numeral(.footnote))
                             .monospacedDigit()
-                            .metaLabel()
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Text(node.matchText)

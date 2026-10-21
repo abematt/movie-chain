@@ -308,7 +308,7 @@ struct FloatingGain: View {
 
     var body: some View {
         Text("+\(value)")
-            .font(Theme.Font.bodyStrong)
+            .font(Theme.Font.numeral(.subheadline))
             .monospacedDigit()
             .foregroundStyle(Theme.Color.good)
             .opacity(rise ? 0 : 1)

@@ -74,7 +74,7 @@ struct GameOverView: View {
                             .foregroundStyle(.secondary)
                     }
                     Text(reelMessage)
-                        .font(Theme.Font.bodyStrong)
+                        .font(Theme.Font.numeral())
                         .foregroundStyle(Theme.Color.ink)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
@@ -147,7 +147,7 @@ struct GameOverView: View {
                 Text("Personal best").metaLabel()
             }
             Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
-                .font(Theme.Font.bodyStrong)
+                .font(Theme.Font.numeral())
                 .monospacedDigit()
                 .foregroundStyle(Theme.Color.ink)
         }

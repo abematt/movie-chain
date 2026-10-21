@@ -112,7 +112,7 @@ struct GameView: View {
             Spacer()
 
             Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
-                .font(Theme.Font.bodyStrong)
+                .font(Theme.Font.numeral(.subheadline))
                 .monospacedDigit()
                 .foregroundStyle(lowTime ? Color.red : .secondary)
                 .contentTransition(.numericText())

@@ -79,6 +79,9 @@ enum Theme {
     //     a regular italic **flourish** for the secondary word (years, "pts",
     //     "Chain" in the wordmark). The serif is the system's New York, standing
     //     in for the spec's Fraunces; swapping the font later is a change here.
+    //   • Numerals — every figure in the app (scores, counts, "2 links · 89
+    //     pts", the timer) is the bold serif, via `numeral`. This is the spec's
+    //     card-numeral role: numbers never fall back to the sans, whatever size.
     //   • Body — the system sans at two sizes (`body`, `small`), medium weight,
     //     plus `bodyStrong` for names in rows.
     //   • Label — tiny bold uppercase tracked metadata ("ACTOR", "TIME'S UP").
@@ -92,6 +95,10 @@ enum Theme {
         }
         /// Serif heading that scales: node names, card titles, sheet heroes.
         static func heading(_ style: SwiftUI.Font.TextStyle = .title3) -> SwiftUI.Font {
+            .system(style, design: .serif, weight: .bold)
+        }
+        /// Bold serif figures at a text-style size: counts, stats, the timer.
+        static func numeral(_ style: SwiftUI.Font.TextStyle = .headline) -> SwiftUI.Font {
             .system(style, design: .serif, weight: .bold)
         }
         /// The italic flourish paired with display/heading type.

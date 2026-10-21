@@ -46,7 +46,8 @@ not a contract — if milestones land out of order, the version follows the work
 - **One type system across every screen.** Three voices replace the old ad-hoc sizes:
   a bold serif with an italic flourish for numerals, names and the wordmark ("Movie
   *Chain*"), a sans body at two sizes, and one tracked uppercase label recipe in place
-  of seven. Movie years are an italic flourish everywhere instead of parentheses. The
+  of seven. Every figure is the serif, whatever its size: the timer, "2 links · 89
+  pts", the Reel counts. Before, the same kind of number changed voice with its size. Movie years are an italic flourish everywhere instead of parentheses. The
   game-over recap reuses the play screen's compact cards, so the chain looks like one
   object from first link to last. Thin rules, soft shadows and the Reel's gradient
   name scrim are gone. Everything except the big numerals still scales with Dynamic
