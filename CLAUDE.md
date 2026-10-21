@@ -63,20 +63,21 @@ drive SwiftUI canvas previews.
 The app is versioned and every notable change is recorded in
 [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.4.0`;
 `1.0.0` means launch.** Each remaining pre-launch milestone is allocated a minor
-version — design overhaul (0.5.0), login/session (0.6.0), social/Pass & Play (0.7.0),
-leaderboards (0.8.0), share images + TMDB proxy (0.9.0) — so **check the changelog
-table before choosing a bump**. Each is documented in
+version — foundations & safety net (0.5.0), design overhaul (0.6.0), the service /
+TMDB proxy (0.7.0), accounts (0.8.0), the Daily Chain (0.9.0), friend groups (0.10.0);
+share images ship with launch (1.0.0). Global leaderboards are dropped — **check the
+changelog table before choosing a bump**. Each is documented in
 [`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
 the relevant section before starting one.
 
 > Note: the current **visual design is placeholder** (including the chain treatment) —
-> the 0.5.0 overhaul replaces it. The **direction is still open** — a stacked list of
+> the 0.6.0 overhaul replaces it. The **direction is still open** — a stacked list of
 > cards is the leading candidate, with a filmstrip / linked thread / constellation also
 > live; don't treat any of them as settled. `ChainStack`'s information architecture
 > (stack, collapse older, emphasise newest) probably survives whichever wins, and the
 > recurring constraint is vertical room against the docked keyboard. The design-system structure
 > (`Theme` tokens, owned `Components`, per-node category identity) is also meant to
-> survive. See [`docs/ROADMAP.md`](docs/ROADMAP.md#050--design-overhaul) before
+> survive. See [`docs/ROADMAP.md`](docs/ROADMAP.md#060--design-overhaul) before
 > touching anything visual.
 
 - **Where the version lives:** `MARKETING_VERSION` (e.g. `0.4.0`) and
@@ -107,7 +108,10 @@ the relevant section before starting one.
 >
 > **The rest of the doc set** (each has a distinct job — keep the right one current):
 > [`docs/ROADMAP.md`](docs/ROADMAP.md) = the planned path to 1.0, milestone by
-> milestone; [`CHANGELOG.md`](CHANGELOG.md) = what changed per version;
+> milestone (**re-cut 2026-08-08** — read it before planning any work);
+> [`docs/DAILY-CHAIN.md`](docs/DAILY-CHAIN.md) = spec for the planned headline mode (one
+> puzzle a day, longest route A→B — specced, **not playtested, not built**);
+> [`CHANGELOG.md`](CHANGELOG.md) = what changed per version;
 > [`docs/ASSISTED-MODE.md`](docs/ASSISTED-MODE.md) = postmortem of a removed mode,
 > **read it before building anything that picks chain links for the player**;
 > [`docs/GROWTH.md`](docs/GROWTH.md) = growth mechanics as a **build catalog** (share
@@ -220,10 +224,11 @@ tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs th
 system serif wordmark with the default sans). Prefer reusing these over hardcoded
 values.
 
-Remaining fan-out modes (genre locks, memory-recall every Nth link, leaderboards)
-all layer on this same engine — keep the engine/provider split clean. Leaderboards
-are the natural point to add accounts; the local collection/session data is
-forward-compatible with a future sync.
+Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall
+every Nth link) all layer on this same engine — keep the engine/provider split clean.
+Accounts arrive at 0.8.0 (Sign in with Apple over a device id); the local
+collection/session data is forward-compatible with that sync. There will be no global
+leaderboard.
 
 A multiple-choice **Assisted mode was built, playtested, and removed** (it served
 neither the newcomer nor the enthusiast). Read

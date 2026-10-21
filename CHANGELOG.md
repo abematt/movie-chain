@@ -7,21 +7,24 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — read
 `MAJOR.MINOR.PATCH` on the *marketing version* (`MARKETING_VERSION`), with the build
 number (`CURRENT_PROJECT_VERSION`) incrementing independently per submitted build.
 
-**1.0.0 means launch.** The solo game loop is complete and tested, but five major
+**1.0.0 means launch.** The solo game loop is complete and tested, but six major
 workstreams are planned *before* a public release — so the pre-1.0 minor versions are
 allocated as milestone signals rather than picked by feel. **Each milestone is
 documented in [`docs/ROADMAP.md`](docs/ROADMAP.md)** (scope, rationale, decisions to
-settle, and the traps):
+settle, and the traps). **The plan was re-cut on 2026-08-08** — launch scope is now the
+full loop (game + daily + friend groups), global leaderboards are dropped, and the
+[Daily Chain](docs/DAILY-CHAIN.md) is the new headline mode:
 
 | Version | Milestone |
 |---|---|
 | **0.4.0** | Solo game complete — engine, matching, providers, collection, tests |
-| 0.5.0 | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity (today's look, including the chain treatment, is placeholder) |
-| 0.6.0 | [**Login / session retention**](docs/ROADMAP.md#060--login--session-retention) — durable identity, so scores can be attributed |
-| 0.7.0 | [**Social — Pass & Play**](docs/ROADMAP.md#070--social--pass--play) — continue a friend's chain and shuttle it back and forth |
-| 0.8.0 | [**Leaderboards**](docs/ROADMAP.md#080--leaderboards) |
-| 0.9.0 | [**Share-image renderers**](docs/ROADMAP.md#090--share-image-renderers--tmdb-proxy) (Reel + scores as images) + the TMDB proxy → release candidate |
-| 1.0.0 | [**Launch**](docs/ROADMAP.md#100--launch) |
+| 0.5.0 | [**Foundations & safety net**](docs/ROADMAP.md#050--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
+| 0.6.0 | [**Design overhaul**](docs/ROADMAP.md#060--design-overhaul) — the real visual identity (today's look, including the chain treatment, is placeholder) |
+| 0.7.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#070--the-service) — takes the shared key out of the app and caches it |
+| 0.8.0 | [**Accounts**](docs/ROADMAP.md#080--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
+| 0.9.0 | [**The Daily Chain**](docs/ROADMAP.md#090--the-daily-chain) — one puzzle a day: longest route from A to B ([spec](docs/DAILY-CHAIN.md)) |
+| 0.10.0 | [**Friend groups**](docs/ROADMAP.md#0100--friend-groups) — invite-code groups, no global ranking |
+| 1.0.0 | [**Launch**](docs/ROADMAP.md#100--launch) — share images + links, onboarding demo, store listing |
 
 Until 1.0, breaking internal changes land in minor bumps. The order above is a plan,
 not a contract — if milestones land out of order, the version follows the work.

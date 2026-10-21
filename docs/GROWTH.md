@@ -6,8 +6,16 @@
 > product to work at all; this doc is what those mechanics are here, what they'd cost,
 > where they plug into the existing code, and which ones only make sense together.
 >
-> **Status: options, not a plan.** Nothing here is scheduled or decided. §7 groups the
-> builds into three directional bets — the point is to pick one, not to build the list.
+> **Status: partly superseded (2026-08-08).** The direction has since been decided —
+> see [`ROADMAP.md`](ROADMAP.md) for the plan of record. In short: **Bet A (the daily)
+> was taken and enlarged** into the [Daily Chain](DAILY-CHAIN.md), friend groups replaced
+> global leaderboards, and login moved *into* the launch scope rather than after it,
+> because mastering the full publish→backend→auth→social loop is the actual goal here.
+>
+> **What's still live in this doc:** the build catalog in §4 (sizes and code anchors all
+> still hold), the TMDB rate-limit derivation in §8, the licensing analysis, and §6 on
+> why the onboarding lever doesn't transfer. **What's dead:** the §5 "smaller 1.0"
+> recommendation and the §7 bet framing.
 >
 > **Companions:** [`ROADMAP.md`](ROADMAP.md) (the path to 1.0 — several items here are
 > roadmap milestones seen from a different angle), [`ASSISTED-MODE.md`](ASSISTED-MODE.md)
@@ -100,7 +108,7 @@ Store link. Blocked only on a listing existing. **XS.** Highest
 distribution-value-per-line in the repo — right now the app's best organic artifact
 converts at exactly zero.
 
-**D3 — Rendered share image (score card).** The 0.9.0 milestone. SwiftUI `ImageRenderer`
+**D3 — Rendered share image (score card).** Part of the 1.0.0 launch milestone. SwiftUI `ImageRenderer`
 over the existing node components. **M** — the trap is documented: `ImageRenderer` is
 synchronous, so any `AsyncImage` renders as its placeholder and poster art comes out
 empty; art must be fetched into memory and handed in as a concrete `Image`. Keep the
@@ -126,8 +134,8 @@ doesn't already have the app.
 No backend, no accounts — deterministic from the date. **M.**
 
 This is what makes the existing 🟦🟪 card mean something, and the roadmap already
-identifies it (inside 0.8.0) as *"probably the strongest single social feature here."*
-It doesn't need the rest of leaderboards.
+identified it (inside the old leaderboards milestone, now dropped) as *"probably the strongest single social feature here."*
+It never needed the rest of leaderboards.
 
 ⚠️ **It inherits the drift obligation.** [`ASSISTED-MODE.md`](ASSISTED-MODE.md#the-trap-worth-remembering-drift)
 names a daily seeded chain explicitly: the moment the *game* chooses the seed, the game
@@ -226,7 +234,7 @@ a complete video: timer pressure, a rising chain, the shake on reject, the score
 the near-miss. Camera-shyness is a non-issue, and going faceless isn't a deviation from
 the playbook — it's the correct application of it to a different product.
 
-**Which makes 0.5.0 a distribution deliverable.** If the screen is the creative, the
+**Which makes 0.6.0 (the design overhaul) a distribution deliverable.** If the screen is the creative, the
 screen's quality is the creative's quality — and it's also the App Store screenshots and
 the preview video. The design overhaul is the one "feature" on the roadmap that is
 straightforwardly acquisition work.
@@ -307,7 +315,7 @@ screen the cohort you just earned would see.
   `vote_count.desc` query, near-static, and *identical for every player*, yet it's
   refetched from scratch on every cold launch. **S**, and it removes most of the burst
   with no server.
-- **Real fix: the 0.9.0 proxy with caching**, which also takes the extractable key out of
+- **Real fix: the 0.7.0 proxy with caching**, which also takes the extractable key out of
   the `.ipa`. Because the pool is identical for everyone, one cached upstream response
   serves the whole player base.
 

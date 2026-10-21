@@ -10,7 +10,8 @@
 |---|---|
 | [`../CLAUDE.md`](../CLAUDE.md) | Lean auto-loaded summary + commands, versioning process, conventions |
 | **this file** | How the app works today: modules, rules, design decisions, the "why" |
-| [`ROADMAP.md`](ROADMAP.md) | The planned path to 1.0 (launch) — five milestones, each with scope, decisions to settle, and known traps |
+| [`ROADMAP.md`](ROADMAP.md) | The planned path to 1.0 (launch) — six milestones, each with scope, decisions to settle, and known traps |
+| [`DAILY-CHAIN.md`](DAILY-CHAIN.md) | Spec for the headline mode: one puzzle a day, longest route from A to B — **not yet playtested or built** |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | What changed per version (Keep a Changelog + SemVer); its header holds the version↔milestone table |
 | [`ASSISTED-MODE.md`](ASSISTED-MODE.md) | Postmortem of a removed mode — **read before building anything that picks chain links for the player** |
 | [`GROWTH.md`](GROWTH.md) | Growth mechanics as a build catalog — the share/daily/challenge/replay features that make distribution possible, sized and mapped to the code |
@@ -358,7 +359,7 @@ pure-value + observable-store split as the rest of the app:
 
 > ⚠️ **The current visual treatment is placeholder**, including the chain rendering —
 > a full design overhaul is the next milestone: **[`ROADMAP.md` →
-> 0.5.0](ROADMAP.md#050--design-overhaul)**, which holds the options still being
+> 0.6.0](ROADMAP.md#060--design-overhaul)**, which holds the options still being
 > explored (a stacked list of cards is currently leading) and the constraints. Read it
 > before changing anything visual — the direction is **not settled yet**.
 > Treat what follows as a description of *what exists today*, not a settled identity.
@@ -408,11 +409,11 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   `staggered:`, reveals its tiles one-after-another (through `StaggeredAppear`) as
   a rare end-of-run delight beat — a no-op during play, where tiles land
   individually on the `drop` transition.
-  **`ChainStack` is the most likely casualty of the 0.5.0 overhaul** — the replacement
+  **`ChainStack` is the most likely casualty of the 0.6.0 overhaul** — the replacement
   isn't decided (a stacked list of cards is the leading candidate). Worth knowing: its
   *information architecture* (stack, collapse older, emphasise newest) probably survives
   whatever wins, so the change may be a re-skin of this component rather than a new
-  layout model. See [`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul) for the open
+  layout model. See [`ROADMAP.md` → 0.6.0](ROADMAP.md#060--design-overhaul) for the open
   options and the vertical-room constraint against the docked keyboard.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
   (drains in ink, shifts to a warning red in the final quarter).
@@ -434,7 +435,7 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
 > placeholder.** The routing, state ownership, and layout *constraints* (keyboard
 > docking, portrait-only, Reduce Motion) are real and load-bearing; the styling is not
 > settled, and the chain's replacement is still an open question. See **[`ROADMAP.md` →
-> 0.5.0](ROADMAP.md#050--design-overhaul)** before changing anything visual.
+> 0.6.0](ROADMAP.md#060--design-overhaul)** before changing anything visual.
 
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
@@ -552,18 +553,19 @@ pick seed  ──▶  candidates = cast/filmography of last node
 
 ## Extending it
 
-> **The planned path to launch is [`ROADMAP.md`](ROADMAP.md)** — five milestones
-> (design overhaul, login/session, Pass & Play, leaderboards, share images + TMDB
-> proxy), each with scope, decisions to settle, and known traps. The technical designs
-> for the social/leaderboard work are the "Direction" sections below; the roadmap is
-> the planning layer over them.
+> **The planned path to launch is [`ROADMAP.md`](ROADMAP.md)** (re-cut 2026-08-08) —
+> foundations, design overhaul, the service / TMDB proxy, accounts, the
+> [Daily Chain](DAILY-CHAIN.md) and friend groups, then launch, each with scope,
+> decisions to settle, and known traps. Global leaderboards are dropped and Pass & Play
+> moved after 1.0. The "Direction" sections below predate the re-cut: they remain the
+> technical designs, and the roadmap is the plan of record over them.
 
 The collection ("Your Reel") is the first fan-out built on top of the loop —
 a local, login-free registry that layers on the engine without touching the
 engine/provider split (it's just another observable store the engine records
 into at game over). Still planned: genre locks, memory-recall every Nth link,
-and leaderboards (the natural point to add accounts — local session/collection
-data is forward-compatible with a future sync). The rule of thumb: **keep the
+the Daily Chain and friend groups (accounts arrive at 0.8.0 — local
+session/collection data is forward-compatible with that sync). The rule of thumb: **keep the
 engine/provider split clean.** New rules live in `GameEngine`; new data sources
 implement `MovieDataProvider`; new screens read observable state and call methods.
 
@@ -627,8 +629,8 @@ scratch:
   + an `apple-app-site-association` file) fix both and are the eventual target —
   and since the codec already speaks URLs, only the transport changes.
 
-Leaderboards remain the natural place to add accounts; the per-device player id
-this mode introduces, plus the local session/collection data, are all
+Accounts arrive at 0.8.0 on the roadmap; the per-device player id (now a 0.5.0
+foundation), plus the local session/collection data, are all
 forward-compatible with a future sync.
 
 ### Direction: sociality as a core gamification axis
