@@ -205,13 +205,16 @@ Reel** shrunk to a corner pill (personal best folded into that sheet; the pill i
 always reachable, count hidden when empty, because the Reel sheet hosts the
 required **TMDB attribution**). Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
-per-node category identity — **blue = actor, purple = movie**) and
-`Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`,
+per-node category identity — **blue = actor, yellow = movie**) and
+`Components.swift` (`.neoSurface` = border + hard shadow, `PrimaryButtonStyle` = coral, `GhostButtonStyle`,
 `PressScaleStyle` = `.pressScale` subtle press feedback, `.card()`,
 `NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
 (`.appear(i)`)), all built on the
-warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
-ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
+Cream Neobrutalist palette (0.6.0 prototype) defined in `Assets.xcassets`
+(Canvas/Ink/Tile/Shadow/Hairline/Coral/ActorBlue/MovieYellow/Good/OnAccent, each
+light+dark). The play screen draws the chain as **cards** by default
+(`ChainCards.swift`: a hero card for the newest link, compact cards for the two
+before it); Settings → Chain style switches back to the tile stack for comparison. The signature visual is
 `ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category
 tiles** — a new link drops in and older ones collapse into "+N earlier". The play
 screen docks the text input via `.safeAreaInset(.bottom)` above the

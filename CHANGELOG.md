@@ -31,6 +31,19 @@ not a contract — if milestones land out of order, the version follows the work
 
 ## [Unreleased]
 
+### Added
+
+- **Design overhaul prototype: Cream Neobrutalist** (0.6.0 groundwork, on a branch).
+  White cards with a 2pt ink border and a hard offset shadow on a cream canvas, a
+  coral call-to-action, and a neobrutalist press where the shadow collapses. Actor
+  stays blue and movie moves from purple to yellow, the most colour-blind-safe
+  pairing. Every color has a dark variant, with cream borders on charcoal.
+- **The chain drawn as cards** on the play screen: the newest link gets a hero card
+  with its poster or headshot, the two before it get compact cards, and older links
+  collapse into "+N earlier". Sized to fit above the docked keyboard on an iPhone 16.
+  Settings → Chain style flips back to the tile stack so the two can be judged side
+  by side on a device, which is how the roadmap says the chain treatment gets chosen.
+
 ### Changed
 
 - **Lowered the iOS deployment target from 26.2 to 18.0**, roughly doubling the

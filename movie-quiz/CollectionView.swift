@@ -8,7 +8,7 @@
 //  game-over screens.
 //
 //  Built entirely on the `Theme` tokens and the node-category identity (blue =
-//  actor, purple = movie), matching the NYT-Games puzzle-page treatment used
+//  actor, yellow = movie), matching the NYT-Games puzzle-page treatment used
 //  everywhere else. Images stream in via `AsyncImage` (system-cached, never
 //  stored on disk); when there's no art — the stub graph, or a title TMDB has no
 //  poster for — the tile falls back to a typographic placeholder.
@@ -187,12 +187,12 @@ struct CollectionView: View {
                         image.resizable().aspectRatio(contentMode: .fill)
                     } else {
                         Image(systemName: entity.kind.symbol)
-                            .foregroundStyle(Theme.Color.onAccent.opacity(0.4))
+                            .foregroundStyle(entity.kind.onAccent.opacity(0.6))
                     }
                 }
             } else {
                 Image(systemName: entity.kind.symbol)
-                    .foregroundStyle(Theme.Color.onAccent.opacity(0.5))
+                    .foregroundStyle(entity.kind.onAccent.opacity(0.7))
             }
         }
         .frame(width: 46, height: 46)
@@ -380,7 +380,7 @@ private struct ReelTile: View {
     private var glyph: some View {
         Image(systemName: entity.kind.symbol)
             .font(.system(size: 32))
-            .foregroundStyle(Theme.Color.onAccent.opacity(0.32))
+            .foregroundStyle(entity.kind.onAccent.opacity(0.5))
     }
 
     private var nameBar: some View {

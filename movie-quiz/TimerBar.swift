@@ -26,8 +26,10 @@ struct TimerBar: View {
                     .fill(lowTime ? Color.red : Theme.Color.ink)
                     .frame(width: clamped * geo.size.width)
             }
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
         }
-        .frame(height: 4)
+        .frame(height: 10)
         .animation(.linear(duration: 0.25), value: clamped)
         .animation(Theme.Motion.standard, value: lowTime)
     }

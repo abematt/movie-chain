@@ -367,27 +367,36 @@ pure-value + observable-store split as the rest of the app:
 > and per-node category identity — so a re-skin is a `Theme`/`Components` change
 > rather than a rewrite of every screen.
 
-An **editorial, puzzle-page treatment** (NYT Games / Connections): paper-warm
-neutrals, near-black ink, and two "category" accents — **blue for actors, purple
-for movies** — used the way Connections uses its group colors. A serif wordmark +
-system sans carry the type; there is no flame, confetti, or radial-heat.
+**Cream Neobrutalist** (the 0.6.0 prototype, on the `feature_cream-neobrutalist`
+branch): a cream canvas, white surfaces with a 2pt ink border and a hard unblurred
+offset shadow, one coral call-to-action, and two category accents — **blue for
+actors, yellow for movies** (the most colour-blind-safe pair). Dark mode flips the
+borders to cream on a warm charcoal canvas. A bold serif with an italic flourish
+carries display type (system New York, standing in for Fraunces); UI labels are
+small, bold, uppercase and tracked.
 - **Color** lives in `Assets.xcassets` as named sets with light+dark variants —
-  `Canvas`, `Ink`, `Tile` (warm grey surface), `Hairline`, `ActorBlue`,
-  `MoviePurple`, `Good` (correct-link green), and `OnAccent` (near-black text that
-  stays legible on the pastels in *both* themes). `Theme.Color` just names them;
+  `Canvas` (cream), `Ink` (text and every border), `Tile` (white surface),
+  `Shadow` (the hard offset shadow), `Hairline` (muted track), `Coral` (the CTA),
+  `ActorBlue`, `MovieYellow`, `Good` (correct-link green), and `OnAccent`
+  (near-black text for the light accents; actor blue takes white instead, via
+  `NodeKind.onAccent`). `Theme.Color` just names them;
   muted text still uses Apple's semantic `.secondary`/`.tertiary`.
-- `Theme` — token namespaces: `Color`, `Spacing`, `Radius`, `Motion` (incl.
+- `Theme` — token namespaces: `Color`, `Spacing`, `Border`, `Shadow` (`small`
+  2pt for chrome, `large` 4pt for primary cards and the CTA), `Font` (display,
+  flourish, tracked label), `Radius`, `Motion` (incl.
   `drop`, the spring a new tile lands on; `screen`, the soft spring the
   screen-to-screen carousel rides; `intro`, the seed cold-launch reveal; and
   `cascade`, the springy wave a staggered group of siblings rises in on).
   Views reference these, never literals. `AnyTransition.screenPush(reduceMotion:)`
   (also here) is the router's directional page push — see the UI section.
-- `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/purple),
+- `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/yellow), an `onAccent` text colour,
   a `tileLabel` ("ACTOR"/"MOVIE"), and a `symbol`, eliminating color/label logic
   that was duplicated across views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
-  `PrimaryButtonStyle` (`.buttonStyle(.primary)`, an ink-filled pill),
-  `GhostButtonStyle` (`.ghost`, outlined), `PressScaleStyle` (`.pressScale` — a
+  `.neoSurface(...)` (the neobrutalist atom: fill, ink border, hard shadow, and a
+  `pressed` state that collapses the shadow), `PrimaryButtonStyle`
+  (`.buttonStyle(.primary)`, coral with a 4pt shadow), `GhostButtonStyle`
+  (`.ghost`, white with a 2pt shadow), `PressScaleStyle` (`.pressScale` — a
   near-imperceptible press squish+dim for buttons that carry their own chrome but
   lacked an `isPressed` state, e.g. the in-game "Go"), `CardModifier` (`.card()`), `NodeTile`
   (the Connections category tile — the atom of the chain), `NodeDot` (small

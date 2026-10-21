@@ -18,12 +18,14 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
+                    chainStyleSection
                     aboutSection
                 }
                 .padding()
@@ -54,7 +56,24 @@ struct SettingsView: View {
             .tint(Theme.Color.ink)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
-            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+        }
+    }
+
+    // MARK: Chain style (0.6.0 prototype)
+    //
+    // Flips the play screen between chain treatments so they can be judged on a
+    // device. Remove once the overhaul picks one.
+
+    private var chainStyleSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("Chain style · prototype")
+            Picker("Chain style", selection: $chainStyle) {
+                ForEach(ChainStyle.allCases) { style in
+                    Text(style.label).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
         }
     }
 
@@ -78,7 +97,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
-            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Movie Chain version \(Config.appVersion), build \(Config.buildNumber)")
         }

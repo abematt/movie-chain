@@ -16,6 +16,8 @@ struct GameView: View {
     @Bindable var engine: GameEngine
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    /// Prototype switch between chain treatments (Settings → Chain style).
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
 
     @State private var answer = ""
     @FocusState private var fieldFocused: Bool
@@ -49,8 +51,14 @@ struct GameView: View {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .bottom) {
-                    ChainStack(chain: engine.chain, maxVisible: visibleLinks)
-                        .fixedSize(horizontal: false, vertical: true)
+                    switch chainStyle {
+                    case .cards:
+                        ChainCardStack(chain: engine.chain)
+                            .fixedSize(horizontal: false, vertical: true)
+                    case .tiles:
+                        ChainStack(chain: engine.chain, maxVisible: visibleLinks)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .clipped()
 
@@ -123,7 +131,7 @@ struct GameView: View {
     private var scoreHero: some View {
         VStack(spacing: 2) {
             Text("\(engine.score)")
-                .font(.system(size: 60, weight: .bold, design: .serif))
+                .font(Theme.Font.display(60))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .foregroundStyle(Theme.Color.ink)
@@ -136,7 +144,7 @@ struct GameView: View {
                 }
 
             Text("\(engine.points) pts")
-                .font(.subheadline)
+                .font(Theme.Font.flourish(16))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .contentTransition(.numericText())
@@ -192,27 +200,20 @@ struct GameView: View {
                         .submitLabel(.go)
                         .onSubmit(submit)
                         .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.vertical, Theme.Spacing.sm + 4)
-                        .background(Theme.Color.tile, in: Capsule())
+                        .frame(minHeight: 44)
+                        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
 
-                    Button(action: submit) {
-                        Text("Go")
-                            .font(.headline)
-                            .foregroundStyle(Theme.Color.onInk)
-                            .padding(.horizontal, Theme.Spacing.md + 2)
-                            .padding(.vertical, Theme.Spacing.sm + 4)
-                            .background(Theme.Color.ink, in: Capsule())
-                    }
-                    .buttonStyle(.pressScale)
-                    .disabled(!canSubmit)
-                    .opacity(canSubmit ? 1 : 0.4)
+                    Button("Go", action: submit)
+                        .buttonStyle(.primary)
+                        .fixedSize()
+                        .disabled(!canSubmit)
                 }
                 .shake(shakeToken)
             }
         }
         .padding(.horizontal)
         .padding(.top, Theme.Spacing.sm)
-        .padding(.bottom, Theme.Spacing.xs)
+        .padding(.bottom, Theme.Spacing.sm)
         .background(Theme.Color.canvas)
         .animation(.snappy, value: engine.feedback)
     }

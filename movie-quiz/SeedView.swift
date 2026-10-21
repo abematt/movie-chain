@@ -4,7 +4,7 @@
 //
 //  The home screen. It leads with a *dealt start*, not a search box: the branded
 //  lockup, then one big "Start with · <name>" button whose pill is a random
-//  popular actor or movie (blue = actor, purple = movie). Tapping it plays
+//  popular actor or movie (blue = actor, yellow = movie). Tapping it plays
 //  immediately; Shuffle deals a fresh start; a quiet link drops down to the
 //  search flow for players who want to pick their own. This reads as a game's
 //  start screen rather than a movie-logging app.
@@ -568,10 +568,12 @@ private struct StartButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.md + 2)
             .padding(.horizontal, Theme.Spacing.md)
-            .background(Theme.Color.ink, in: RoundedRectangle(cornerRadius: Theme.Radius.card + 4))
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(Theme.Motion.standard, value: configuration.isPressed)
+            // The screen's one loud surface: ink fill, hard shadow, and the
+            // neobrutalist press (shadow collapses, card shifts into the page).
+            .neoSurface(radius: Theme.Radius.card + 4,
+                        fill: Theme.Color.ink,
+                        pressed: configuration.isPressed)
+            .animation(.snappy(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -610,7 +612,7 @@ private struct SegmentButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(selected ? Theme.Color.onAccent : kind.accent.opacity(0.9))
+            .foregroundStyle(selected ? kind.onAccent : Theme.Color.ink)
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .background {
