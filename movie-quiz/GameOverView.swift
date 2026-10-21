@@ -3,8 +3,8 @@
 //  movie-quiz
 //
 //  End-of-run summary: final score, a quiet "new best" mark, the near-miss that
-//  ended the run, the full chain revealed as category tiles, a share card, and a
-//  play-again.
+//  ended the run, the full chain revealed (as compact cards, or as category
+//  tiles under the prototype's tile style), a share card, and a play-again.
 //
 
 import SwiftUI
@@ -18,14 +18,18 @@ struct GameOverView: View {
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
     @State private var scorePop = 0
+    /// Prototype switch: the recap follows the play screen's chain treatment.
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
             scoreHeader
 
-            bestLine
-
-            reelLine
+            HStack(spacing: Theme.Spacing.sm) {
+                bestLine
+                reelLine
+            }
+            .fixedSize(horizontal: false, vertical: true)
 
             if let missed = engine.missedAnswer {
                 oneAway(missed)
@@ -61,28 +65,34 @@ struct GameOverView: View {
     @ViewBuilder private var reelLine: some View {
         if collection.total > 0 {
             Button { showReel = true } label: {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "film.stack")
-                        .font(.footnote)
-                        .foregroundStyle(engine.reelAdditions > 0 ? Theme.Color.good : .secondary)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Text("Your Reel").metaLabel()
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(Theme.Font.label)
+                            .foregroundStyle(.secondary)
+                    }
                     Text(reelMessage)
-                        .font(.footnote.weight(.semibold))
+                        .font(Theme.Font.bodyStrong)
                         .foregroundStyle(Theme.Color.ink)
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(Theme.Spacing.sm + 4)
+                .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressScale)
         }
     }
 
     private var reelMessage: String {
         if engine.reelAdditions > 0 {
             let n = engine.reelAdditions
-            return "\(n) new to your Reel · \(collection.total) total"
+            return "+\(n) new · \(collection.total) total"
         }
-        return "View your Reel · \(collection.total)"
+        return "\(collection.total) logged"
     }
 
     // MARK: Score header
@@ -90,25 +100,22 @@ struct GameOverView: View {
     private var scoreHeader: some View {
         VStack(spacing: Theme.Spacing.xs) {
             Text(engine.endedByQuit ? "Chain ended" : "Time's up")
-                .font(.footnote.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(1.5)
-                .foregroundStyle(.secondary)
+                .metaLabel()
 
             if engine.isNewBest {
                 Text("a new best")
-                    .font(.system(.subheadline, design: .serif))
-                    .italic()
+                    .font(Theme.Font.flourish(.subheadline))
                     .foregroundStyle(Theme.Color.onAccent)
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.vertical, Theme.Spacing.xs + 1)
-                    .background(Theme.Color.good, in: Capsule())
+                    .neoSurface(radius: Theme.Radius.pill, fill: Theme.Color.good,
+                                shadow: Theme.Shadow.small)
                     .padding(.top, 2)
                     .transition(.scale.combined(with: .opacity))
             }
 
             Text("\(engine.score)")
-                .font(.system(size: 72, weight: .bold, design: .serif))
+                .font(Theme.Font.display(72))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 // One-shot bounce (up then settle) fired by `scorePop` on a new
@@ -123,7 +130,7 @@ struct GameOverView: View {
                 }
 
             Text("\(engine.points) pts")
-                .font(.headline)
+                .font(Theme.Font.flourish(.title3))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
@@ -132,43 +139,39 @@ struct GameOverView: View {
     // MARK: Personal best — fenced off so it never reads as this run
 
     private var bestLine: some View {
-        VStack(spacing: 0) {
-            Rectangle().fill(Theme.Color.hairline).frame(height: 1)
-            HStack(spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            HStack(spacing: Theme.Spacing.xs) {
                 Image(systemName: "star.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Text("Personal best")
-                    .font(.caption.weight(.bold))
-                    .textCase(.uppercase)
-                    .tracking(1)
-                    .foregroundStyle(Theme.Color.ink)
-                Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
-                    .font(.footnote)
-                    .monospacedDigit()
+                    .font(Theme.Font.label)
                     .foregroundStyle(.secondary)
+                Text("Personal best").metaLabel()
             }
-            .padding(.vertical, Theme.Spacing.sm + 2)
-            Rectangle().fill(Theme.Color.hairline).frame(height: 1)
+            Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
+                .font(Theme.Font.bodyStrong)
+                .monospacedDigit()
+                .foregroundStyle(Theme.Color.ink)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(Theme.Spacing.sm + 4)
+        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: One-away near-miss
 
     private func oneAway(_ node: ChainNode) -> some View {
         VStack(spacing: Theme.Spacing.xs) {
-            Text("You were one away")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            Text("You were one away").metaLabel()
             HStack(spacing: Theme.Spacing.sm) {
                 NodeDot(kind: node.kind)
-                Text(node.displayName)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Theme.Color.ink)
+                NodeName(node: node,
+                         font: Theme.Font.heading(.title3),
+                         yearFont: Theme.Font.flourish(.title3))
+                    .multilineTextAlignment(.center)
             }
             Text(node.kind == .actor ? "was in the cast" : "was in the filmography")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .font(Theme.Font.flourish(.footnote))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .card()
@@ -178,14 +181,23 @@ struct GameOverView: View {
 
     private var recapSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Your chain")
-                .font(.caption.weight(.heavy))
-                .textCase(.uppercase)
-                .tracking(1.5)
-                .foregroundStyle(.tertiary)
+            Text("Your chain").metaLabel()
             ScrollView {
-                ChainStack(chain: engine.chain, numbered: true, showKind: false, staggered: true)
+                switch chainStyle {
+                case .cards:
+                    VStack(spacing: Theme.Spacing.xs + 2) {
+                        ForEach(Array(engine.chain.enumerated()), id: \.element.id) { i, node in
+                            CompactChainCard(node: node, position: i + 1)
+                                .appear(i, animation: Theme.Motion.cascade, offset: 14)
+                        }
+                    }
+                    // Room for the hard shadows, which draw outside each card.
+                    .padding(.trailing, Theme.Shadow.small)
                     .padding(.bottom, Theme.Spacing.sm)
+                case .tiles:
+                    ChainStack(chain: engine.chain, numbered: true, showKind: false, staggered: true)
+                        .padding(.bottom, Theme.Spacing.sm)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

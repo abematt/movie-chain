@@ -87,9 +87,9 @@ private struct NeoButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.headline)
+            .font(Theme.Font.button)
             .textCase(.uppercase)
-            .tracking(0.6)
+            .tracking(Theme.Font.buttonTracking)
             .padding(.horizontal, Theme.Spacing.lg - 4)
             .frame(maxWidth: .infinity, minHeight: 44)
             // Disabled reads as "flat and empty", not as a faded copy: muted
@@ -100,6 +100,41 @@ private struct NeoButtonBody: View {
                                  shadow: isEnabled ? shadow : 0,
                                  pressed: configuration.isPressed && !reduceMotion))
             .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Meta label
+//
+// The one uppercase-label recipe. Every "ACTOR", "TIME'S UP", "YOUR CHAIN" and
+// section title goes through this, so size, case and tracking stay identical.
+
+extension View {
+    /// Usage: `Text("Your chain").metaLabel()`
+    func metaLabel(_ color: Color = .secondary) -> some View {
+        self.font(Theme.Font.label)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.labelTracking)
+            .foregroundStyle(color)
+    }
+}
+
+// MARK: - Node name
+//
+// A node's name with the movie year as an italic flourish ("Les Misérables
+// *2012*") instead of a parenthetical. One definition so every row, card and
+// recap shows years the same way.
+
+struct NodeName: View {
+    let node: ChainNode
+    var font: Font = Theme.Font.bodyStrong
+    var yearFont: Font = Theme.Font.flourish(.subheadline)
+
+    var body: some View {
+        if case .movie(let m) = node, let year = m.year {
+            Text("\(Text(m.title).font(font).foregroundStyle(Theme.Color.ink)) \(Text(String(year)).font(yearFont).foregroundStyle(.secondary))")
+        } else {
+            Text(node.matchText).font(font).foregroundStyle(Theme.Color.ink)
+        }
     }
 }
 
@@ -202,21 +237,18 @@ struct NodeTile: View {
         HStack(spacing: Theme.Spacing.sm) {
             if showKind {
                 Text(node.kind.tileLabel)
-                    .font(.system(size: 10, weight: .heavy))
-                    .tracking(1.2)
-                    .foregroundStyle(node.kind.onAccent.opacity(0.7))
+                    .metaLabel(node.kind.onAccent.opacity(0.7))
             }
             Text(node.displayName)
-                .font(.system(.subheadline, weight: .bold))
+                .font(Theme.Font.bodyStrong)
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
                 .foregroundStyle(node.kind.onAccent)
             Spacer(minLength: 0)
             if let index {
                 Text("\(index)")
-                    .font(.caption.weight(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(node.kind.onAccent.opacity(0.6))
+                    .metaLabel(node.kind.onAccent.opacity(0.6))
             }
         }
         .padding(.horizontal, 14)
@@ -276,7 +308,7 @@ struct FloatingGain: View {
 
     var body: some View {
         Text("+\(value)")
-            .font(.system(.subheadline, weight: .bold))
+            .font(Theme.Font.bodyStrong)
             .monospacedDigit()
             .foregroundStyle(Theme.Color.good)
             .opacity(rise ? 0 : 1)

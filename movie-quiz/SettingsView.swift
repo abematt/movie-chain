@@ -50,7 +50,7 @@ struct SettingsView: View {
             sectionTitle("Sound")
             Toggle(isOn: $soundEnabled) {
                 Text("Sound effects")
-                    .font(.body.weight(.semibold))
+                    .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
             }
             .tint(Theme.Color.ink)
@@ -87,11 +87,11 @@ struct SettingsView: View {
             sectionTitle("About")
             HStack {
                 Text("Movie Chain")
-                    .font(.body.weight(.semibold))
+                    .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
                 Spacer()
                 Text(Config.versionString)
-                    .font(.footnote)
+                    .font(Theme.Font.flourish(.footnote))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
@@ -104,11 +104,7 @@ struct SettingsView: View {
     }
 
     private func sectionTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.heavy))
-            .textCase(.uppercase)
-            .tracking(1.5)
-            .foregroundStyle(.tertiary)
+        Text(text).metaLabel()
     }
 }
 

@@ -112,17 +112,17 @@ struct GameView: View {
             Spacer()
 
             Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
-                .font(.subheadline.weight(.semibold))
+                .font(Theme.Font.bodyStrong)
                 .monospacedDigit()
                 .foregroundStyle(lowTime ? Color.red : .secondary)
                 .contentTransition(.numericText())
 
             Spacer()
 
-            Button("Quit") { engine.quit() }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .buttonStyle(.plain)
+            Button { engine.quit() } label: {
+                Text("Quit").metaLabel()
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -144,7 +144,7 @@ struct GameView: View {
                 }
 
             Text("\(engine.points) pts")
-                .font(Theme.Font.flourish(16))
+                .font(Theme.Font.flourish(.body))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .contentTransition(.numericText())
@@ -160,7 +160,7 @@ struct GameView: View {
         HStack(spacing: Theme.Spacing.sm) {
             NodeDot(kind: engine.expectedKind)
             Text(hintText)
-                .font(.subheadline.weight(.semibold))
+                .font(Theme.Font.body)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -183,7 +183,7 @@ struct GameView: View {
         VStack(spacing: Theme.Spacing.sm) {
             if let feedback = engine.feedback {
                 Text(feedback)
-                    .font(.footnote)
+                    .font(Theme.Font.small)
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)

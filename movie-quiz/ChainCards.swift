@@ -40,10 +40,7 @@ struct ChainCardStack: View {
         VStack(spacing: Theme.Spacing.xs + 2) {
             if hiddenCount > 0 {
                 Text("+\(hiddenCount) earlier")
-                    .font(Theme.Font.label)
-                    .tracking(Theme.Font.labelTracking)
-                    .textCase(.uppercase)
-                    .foregroundStyle(.secondary)
+                    .metaLabel()
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
             }
@@ -89,21 +86,19 @@ struct HeroChainCard: View {
                     Spacer(minLength: 0)
                     if let position {
                         Text("#\(position)")
-                            .font(Theme.Font.label)
-                            .tracking(Theme.Font.labelTracking)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .metaLabel()
                     }
                 }
                 Text(node.matchText)
-                    .font(Theme.Font.display(22))
+                    .font(Theme.Font.heading(.title2))
                     .foregroundStyle(Theme.Color.ink)
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
                     .fixedSize(horizontal: false, vertical: true)
                 if case .movie(let m) = node, let year = m.year {
                     Text(String(year))
-                        .font(Theme.Font.flourish(14))
+                        .font(Theme.Font.flourish(.subheadline))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -119,20 +114,25 @@ struct HeroChainCard: View {
 
 struct CompactChainCard: View {
     let node: ChainNode
+    /// 1-based position, shown as a leading numeral (the game-over recap).
+    var position: Int? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm + 2) {
+            if let position {
+                Text("\(position)")
+                    .font(Theme.Font.heading(.subheadline))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 18)
+            }
             ChainArt(node: node, width: 26, height: 26, radius: 6, glyphSize: 11)
-            Text(node.displayName)
-                .font(.system(.subheadline, weight: .semibold))
-                .foregroundStyle(Theme.Color.ink)
+            NodeName(node: node)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 0)
             Text(node.kind.tileLabel)
-                .font(Theme.Font.label)
-                .tracking(Theme.Font.labelTracking)
-                .foregroundStyle(.secondary)
+                .metaLabel()
         }
         .padding(.horizontal, Theme.Spacing.sm + 2)
         .padding(.vertical, Theme.Spacing.sm - 1)
@@ -149,9 +149,7 @@ struct KindChip: View {
 
     var body: some View {
         Text(kind.tileLabel)
-            .font(Theme.Font.label)
-            .tracking(Theme.Font.labelTracking)
-            .foregroundStyle(kind.onAccent)
+            .metaLabel(kind.onAccent)
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, 3)
             .background(Capsule().fill(kind.accent))

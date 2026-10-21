@@ -382,8 +382,10 @@ small, bold, uppercase and tracked.
   `NodeKind.onAccent`). `Theme.Color` just names them;
   muted text still uses Apple's semantic `.secondary`/`.tertiary`.
 - `Theme` — token namespaces: `Color`, `Spacing`, `Border`, `Shadow` (`small`
-  2pt for chrome, `large` 4pt for primary cards and the CTA), `Font` (display,
-  flourish, tracked label), `Radius`, `Motion` (incl.
+  2pt for chrome, `large` 4pt for primary cards and the CTA), `Font` (the whole
+  type system: serif `display`/`heading` with an italic `flourish`, sans `body`/
+  `bodyStrong`/`small`, and the tracked uppercase `label` — everything but the big
+  numerals rides a Dynamic Type text style), `Radius`, `Motion` (incl.
   `drop`, the spring a new tile lands on; `screen`, the soft spring the
   screen-to-screen carousel rides; `intro`, the seed cold-launch reveal; and
   `cascade`, the springy wave a staggered group of siblings rises in on).
@@ -393,6 +395,8 @@ small, bold, uppercase and tracked.
   a `tileLabel` ("ACTOR"/"MOVIE"), and a `symbol`, eliminating color/label logic
   that was duplicated across views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
+  `.metaLabel()` (the one uppercase-label recipe), `NodeName` (a name with the
+  movie year as an italic flourish, never a parenthetical),
   `.neoSurface(...)` (the neobrutalist atom: fill, ink border, hard shadow, and a
   `pressed` state that collapses the shadow), `PrimaryButtonStyle`
   (`.buttonStyle(.primary)`, coral with a 4pt shadow), `GhostButtonStyle`

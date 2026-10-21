@@ -74,21 +74,43 @@ enum Theme {
 
     // MARK: Type roles
     //
-    // Display type is a bold serif with an italic flourish word; UI labels are
-    // small, bold, uppercase and tracked. The serif is the system's New York as
-    // a stand-in for Fraunces — swapping in the bundled font later is a change
-    // here only.
+    // The whole type system. Three voices, nothing else:
+    //   • Display — a bold serif for numerals, the wordmark and node names, with
+    //     a regular italic **flourish** for the secondary word (years, "pts",
+    //     "Chain" in the wordmark). The serif is the system's New York, standing
+    //     in for the spec's Fraunces; swapping the font later is a change here.
+    //   • Body — the system sans at two sizes (`body`, `small`), medium weight,
+    //     plus `bodyStrong` for names in rows.
+    //   • Label — tiny bold uppercase tracked metadata ("ACTOR", "TIME'S UP").
+    //     Always apply it with `.metaLabel()` so case and tracking can't drift.
+    // Everything but the big fixed-size numerals rides a Dynamic Type text
+    // style, so the app still scales with the reader's text size.
     enum Font {
+        /// Big serif numerals and the wordmark (fixed size: they are the hero).
         static func display(_ size: CGFloat) -> SwiftUI.Font {
             .system(size: size, weight: .bold, design: .serif)
         }
-        static func flourish(_ size: CGFloat) -> SwiftUI.Font {
+        /// Serif heading that scales: node names, card titles, sheet heroes.
+        static func heading(_ style: SwiftUI.Font.TextStyle = .title3) -> SwiftUI.Font {
+            .system(style, design: .serif, weight: .bold)
+        }
+        /// The italic flourish paired with display/heading type.
+        static func flourish(_ style: SwiftUI.Font.TextStyle = .subheadline) -> SwiftUI.Font {
+            .system(style, design: .serif).italic()
+        }
+        /// Fixed-size flourish, for the italic word beside a fixed display size.
+        static func flourish(size: CGFloat) -> SwiftUI.Font {
             .system(size: size, weight: .regular, design: .serif).italic()
         }
-        /// Uppercase tracked micro-label ("ACTOR", "MOVIE", metadata). Pair with
-        /// `.tracking(Theme.Font.labelTracking)` and `.textCase(.uppercase)`.
-        static let label: SwiftUI.Font = .system(size: 10, weight: .bold)
-        static let labelTracking: CGFloat = 0.8
+        static let body: SwiftUI.Font = .system(.subheadline, weight: .medium)
+        static let bodyStrong: SwiftUI.Font = .system(.subheadline, weight: .semibold)
+        static let small: SwiftUI.Font = .system(.footnote)
+        /// Uppercase tracked micro-label. Use via `.metaLabel()`.
+        static let label: SwiftUI.Font = .system(.caption2, weight: .bold)
+        static let labelTracking: CGFloat = 0.9
+        /// Button labels: uppercase and tracked like labels, at body size.
+        static let button: SwiftUI.Font = .system(.subheadline, weight: .bold)
+        static let buttonTracking: CGFloat = 0.8
     }
 
     // MARK: Corner radii

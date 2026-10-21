@@ -8,7 +8,7 @@
 //  game-over screens.
 //
 //  Built entirely on the `Theme` tokens and the node-category identity (blue =
-//  actor, yellow = movie), matching the NYT-Games puzzle-page treatment used
+//  actor, yellow = movie), matching the Cream Neobrutalist treatment used
 //  everywhere else. Images stream in via `AsyncImage` (system-cached, never
 //  stored on disk); when there's no art — the stub graph, or a title TMDB has no
 //  poster for — the tile falls back to a typographic placeholder.
@@ -93,10 +93,10 @@ struct CollectionView: View {
         VStack(spacing: Theme.Spacing.md) {
             VStack(spacing: Theme.Spacing.xs) {
                 Text("You have logged")
-                    .font(.subheadline)
+                    .font(Theme.Font.flourish(.body))
                     .foregroundStyle(.secondary)
                 Text("\(statsIn ? store.total : 0)")
-                    .font(.system(size: 64, weight: .bold, design: .serif))
+                    .font(Theme.Font.display(64))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: Double(store.total)))
                     .foregroundStyle(Theme.Color.ink)
@@ -110,11 +110,9 @@ struct CollectionView: View {
             if bestChain > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "trophy.fill")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.Color.good)
-                    Text("Best chain · \(bestChain) links")
-                        .font(.caption.weight(.semibold))
+                        .font(Theme.Font.label)
                         .foregroundStyle(.secondary)
+                    Text("Best chain · \(bestChain) links").metaLabel()
                 }
             }
         }
@@ -123,19 +121,16 @@ struct CollectionView: View {
     private func countCard(_ kind: NodeKind, _ value: Int, _ label: String) -> some View {
         VStack(spacing: Theme.Spacing.sm) {
             Text("\(statsIn ? value : 0)")
-                .font(.system(size: 44, weight: .bold, design: .serif))
+                .font(Theme.Font.display(44))
                 .monospacedDigit()
-                .foregroundStyle(kind.accent)
+                .foregroundStyle(Theme.Color.ink)
                 .contentTransition(.numericText(value: Double(value)))
-            Text(label)
-                .font(.caption2.weight(.bold))
-                .textCase(.uppercase)
-                .tracking(1.4)
-                .foregroundStyle(.secondary)
+            KindChip(kind: kind)
+                .accessibilityLabel(label)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.md)
-        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .neoSurface(radius: Theme.Radius.card)
     }
 
     // MARK: Regulars — most-logged actor + movie
@@ -156,26 +151,20 @@ struct CollectionView: View {
         HStack(spacing: Theme.Spacing.sm) {
             thumb(entity)
             VStack(alignment: .leading, spacing: 2) {
-                Text(entity.kind.tileLabel)
-                    .font(.system(size: 10, weight: .heavy))
-                    .tracking(1)
-                    .foregroundStyle(.tertiary)
+                Text(entity.kind.tileLabel).metaLabel()
                 Text(entity.name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
                     .lineLimit(1)
                 Text("in \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
-                    .font(.caption)
+                    .font(Theme.Font.flourish(.footnote))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
         .padding(Theme.Spacing.sm + 2)
         .frame(maxWidth: .infinity)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.card)
-                .strokeBorder(Theme.Color.hairline, lineWidth: 1)
-        )
+        .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
     }
 
     private func thumb(_ entity: CollectedEntity) -> some View {
@@ -197,6 +186,8 @@ struct CollectionView: View {
         }
         .frame(width: 46, height: 46)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm)
+            .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
     }
 
     // MARK: Filter
@@ -210,24 +201,25 @@ struct CollectionView: View {
                     HStack(spacing: 5) {
                         Text(f.label)
                         Text("\(count(for: f))")
-                            .foregroundStyle(.tertiary)
+                            .opacity(0.6)
                             .monospacedDigit()
                     }
-                    .font(.subheadline.weight(.semibold))
+                    .font(Theme.Font.button)
+                    .textCase(.uppercase)
+                    .tracking(Theme.Font.buttonTracking)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Theme.Spacing.sm)
-                    .foregroundStyle(filter == f ? Theme.Color.ink : .secondary)
+                    .foregroundStyle(filter == f ? Theme.Color.onInk : .secondary)
                     .background(
-                        RoundedRectangle(cornerRadius: Theme.Radius.sm + 1)
-                            .fill(filter == f ? Theme.Color.canvas : .clear)
-                            .shadow(color: .black.opacity(filter == f ? 0.12 : 0), radius: 2, y: 1)
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .fill(filter == f ? Theme.Color.ink : .clear)
                     )
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(3)
-        .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .padding(4)
+        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
     }
 
     private func count(for f: Filter) -> Int {
@@ -261,12 +253,10 @@ struct CollectionView: View {
     private func gridSection(_ kind: NodeKind, _ title: String, _ n: Int, _ items: [CollectedEntity]) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(spacing: Theme.Spacing.sm) {
-                RoundedRectangle(cornerRadius: 3).fill(kind.accent).frame(width: 9, height: 9)
-                Text(title)
-                    .font(.caption.weight(.heavy)).tracking(1.4).textCase(.uppercase)
-                    .foregroundStyle(.secondary)
+                NodeDot(kind: kind, size: 9)
+                Text(title).metaLabel()
                 Spacer()
-                Text("\(n)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.tertiary)
+                Text("\(n)").monospacedDigit().metaLabel()
             }
             LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
@@ -281,9 +271,9 @@ struct CollectionView: View {
 
     private func sectionLabel(_ title: String, trailing: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title).font(.system(.title3, design: .serif)).foregroundStyle(Theme.Color.ink)
+            Text(title).font(Theme.Font.heading(.title3)).foregroundStyle(Theme.Color.ink)
             Spacer()
-            Text(trailing).font(.caption).foregroundStyle(.tertiary)
+            Text(trailing).font(Theme.Font.flourish(.footnote)).foregroundStyle(.secondary)
         }
     }
 
@@ -295,9 +285,9 @@ struct CollectionView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.tertiary)
                 Text("Your reel is empty")
-                    .font(.title3.weight(.semibold))
+                    .font(Theme.Font.heading(.title3))
                 Text("Finish a chain and every actor and movie you named lands here.")
-                    .font(.subheadline)
+                    .font(Theme.Font.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -324,15 +314,15 @@ struct CollectionView: View {
 struct TMDBAttribution: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            Divider().overlay(Theme.Color.hairline)
+            Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
             Image("TMDBLogo")
                 .resizable()
                 .scaledToFit()
                 .frame(height: 14)
                 .accessibilityLabel("The Movie Database (TMDB)")
             Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .font(Theme.Font.flourish(.caption))
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, Theme.Spacing.sm)
@@ -349,15 +339,23 @@ private struct ReelTile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ZStack {
-            entity.kind.accent
-            artContent
+        VStack(spacing: 0) {
+            ZStack {
+                entity.kind.accent
+                artContent
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .clipped()
+            .overlay(alignment: .topTrailing) { countChip }
+            .overlay(alignment: .topLeading) { if isNew { newBadge } }
+
+            Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+
+            nameBar
         }
-        .aspectRatio(3.0 / 4.0, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.tile))
-        .overlay(alignment: .bottom) { nameBar }
-        .overlay(alignment: .topTrailing) { countChip }
-        .overlay(alignment: .topLeading) { if isNew { newBadge } }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
     }
 
     @ViewBuilder private var artContent: some View {
@@ -383,42 +381,38 @@ private struct ReelTile: View {
             .foregroundStyle(entity.kind.onAccent.opacity(0.5))
     }
 
+    // A solid name strip under the art, not a gradient scrim over it — the spec
+    // allows no gradients, and ink-on-white reads in both themes.
     private var nameBar: some View {
         Text(entity.displayName)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white)
-            .lineLimit(2)
+            .font(Theme.Font.small.weight(.semibold))
+            .foregroundStyle(Theme.Color.ink)
+            .lineLimit(2, reservesSpace: true)
+            .minimumScaleFactor(0.85)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 6)
-            .padding(.bottom, 5)
-            .padding(.top, 16)
-            .background(
-                LinearGradient(
-                    colors: [.black.opacity(0), .black.opacity(0.72)],
-                    startPoint: .top, endPoint: .bottom
-                )
-            )
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs + 2)
+            .background(Theme.Color.tile)
     }
 
     private var countChip: some View {
         Text("×\(entity.timesLogged)")
-            .font(.system(size: 10, weight: .bold))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .metaLabel(Theme.Color.ink)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.black.opacity(0.55), in: Capsule())
+            .background(Capsule().fill(Theme.Color.tile))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: 1.5))
             .padding(6)
     }
 
     private var newBadge: some View {
-        Text("NEW")
-            .font(.system(size: 8, weight: .heavy))
-            .tracking(0.5)
-            .foregroundStyle(Theme.Color.onAccent)
-            .padding(.horizontal, 5)
+        Text("New")
+            .metaLabel(Theme.Color.onAccent)
+            .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Theme.Color.good, in: RoundedRectangle(cornerRadius: 5))
+            .background(Capsule().fill(Theme.Color.good))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: 1.5))
             .padding(6)
     }
 }
