@@ -19,7 +19,6 @@ struct SettingsView: View {
 
     @AppStorage("soundEnabled") private var soundEnabled = true
     @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
-    @AppStorage("recordCueStyle") private var cueStyle: RecordCueStyle = .banner
 
     var body: some View {
         NavigationStack {
@@ -76,10 +75,6 @@ struct SettingsView: View {
             sectionTitle("Chain style · prototype")
             NeoSegmented(selection: $chainStyle,
                          options: ChainStyle.allCases.map { (value: $0, label: $0.label) })
-            sectionTitle("Record cue · prototype")
-                .padding(.top, Theme.Spacing.md)
-            NeoSegmented(selection: $cueStyle,
-                         options: RecordCueStyle.allCases.map { (value: $0, label: $0.label) })
         }
     }
 
