@@ -72,7 +72,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             sectionTitle("About")
             HStack {
-                Text("Movie Chain")
+                Text("Unspool")
                     .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
                 Spacer()
@@ -85,7 +85,7 @@ struct SettingsView: View {
             .padding(.vertical, Theme.Spacing.sm + 2)
             .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Movie Chain version \(Config.appVersion), build \(Config.buildNumber)")
+            .accessibilityLabel("Unspool version \(Config.appVersion), build \(Config.buildNumber)")
 
             // The SIL Open Font License asks that the license travel with the
             // font; the full text ships in the bundle as Fonts/Fraunces-OFL.txt.

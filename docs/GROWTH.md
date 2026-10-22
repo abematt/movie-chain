@@ -316,7 +316,7 @@ screen the cohort you just earned would see.
   `vote_count.desc` query, near-static, and *identical for every player*, yet it's
   refetched from scratch on every cold launch. **S**, and it removes most of the burst
   with no server.
-- **Real fix: the 0.7.0 proxy with caching**, which also takes the extractable key out of
+- **Real fix: the 0.8.0 proxy with caching**, which also takes the extractable key out of
   the `.ipa`. Because the pool is identical for everyone, one cached upstream response
   serves the whole player base.
 

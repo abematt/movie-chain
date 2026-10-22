@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **Movie Chain** are recorded here.
+All notable changes to **Unspool** (called Movie Chain until 0.6.0) are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — read as
@@ -19,18 +19,47 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 |---|---|
 | **0.4.0** | Solo game complete — engine, matching, providers, collection, tests |
 | **0.5.0** | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity: Cream Neobrutalist, Fraunces, the chain as cards (motion re-tuned in 0.5.1) |
-| 0.6.0 | [**Foundations & safety net**](docs/ROADMAP.md#060--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
-| 0.7.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#070--the-service) — takes the shared key out of the app and caches it |
-| 0.8.0 | [**Accounts**](docs/ROADMAP.md#080--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
-| 0.9.0 | [**The Daily Chain**](docs/ROADMAP.md#090--the-daily-chain) — one puzzle a day: longest route from A to B ([spec](docs/DAILY-CHAIN.md)) |
-| 0.10.0 | [**Friend groups**](docs/ROADMAP.md#0100--friend-groups) — invite-code groups, no global ranking |
+| 0.6.0 | [**Unspool**](docs/ROADMAP.md#060--unspool) — the rebrand: name, two-circle icon, wordmark, a home screen that deals a real card |
+| 0.7.0 | [**Foundations & safety net**](docs/ROADMAP.md#070--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
+| 0.8.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#080--the-service) — takes the shared key out of the app and caches it |
+| 0.9.0 | [**Accounts**](docs/ROADMAP.md#090--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
+| 0.10.0 | [**The Daily Chain**](docs/ROADMAP.md#0100--the-daily-chain) — one puzzle a day: longest route from A to B ([spec](docs/DAILY-CHAIN.md)) |
+| 0.11.0 | [**Friend groups**](docs/ROADMAP.md#0110--friend-groups) — invite-code groups, no global ranking |
 | 1.0.0 | [**Launch**](docs/ROADMAP.md#100--launch) — share images + links, onboarding demo, store listing |
 
 Until 1.0, breaking internal changes land in minor bumps. The order above is a plan,
 not a contract — if milestones land out of order, the version follows the work. (It
-already has: the design overhaul landed before Foundations and took 0.5.0.)
+already has: the design overhaul landed before Foundations and took 0.5.0, and the
+Unspool rebrand was inserted as 0.6.0.)
 
 ## [Unreleased]
+
+### Changed
+
+- **The game is called Unspool now.** "Movie Chain" described the mechanic and nothing
+  else; Unspool is film coming off a reel and a chain playing out, and it's a name the
+  game can own. The home-screen name, Settings, and both share texts say Unspool.
+- **A new icon and wordmark.** Two overlapping circles, blue for actors and yellow for
+  movies, and the ink where they overlap is the link between them: the game's one rule
+  as a mark. It stands in for the "oo" in the wordmark, and the icon is the mark on a
+  cream tile (with dark and tinted versions for iOS 18's home-screen styles).
+- **The home screen is the first turn.** It used to be a name on a coral "Start with"
+  button; now it's a sentence with a blank, "Chris Hemsworth *was in* a movie…" (or
+  "Inception *starred* an actor…"), so a new player reads the rule instead of being
+  told it. Tap the blank and the home turns into the play screen in place: the name,
+  its chip and its photo fly down into the start card, the card assembles around them,
+  and the blank settles into the answer box as the keyboard comes up. It takes about
+  half a second, since you see it every run, and a soft tap on landing marks the
+  moment the clock starts. The first time you open the game, the blank's arrow nudges
+  once to show you where to tap. **Deal again** flicks the start away and deals a fresh one; **Pick
+  your own** opens the search as before. Your best run sits in a quiet line at the
+  bottom.
+- **The first turn is ready when you get there.** The dealt start's films (or cast)
+  are fetched while you're still looking at it, so the first answer you type is checked
+  at once rather than after a load.
+- **Share squares use yellow for movies.** The spoiler-free share card still drew
+  movies as 🟪, a leftover from the purple of the old palette; they're 🟨 now, to match
+  the game.
 
 ## [0.5.3] — 2026-10-22
 

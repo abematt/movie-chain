@@ -45,9 +45,9 @@ final class GameEngine {
 
         /// Spoiler-free share card: each link as a coloured square, never a name.
         var shareText: String {
-            let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
+            let squares = chain.map { $0.kind == .actor ? "🟦" : "🟨" }.joined()
             let linkWord = links == 1 ? "link" : "links"
-            return "Movie Chain 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            return "Unspool 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
         }
     }
 
@@ -149,6 +149,11 @@ final class GameEngine {
     private let collection: CollectionStore?
     /// Valid next nodes for the current turn (cast or filmography), pre-wrapped.
     private var candidates: [ChainNode] = []
+    /// The dealt start's candidates, fetched while the player is still looking at
+    /// the home screen (`prefetchCandidates`), so its first turn is answerable the
+    /// moment the keyboard is up. Keyed by node id; one at a time, since only the
+    /// start on screen can be played.
+    private var prefetch: (id: String, task: Task<[ChainNode]?, Never>)?
     private var usedIds: Set<String> = []
     private var countdownTask: Task<Void, Never>?
     /// Monotonic token identifying the current run/turn's async work. Every
@@ -306,13 +311,36 @@ final class GameEngine {
         }
     }
 
+    /// Fetch `node`'s candidates ahead of play — the home calls this once a dealt
+    /// start has settled on screen. A fetch already in flight for the same node is
+    /// kept, not repeated; one for a different node is replaced. A failure just
+    /// means `startGame` loads them itself.
+    func prefetchCandidates(for node: ChainNode) {
+        guard prefetch?.id != node.id else { return }
+        prefetch = (node.id, Task { try? await fetchCandidates(for: node) })
+    }
+
     func startGame(with seed: ChainNode) async {
         resetRun()
         let token = generation
         chain = [seed]
         usedIds = [seed.id]
         phase = .playing
-        await loadCandidates(for: seed, token: token)
+        let ahead = prefetch?.id == seed.id ? prefetch?.task : nil
+        prefetch = nil
+        if let ahead {
+            expectedKind = seed.nextKind
+            isChecking = true
+            if let loaded = await ahead.value, !loaded.isEmpty {
+                guard generation == token else { return }
+                candidates = loaded
+                isChecking = false
+            } else {
+                await loadCandidates(for: seed, token: token)
+            }
+        } else {
+            await loadCandidates(for: seed, token: token)
+        }
         // Bail if a reset/quit/new game happened during the await.
         guard phase == .playing, generation == token else { return }
         if holdsFirstTurnClock && !playerIsReady {
@@ -435,13 +463,7 @@ final class GameEngine {
         // so the run is stuck until the clock runs out.
         for attempt in 0..<max(1, Config.candidateLoadAttempts) {
             do {
-                let loaded: [ChainNode]
-                switch node {
-                case .movie(let movie):
-                    loaded = try await provider.cast(of: movie).map(ChainNode.actor)
-                case .actor(let actor):
-                    loaded = try await provider.filmography(of: actor).map(ChainNode.movie)
-                }
+                let loaded = try await fetchCandidates(for: node)
                 // Drop a superseded result: a reset/quit/new game moved the token on
                 // while this fetch was in flight, so installing its candidates would
                 // corrupt the current round.
@@ -463,6 +485,14 @@ final class GameEngine {
                 feedback = "Couldn't load the next round — tap Retry."
                 isChecking = false
             }
+        }
+    }
+
+    /// The valid next links for `node`: a movie's cast, or an actor's films.
+    private func fetchCandidates(for node: ChainNode) async throws -> [ChainNode] {
+        switch node {
+        case .movie(let movie): try await provider.cast(of: movie).map(ChainNode.actor)
+        case .actor(let actor): try await provider.filmography(of: actor).map(ChainNode.movie)
         }
     }
 

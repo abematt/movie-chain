@@ -17,6 +17,9 @@ struct GameView: View {
 
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The home → play handoff, when this screen was reached by tapping the
+    /// home's blank: the start card and the dock wait hidden for it to land.
+    @Environment(HandoffStage.self) private var stage: HandoffStage?
 
     @State private var answer = ""
     @FocusState private var fieldFocused: Bool
@@ -87,21 +90,32 @@ struct GameView: View {
         .background(Theme.Color.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) { answerDock }
         .task {
-            // Feedback warm-up (haptics + audio) now happens on the seed screen,
-            // OFF this transition — `AVAudioEngine.start()` briefly blocks the main
-            // actor and was hitching the seed->play push. Here we only raise the
-            // keyboard, and only *after* the push has settled: focusing mid-push
-            // triggers keyboard-driven safe-area relayout that fights the spring.
-            // ~550ms clears `Theme.Motion.screen` and also lets the field enter the
-            // responder chain (a synchronous focus set on a cold launch is dropped).
-            try? await Task.sleep(for: .milliseconds(550))
+            // Feedback warm-up (haptics + audio) happens on the seed screen, off
+            // this transition — `AVAudioEngine.start()` briefly blocks the main
+            // actor. Here we only raise the keyboard. Arriving by the handoff, it
+            // comes up at once, so the flight rides it into place (one frame's
+            // wait still lets the field enter the responder chain — a synchronous
+            // focus set on a cold launch is dropped). Arriving from search, the
+            // screen cross-fades in first: focusing mid-fade relays the safe area
+            // under it.
+            let handoff = stage?.isFlying == true
+            try? await Task.sleep(for: .milliseconds(handoff ? 16 : 350))
             // Bail if the view went away during the wait (e.g. a fast Quit) —
             // `try?` swallows the sleep's cancellation, so without this the focus
             // set would fire on whatever screen replaced us and jump the keyboard.
             guard !Task.isCancelled else { return }
             fieldFocused = true
-            // The first turn's clock starts now, not when the push began.
-            engine.playerReady()
+            // The first turn's clock starts once the player can see the turn:
+            // after the handoff lands (below), or now.
+            guard handoff else { engine.playerReady(); return }
+            // Resumes once focusing (and its first-time keyboard load) has passed:
+            // the flight's cue to go.
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            stage?.inputFocused = true
+        }
+        .onChange(of: stage?.isFlying ?? false) { _, flying in
+            if !flying { engine.playerReady() }
         }
         #if DEBUG
         .onAppear {
@@ -324,6 +338,8 @@ struct GameView: View {
                         .disabled(!canSubmit)
                 }
                 .shake(shakeToken)
+                .handoffTarget(.dock, stage)
+                .opacity(stage?.isFlying == true ? 0 : 1)
                 .transition(dockSwap)
             }
         }

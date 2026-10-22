@@ -262,7 +262,7 @@ final class CollectionStore {
 
     /// Spoiler-free stats card for sharing — no chains, just the tallies.
     var shareText: String {
-        "My Movie Chain reel 🎬\n\(actorCount) actors · \(movieCount) movies logged"
+        "My Unspool reel 🎬\n\(actorCount) actors · \(movieCount) movies logged"
     }
 
     private func sorted(_ kind: NodeKind) -> [CollectedEntity] {

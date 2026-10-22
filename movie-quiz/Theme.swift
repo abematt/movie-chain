@@ -228,6 +228,24 @@ enum Theme {
         /// with a gentle overshoot, so — stepped tight enough that consecutive
         /// items overlap — it reads as one springy wave rather than discrete pops.
         static let cascade: Animation = .spring(response: 0.5, dampingFraction: 0.72)
+        /// The home → play handoff: the sentence's pieces flying into the start
+        /// card and the dock. A spring sampled by the flight's own clock (see
+        /// `HandoffFlight`), with no bounce — an overshoot would carry the copies
+        /// past the real views they hand to. It plays at the start of every run,
+        /// so it stays short: the movement is done by ~0.4s, and by
+        /// `handoffDuration` it is within a point of landing, when the real views
+        /// take over (and the first turn's clock starts).
+        static let handoffSpring = Spring(duration: 0.45, bounce: 0)
+        static let handoffDuration: Double = 0.55
+        /// The home's chrome leaving under the handoff: gone fast, so it never
+        /// sits half-faded on top of the play screen's chrome coming in.
+        static let handoffExit: Animation = .easeOut(duration: 0.15)
+        /// The play screen's chrome arriving under the handoff, a beat after the
+        /// home's has started to go.
+        static let handoffEnter: Animation = .easeOut(duration: 0.25).delay(0.06)
+        /// A start leaving on Deal again: quicker than the new one lands, so it is
+        /// out of the way rather than competing with it.
+        static let dealOut: Animation = .snappy(duration: 0.22)
     }
 }
 

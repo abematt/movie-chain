@@ -171,7 +171,7 @@ themed week.
 |---|---|
 | Ship a pack in the app bundle | Zero infrastructure, works offline. Frozen at ship time — a bad puzzle needs an App Store update, and it runs out. |
 | Publish to a static file (GitHub Pages, S3) | Nothing *running*, so nothing to deploy or monitor. Fixable any day, never runs out. |
-| Publish through the service | Everything above, plus themed packs, community puzzles, remote tuning, and a message channel. See [`ROADMAP.md`](ROADMAP.md#070--the-service). |
+| Publish through the service | Everything above, plus themed packs, community puzzles, remote tuning, and a message channel. See [`ROADMAP.md`](ROADMAP.md#080--the-service). |
 
 **Decided: the service** — the point is owning a publishable surface, not just the daily.
 But note the consequence for sequencing: **the daily is not hard-blocked on a backend.**
@@ -183,7 +183,7 @@ Device-local enforcement only, until accounts exist. Reinstalling or changing th
 clock defeats it. Acceptable at friend scale with no prizes — and given an AI can produce
 a valid chain on request, the integrity story was never airtight anyway (see
 [`ROADMAP.md`](ROADMAP.md#the-decisions-this-plan-rests-on)). It tightens automatically at
-0.8.0, when the "already played today" check moves server-side.
+0.9.0, when the "already played today" check moves server-side.
 
 ## 6. What the app needs
 
