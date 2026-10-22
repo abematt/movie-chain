@@ -33,8 +33,7 @@ import Observation
 nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
     let kind: NodeKind
     let tmdbID: Int
-    /// Bare name / title (no year decoration) — refreshed if we later see richer
-    /// metadata for the same id.
+    /// Bare name / title (no year decoration), as first logged.
     var name: String
     /// Release year, movies only.
     var year: Int?
@@ -132,7 +131,7 @@ final class CollectionStore {
         if var existing = entities[key] {
             existing.timesLogged += 1
             existing.lastSeen = now
-            // Fill in art / name if a later encounter carried richer metadata.
+            // Fill in art if a later encounter carried it.
             if existing.imagePath == nil { existing.imagePath = node.imagePath }
             entities[key] = existing
             return false
@@ -154,8 +153,8 @@ final class CollectionStore {
     var sortedActors: [CollectedEntity] { sorted(.actor) }
     var sortedMovies: [CollectedEntity] { sorted(.movie) }
 
-    var mostLoggedActor: CollectedEntity? { sortedActors.first }
-    var mostLoggedMovie: CollectedEntity? { sortedMovies.first }
+    var mostLoggedActor: CollectedEntity? { mostLogged(.actor) }
+    var mostLoggedMovie: CollectedEntity? { mostLogged(.movie) }
 
     /// Entities first discovered within the last 7 days — the "this week" stat.
     var addedThisWeek: Int {
@@ -173,7 +172,19 @@ final class CollectionStore {
     private func sorted(_ kind: NodeKind) -> [CollectedEntity] {
         entities.values
             .filter { $0.kind == kind }
-            .sorted { ($0.timesLogged, $0.lastSeen) > ($1.timesLogged, $1.lastSeen) }
+            .sorted(by: Self.loggedOrder)
+    }
+
+    /// The first entry of `sorted(kind)`, in one pass instead of a full sort.
+    private func mostLogged(_ kind: NodeKind) -> CollectedEntity? {
+        entities.values.lazy
+            .filter { $0.kind == kind }
+            .min(by: Self.loggedOrder)
+    }
+
+    /// Most-logged first, then most-recent.
+    private static func loggedOrder(_ a: CollectedEntity, _ b: CollectedEntity) -> Bool {
+        (a.timesLogged, a.lastSeen) > (b.timesLogged, b.lastSeen)
     }
 
     // MARK: Persistence

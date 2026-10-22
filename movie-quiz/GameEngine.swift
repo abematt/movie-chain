@@ -14,10 +14,24 @@ import Observation
 @Observable
 final class GameEngine {
 
-    enum Phase {
+    enum Phase: Equatable {
         case seed          // choosing the starting actor/movie
         case playing
-        case gameOver
+        case gameOver(Summary)
+    }
+
+    /// How a finished run went. Lives on `.gameOver` so these facts can't exist
+    /// (or go stale) outside a game-over.
+    struct Summary: Equatable {
+        /// This run beat the previous best — the trigger for the celebration.
+        var isNewBest = false
+        /// A valid answer the player *didn't* give on the turn that timed out — the
+        /// "you were one away" near-miss. `nil` on a manual quit (there was no
+        /// missed turn — the player chose to stop).
+        var missedAnswer: ChainNode?
+        /// How many brand-new actors/movies this run added to the collection ("Your
+        /// Reel") — the "+N to your Reel" figure.
+        var reelAdditions = 0
     }
 
     // MARK: State
@@ -50,9 +64,6 @@ final class GameEngine {
     /// The best run's points — always from the same run as `bestChain`, never a
     /// separate all-time points maximum.
     private(set) var bestPoints: Int
-    /// Set at game over when this run beat the previous best chain — the trigger
-    /// for the celebration on the game-over screen.
-    private(set) var isNewBest = false
     /// True right after the link that passed the previous best. `bestChain` only
     /// updates at game over, so during play it still holds the record to beat.
     /// True for the rest of a run once it is past the previous best.
@@ -62,16 +73,10 @@ final class GameEngine {
     var justPassedBest: Bool {
         phase == .playing && Scoring.passesRecord(score: score, previousBest: bestChain)
     }
-    /// A valid answer the player *didn't* give on the turn that timed out — the
-    /// "you were one away" near-miss shown at game over. `nil` on a manual quit
-    /// (there was no missed turn — the player chose to stop).
-    private(set) var missedAnswer: ChainNode?
-    /// Whether this run ended because the player tapped Quit (vs. the clock
-    /// running out). Lets the summary avoid a misleading "Time's up".
-    private(set) var endedByQuit = false
-    /// How many brand-new actors/movies this run added to the collection ("Your
-    /// Reel") — the "+N to your Reel" figure shown at game over.
-    private(set) var reelAdditions = 0
+    /// The finished run's summary, while on the game-over screen.
+    var summary: Summary? {
+        if case .gameOver(let summary) = phase { summary } else { nil }
+    }
 
     /// The kind chosen for the seed search.
     var seedKind: NodeKind = .actor
@@ -83,7 +88,7 @@ final class GameEngine {
 
     // MARK: Private
 
-    private let provider: MovieDataProvider
+    private let provider: any MovieDataProvider
     /// Popularity-ranked pools the home deals from, fetched once and cached.
     private var actorPool: [Person] = []
     private var moviePool: [Movie] = []
@@ -97,6 +102,9 @@ final class GameEngine {
     private var poolReady: Bool { actorsLoaded || moviesLoaded }
     /// Both sides landed — no further loading needed.
     private var poolComplete: Bool { actorsLoaded && moviesLoaded }
+    /// The pool load in flight, shared by every caller so a Shuffle tap during
+    /// the first load awaits it instead of sending the same requests again.
+    private var poolLoad: Task<Void, Never>?
     /// `ChainNode.id`s dealt recently, so repeated shuffles stay fresh. Bounded to
     /// `Config.seedRecentWindow`.
     private var recentSeedIds: [String] = []
@@ -120,18 +128,23 @@ final class GameEngine {
     /// can't catch it, because the new game is also `.playing`.
     private var generation = 0
 
+    /// Where the best run persists. Injectable so tests never touch the app's
+    /// real records.
+    private let defaults: UserDefaults
     private static let bestChainKey = "bestChain"
     private static let bestPointsKey = "bestPoints"
 
-    init(provider: MovieDataProvider? = nil, collection: CollectionStore? = nil) {
+    init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
+         defaults: UserDefaults = .standard) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
         // the project's MainActor-default isolation.
         self.provider = provider ?? Config.makeProvider()
         self.collection = collection
-        self.bestChain = UserDefaults.standard.integer(forKey: Self.bestChainKey)
-        self.bestPoints = UserDefaults.standard.integer(forKey: Self.bestPointsKey)
+        self.defaults = defaults
+        self.bestChain = defaults.integer(forKey: Self.bestChainKey)
+        self.bestPoints = defaults.integer(forKey: Self.bestPointsKey)
     }
 
     var current: ChainNode? { chain.last }
@@ -211,19 +224,32 @@ final class GameEngine {
         if !poolComplete { Task { await loadSeedPoolsIfNeeded() } }
     }
 
-    /// Load only the pool side(s) not yet loaded, concurrently. Each side is
-    /// marked loaded **only when it returns entries** — an empty result (a failed
-    /// or rate-limited fetch, incl. the derived-actor task group swallowing
-    /// per-cast failures) leaves that side unloaded so it retries later, rather
-    /// than caching a partial (e.g. movie-only) pool for the whole session. A
-    /// cancelled load (leaving the seed screen) commits nothing.
+    /// Load the pool side(s) not yet loaded, joining a load already in flight
+    /// rather than starting a second one. The load is its own task, so a caller
+    /// leaving the seed screen doesn't cancel it: whatever lands is still cached
+    /// for the next deal.
     private func loadSeedPoolsIfNeeded() async {
         guard !poolComplete else { return }
+        if let poolLoad {
+            await poolLoad.value
+            return
+        }
+        let load = Task { await fetchMissingPools() }
+        poolLoad = load
+        await load.value
+        poolLoad = nil
+    }
+
+    /// Fetch the missing side(s) concurrently. Each side is marked loaded **only
+    /// when it returns entries** — an empty result (a failed or rate-limited
+    /// fetch, incl. the derived-actor task group swallowing per-cast failures)
+    /// leaves that side unloaded so it retries later, rather than caching a
+    /// partial (e.g. movie-only) pool for the whole session.
+    private func fetchMissingPools() async {
         async let actorsTask = fetchActorsIfNeeded()
         async let moviesTask = fetchMoviesIfNeeded()
         let actors = await actorsTask
         let movies = await moviesTask
-        guard !Task.isCancelled else { return }
         if let actors, !actors.isEmpty { actorPool = actors; actorsLoaded = true }
         if let movies, !movies.isEmpty { moviePool = movies; moviesLoaded = true }
     }
@@ -255,19 +281,10 @@ final class GameEngine {
     }
 
     func startGame(with seed: ChainNode) async {
-        generation += 1                            // invalidate any prior run's in-flight load
+        resetRun()
         let token = generation
         chain = [seed]
         usedIds = [seed.id]
-        score = 0
-        points = 0
-        lastGain = 0
-        lastAnswerFast = false
-        isNewBest = false
-        missedAnswer = nil
-        endedByQuit = false
-        reelAdditions = 0
-        feedback = nil
         phase = .playing
         await loadCandidates(for: seed, token: token)
         // Bail if a reset/quit/new game happened during the await.
@@ -337,9 +354,15 @@ final class GameEngine {
     }
 
     func reset() {
+        resetRun()
+        phase = .seed
+    }
+
+    /// Clear everything that belongs to one run. The single list both `startGame`
+    /// and `reset` go through, so the two can't drift apart.
+    private func resetRun() {
         generation += 1                            // drop any in-flight candidate load
-        countdownTask?.cancel()
-        countdownTask = nil
+        stopCountdown()
         chain = []
         usedIds = []
         candidates = []
@@ -347,13 +370,9 @@ final class GameEngine {
         points = 0
         lastGain = 0
         lastAnswerFast = false
-        isNewBest = false
-        missedAnswer = nil
-        endedByQuit = false
         feedback = nil
         isChecking = false
         secondsRemaining = Config.secondsPerTurn
-        phase = .seed
     }
 
     // MARK: Candidates
@@ -431,8 +450,14 @@ final class GameEngine {
         stopCountdown()
         secondsRemaining = Config.secondsPerTurn
         countdownTask = Task { [weak self] in
+            // Tick against fixed deadlines from the turn's start, so each second's
+            // scheduling slack doesn't accumulate into a longer turn.
+            let clock = ContinuousClock()
+            let start = clock.now
+            var elapsed = 0
             while let self, self.secondsRemaining > 0 {
-                try? await Task.sleep(for: .seconds(1))
+                elapsed += 1
+                try? await Task.sleep(until: start + .seconds(elapsed), clock: clock)
                 if Task.isCancelled { return }
                 self.secondsRemaining -= 1
             }
@@ -446,14 +471,13 @@ final class GameEngine {
         // end it again.
         guard phase == .playing else { return }
         generation += 1                            // drop any in-flight candidate load
-        countdownTask?.cancel()
-        countdownTask = nil
-        endedByQuit = quit
+        stopCountdown()
+        var summary = Summary()
 
         // "You were one away": surface a valid answer the player didn't give on
         // the turn that ran out — the sting that drives the next run. Skip it on a
         // manual quit: there was no missed turn.
-        missedAnswer = quit ? nil : candidates.first { !usedIds.contains($0.id) }
+        summary.missedAnswer = quit ? nil : candidates.first { !usedIds.contains($0.id) }
 
         // Commit the record: most links wins, points break a tie, and both
         // numbers are written together so they always describe one run.
@@ -461,9 +485,9 @@ final class GameEngine {
                                bestLinks: bestChain, bestPoints: bestPoints) {
             bestChain = score
             bestPoints = points
-            isNewBest = true
-            UserDefaults.standard.set(bestChain, forKey: Self.bestChainKey)
-            UserDefaults.standard.set(bestPoints, forKey: Self.bestPointsKey)
+            summary.isNewBest = true
+            defaults.set(bestChain, forKey: Self.bestChainKey)
+            defaults.set(bestPoints, forKey: Self.bestPointsKey)
         }
 
         // Log the run into the collection. A chain of length ≥ 2 means at least
@@ -472,10 +496,10 @@ final class GameEngine {
         // a seed-then-quit (length 1) logs nothing. `record` dedups by id, so
         // each entity is counted once per chain.
         if chain.count >= 2 {
-            reelAdditions = collection?.record(chain: chain) ?? 0
+            summary.reelAdditions = collection?.record(chain: chain) ?? 0
         }
 
-        phase = .gameOver
+        phase = .gameOver(summary)
     }
 
     #if DEBUG
@@ -511,9 +535,7 @@ final class GameEngine {
     /// Same sample chain, but jump straight to the game-over summary.
     func loadDemoGameOver() {
         loadDemoChain()
-        missedAnswer = candidates.first
-        isNewBest = true
-        phase = .gameOver
+        phase = .gameOver(Summary(isNewBest: true, missedAnswer: candidates.first))
     }
     #endif
 }

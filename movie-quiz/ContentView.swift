@@ -36,8 +36,8 @@ struct ContentView: View {
             case .playing:
                 GameView(engine: engine)
                     .transition(.screenPush(reduceMotion: reduceMotion))
-            case .gameOver:
-                GameOverView(engine: engine, collection: collection)
+            case .gameOver(let summary):
+                GameOverView(engine: engine, collection: collection, summary: summary)
                     .transition(.screenPush(reduceMotion: reduceMotion))
             }
         }

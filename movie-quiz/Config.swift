@@ -16,28 +16,24 @@ enum Config {
     ///
     /// Get a token free at https://www.themoviedb.org/settings/api
     static let tmdbToken: String = {
-        guard
-            let url = Bundle.main.url(forResource: "TMDBSecrets", withExtension: "plist"),
-            let data = try? Data(contentsOf: url),
-            let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
-            let dict = plist as? [String: Any],
-            let token = dict["TMDBToken"] as? String
-        else { return "" }
+        guard let token = secrets["TMDBToken"] as? String else { return "" }
         return token.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
 
     /// true  -> `tmdbToken` is a v4 Read Access Token, sent as a Bearer header.
     /// false -> `tmdbToken` is a v3 API key, sent as the `api_key` query param.
     /// (Override via the `UsesBearerToken` boolean key in TMDBSecrets.plist.)
-    static let usesBearerToken: Bool = {
+    static let usesBearerToken: Bool = secrets["UsesBearerToken"] as? Bool ?? true
+
+    /// The bundled `TMDBSecrets.plist`, read once; empty when the file is absent.
+    private static let secrets: [String: Any] = {
         guard
             let url = Bundle.main.url(forResource: "TMDBSecrets", withExtension: "plist"),
             let data = try? Data(contentsOf: url),
             let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
-            let dict = plist as? [String: Any],
-            let flag = dict["UsesBearerToken"] as? Bool
-        else { return true }
-        return flag
+            let dict = plist as? [String: Any]
+        else { return [:] }
+        return dict
     }()
 
     static var hasTMDBToken: Bool { !tmdbToken.isEmpty }
@@ -127,7 +123,7 @@ enum Config {
     /// (near-static) cast/filmography responses, with the app pointing at that
     /// proxy instead of TMDB directly. Deliberately NOT doing this yet — noting
     /// it here so it's not forgotten. Revenue is the trigger to actually build it.
-    static func makeProvider() -> MovieDataProvider {
+    static func makeProvider() -> any MovieDataProvider {
         hasTMDBToken ? TMDBProvider() : StubProvider()
     }
 }

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Block a commit whose staged Swift breaks the conventions in CLAUDE.md
+# ("Swift conventions"). Enabled per clone with:
+#   git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/swift-check.py" --staged

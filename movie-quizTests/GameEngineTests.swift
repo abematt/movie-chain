@@ -7,11 +7,20 @@
 //  game started while it was in flight. See `GameEngine.generation`.
 //
 
-import XCTest
+import Foundation
+import Testing
 @testable import movie_quiz
 
 @MainActor
-final class GameEngineTests: XCTestCase {
+struct GameEngineTests {
+
+    /// Each test gets its own defaults suite, so no run writes a best into the
+    /// app's real records (or reads one left by another test).
+    private let defaults = UserDefaults(suiteName: "GameEngineTests-\(UUID().uuidString)")!
+
+    private func makeEngine(_ provider: any MovieDataProvider, collection: CollectionStore? = nil) -> GameEngine {
+        GameEngine(provider: provider, collection: collection, defaults: defaults)
+    }
 
     /// A provider that holds the *first* filmography fetch open until the test
     /// releases it, so we can deterministically interleave a slow candidate load
@@ -49,13 +58,13 @@ final class GameEngineTests: XCTestCase {
         }
     }
 
-    func testStaleCandidateLoadDoesNotCorruptNewGame() async {
+    @Test func staleCandidateLoadDoesNotCorruptNewGame() async {
         let provider = RaceProvider()
         provider.filmographies = [
             1: [Movie(id: 101, title: "Aardvark Adventures", year: nil)],
             2: [Movie(id: 202, title: "Bumblebee Ballad", year: nil)],
         ]
-        let engine = GameEngine(provider: provider)
+        let engine = makeEngine(provider)
 
         // Game 1: seed actor #1. `startGame` suspends inside the gated filmography
         // load and parks there.
@@ -74,13 +83,13 @@ final class GameEngineTests: XCTestCase {
         // The live candidate set must be actor #2's filmography, not the stale
         // actor #1's. Actor #1's film must be rejected…
         await engine.submit("Aardvark Adventures")
-        XCTAssertEqual(engine.score, 0, "stale candidates from the abandoned game leaked into the new round")
-        XCTAssertNotNil(engine.feedback)
+        #expect(engine.score == 0, "stale candidates from the abandoned game leaked into the new round")
+        #expect(engine.feedback != nil)
 
         // …and actor #2's film accepted.
         await engine.submit("Bumblebee Ballad")
-        XCTAssertEqual(engine.score, 1)
-        XCTAssertEqual(engine.chain.last?.id, "m202")
+        #expect(engine.score == 1)
+        #expect(engine.chain.last?.id == "m202")
     }
 
     // MARK: Seed-pool per-side load / retry
@@ -111,18 +120,18 @@ final class GameEngineTests: XCTestCase {
         }
     }
 
-    func testPartialPoolLoadRetriesFailedSideOnly() async {
+    @Test func partialPoolLoadRetriesFailedSideOnly() async {
         let provider = CountingPoolProvider()   // actor side fails once, then succeeds
-        let engine = GameEngine(provider: provider)
+        let engine = makeEngine(provider)
 
         await engine.prepareSeeds()
 
         // The movie side landed on the first attempt and must not be re-fetched…
-        XCTAssertEqual(provider.movieCalls, 1, "an already-loaded side must not be re-fetched")
+        #expect(provider.movieCalls == 1, "an already-loaded side must not be re-fetched")
         // …while the empty actor side must have been retried (not cached as loaded).
-        XCTAssertGreaterThanOrEqual(provider.actorCalls, 2, "a failed/empty side must be retried")
+        #expect(provider.actorCalls >= 2, "a failed/empty side must be retried")
         // A start is dealt regardless (movie-only until actors land, then either).
-        XCTAssertNotNil(engine.dealtSeed)
+        #expect(engine.dealtSeed != nil)
     }
 
     // MARK: Reel logging
@@ -141,16 +150,17 @@ final class GameEngineTests: XCTestCase {
         }
     }
 
-    func testCompletedChainLogsToTheReel() async {
+    @Test func completedChainLogsToTheReel() async {
         let store = CollectionStore(fileURL: nil)      // no disk
-        let engine = GameEngine(provider: SimpleGraphProvider(), collection: store)
+        let engine = makeEngine(SimpleGraphProvider(), collection: store)
         await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
 
         await engine.submit("Film 100")
         engine.quit()
 
-        XCTAssertEqual(store.total, 2, "a chain of 2 logs both nodes")
-        XCTAssertEqual(engine.reelAdditions, 2)
+        #expect(store.total == 2, "a chain of 2 logs both nodes")
+        #expect(engine.summary?.reelAdditions == 2)
+        #expect(engine.summary?.missedAnswer == nil, "a quit has no missed turn")
     }
 
     // MARK: Candidate-load resilience (the "stuck turn" fix)
@@ -174,27 +184,41 @@ final class GameEngineTests: XCTestCase {
         }
     }
 
-    func testCandidateLoadRetriesTransientFailure() async {
+    @Test func candidateLoadRetriesTransientFailure() async {
         let provider = FlakyCandidateProvider()   // first fetch throws, then succeeds
-        let engine = GameEngine(provider: provider)
+        let engine = makeEngine(provider)
         await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
 
-        XCTAssertFalse(engine.awaitingRetry, "a transient failure should be retried, not surfaced")
+        #expect(!engine.awaitingRetry, "a transient failure should be retried, not surfaced")
         await engine.submit("Film 100")   // candidates loaded → a valid answer is accepted
-        XCTAssertEqual(engine.score, 1, "the turn was not stuck")
+        #expect(engine.score == 1, "the turn was not stuck")
     }
 
-    func testRetryTurnRecoversAfterExhaustedRetries() async {
+    @Test func retryTurnRecoversAfterExhaustedRetries() async {
         let provider = FlakyCandidateProvider()
         provider.failFilmographyTimes = Config.candidateLoadAttempts   // all initial attempts fail
-        let engine = GameEngine(provider: provider)
+        let engine = makeEngine(provider)
         await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
 
-        XCTAssertTrue(engine.awaitingRetry, "an exhausted load must surface the Retry affordance")
+        #expect(engine.awaitingRetry, "an exhausted load must surface the Retry affordance")
         await engine.retryTurn()           // next fetch succeeds
-        XCTAssertFalse(engine.awaitingRetry)
+        #expect(!engine.awaitingRetry)
         await engine.submit("Film 100")
-        XCTAssertEqual(engine.score, 1)
+        #expect(engine.score == 1)
+    }
+
+    // MARK: Records
+
+    @Test func newRecordPersistsToInjectedDefaults() async {
+        let engine = makeEngine(SimpleGraphProvider())
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+        await engine.submit("Film 100")
+        engine.quit()
+
+        #expect(engine.summary?.isNewBest == true)
+        #expect(defaults.integer(forKey: "bestChain") == 1)
+        // A fresh engine on the same defaults picks the record back up.
+        #expect(makeEngine(SimpleGraphProvider()).bestChain == 1)
     }
 
 }

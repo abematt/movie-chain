@@ -173,7 +173,9 @@ struct GameView: View {
             // swells, dips just under its size, and settles — fired once by
             // `recordPop`. Resting scale is 1, so it can never get stuck large.
             // Reduce Motion keeps the colour change and drops the bounce.
-            .keyframeAnimator(initialValue: 1.0, trigger: recordPop) { view, scale in
+            // `[reduceMotion]`: the content closure is `@Sendable` (SwiftUI may
+            // run it off the main actor), so copy the flag rather than read `self`.
+            .keyframeAnimator(initialValue: 1.0, trigger: recordPop) { [reduceMotion] view, scale in
                 view.scaleEffect(reduceMotion ? 1 : scale, anchor: .center)
             } keyframes: { _ in
                 KeyframeTrack {

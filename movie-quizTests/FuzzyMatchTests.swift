@@ -7,12 +7,12 @@
 //  III", and raw edit distance used to prefer "…II" (2 edits) over "…III" (3).
 //
 
-import XCTest
+import Testing
 @testable import movie_quiz
 
-final class FuzzyMatchTests: XCTestCase {
+struct FuzzyMatchTests {
 
-    private let missionImpossible = [
+    private static let missionImpossible = [
         "Mission: Impossible",
         "Mission: Impossible II",
         "Mission: Impossible III",
@@ -28,61 +28,60 @@ final class FuzzyMatchTests: XCTestCase {
 
     // MARK: Roman-numeral sequels (the reported bug)
 
-    func testArabicSequelMatchesRomanTitle() {
-        XCTAssertEqual(match("mission impossible 3", in: missionImpossible), "Mission: Impossible III")
-        XCTAssertEqual(match("mission impossible 2", in: missionImpossible), "Mission: Impossible II")
-        // NOTE: "mission impossible 1" is deliberately not asserted. The first
-        // film carries no numeral ("Mission: Impossible"), so a typed "1" has no
-        // exact target and currently lands on the nearest numbered sequel. That
-        // franchise-first-installment ambiguity is a separate, unbuilt heuristic.
+    // NOTE: "mission impossible 1" is deliberately not covered. The first film
+    // carries no numeral ("Mission: Impossible"), so a typed "1" has no exact
+    // target and currently lands on the nearest numbered sequel. That
+    // franchise-first-installment ambiguity is a separate, unbuilt heuristic.
+    @Test(arguments: [
+        ("mission impossible 3", "Mission: Impossible III"),
+        ("mission impossible 2", "Mission: Impossible II"),
+        ("mission impossible iii", "Mission: Impossible III"),   // Roman input too
+        ("mission imposible 3", "Mission: Impossible III"),      // and misspelled
+    ])
+    func sequelMatchesRomanTitle(input: String, expected: String) {
+        #expect(match(input, in: Self.missionImpossible) == expected)
     }
 
-    func testRomanInputAlsoMatches() {
-        XCTAssertEqual(match("mission impossible iii", in: missionImpossible), "Mission: Impossible III")
-    }
-
-    func testNormalizeFoldsRomanNumerals() {
-        XCTAssertEqual(FuzzyMatch.normalize("Mission: Impossible III"), "mission impossible 3")
-        XCTAssertEqual(FuzzyMatch.normalize("Rocky IV"), "rocky 4")
+    @Test(arguments: [
+        ("Mission: Impossible III", "mission impossible 3"),
+        ("Rocky IV", "rocky 4"),
+        // "iiii" / "vv" are not canonical Roman numerals — leave them untouched.
+        ("iiii", "iiii"),
+        ("vv", "vv"),
+    ])
+    func normalizeFoldsOnlyCanonicalRomanNumerals(input: String, expected: String) {
+        #expect(FuzzyMatch.normalize(input) == expected)
     }
 
     // MARK: Single letters that are NOT sequels must still match themselves
 
-    func testNonSequelSingleLettersStillMatch() {
+    @Test(arguments: [
+        ("malcolm x", "Malcolm X"),
+        ("x men", "X-Men"),
+        ("i am legend", "I Am Legend"),
+        ("oceans eleven", "Ocean's Eleven"),
+        ("top gun maverick", "Top Gun: Maverick"),
+    ])
+    func nonSequelSingleLettersStillMatch(input: String, expected: String) {
         let titles = ["Malcolm X", "X-Men", "I Am Legend", "Ocean's Eleven", "Top Gun: Maverick"]
-        XCTAssertEqual(match("malcolm x", in: titles), "Malcolm X")
-        XCTAssertEqual(match("x men", in: titles), "X-Men")
-        XCTAssertEqual(match("i am legend", in: titles), "I Am Legend")
-        XCTAssertEqual(match("oceans eleven", in: titles), "Ocean's Eleven")
-        XCTAssertEqual(match("top gun maverick", in: titles), "Top Gun: Maverick")
+        #expect(match(input, in: titles) == expected)
     }
 
-    func testRoundTripRejectsMalformedRomanTokens() {
-        // "iiii" / "vv" are not canonical Roman numerals — leave them untouched.
-        XCTAssertEqual(FuzzyMatch.normalize("iiii"), "iiii")
-        XCTAssertEqual(FuzzyMatch.normalize("vv"), "vv")
-    }
+    // MARK: Rejection
 
-    // MARK: Spelling tolerance & rejection
-
-    func testForgivesMisspelling() {
-        XCTAssertEqual(match("mission imposible 3", in: missionImpossible), "Mission: Impossible III")
-    }
-
-    func testRejectsOffListAnswer() {
-        XCTAssertNil(match("the godfather", in: missionImpossible))
+    @Test func rejectsOffListAnswer() {
+        #expect(match("the godfather", in: Self.missionImpossible) == nil)
     }
 
     // MARK: Subset ties prefer the closest title (the "Making of" bug)
 
-    func testPrefersClosestTitleOnSubsetTie() {
+    @Test func prefersClosestTitleOnSubsetTie() {
         // Both titles contain every typed word, so both hit the same whole-word
         // boost floor. The winner must be the closer literal match, regardless of
         // candidate order — not the "making of" featurette just because TMDB
         // happens to list it first.
         let candidates = ["Making of School of Rock", "The School of Rock"]
-        XCTAssertEqual(match("school of rock", in: candidates), "The School of Rock")
-        // Order must not decide it.
-        XCTAssertEqual(match("school of rock", in: candidates.reversed()), "The School of Rock")
+        #expect(match("school of rock", in: candidates) == "The School of Rock")
+        #expect(match("school of rock", in: candidates.reversed()) == "The School of Rock")
     }
 }

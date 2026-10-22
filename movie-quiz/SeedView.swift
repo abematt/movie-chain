@@ -120,9 +120,11 @@ struct SeedView: View {
         // push. We wait until the entrance animation (cold-launch intro, or the
         // carousel push on a Play-again re-entry) has settled so the warm never
         // lands on an animation.
-        .task { await warmFeedbackWhenIdle() }
+        .task(id: introRunning) { await warmFeedbackWhenIdle() }
         .onAppear {
-            if introTask == nil { introTask = Task { await runIntro() } }
+            // swift-check:ignore on the next line — kept as a stored Task so `skipIntro`
+            // can cancel it; the screen can't leave mid-intro (controls are inert).
+            if introTask == nil { introTask = Task { await runIntro() } }  // swift-check:ignore
             #if DEBUG
             // Screenshot hook: open straight onto the Reel sheet.
             if ProcessInfo.processInfo.arguments.contains("-uiOpenReel") { showReel = true }
@@ -556,16 +558,14 @@ struct SeedView: View {
         introDone = true                                          // (re-inits the view — last)
     }
 
-    /// Warm haptics + audio once the screen is idle. Polls `introRunning` (false
-    /// after the intro completes *or* is skipped, and immediately on a re-entry),
-    /// then waits out the entrance/push settle before paying the briefly-blocking
-    /// `AVAudioEngine.start()` — keeping that cost off every animation, especially
-    /// the seed->play transition (GameView no longer warms).
+    /// Warm haptics + audio once the screen is idle. Re-run by `.task(id:)` when
+    /// `introRunning` changes (false after the intro completes *or* is skipped, and
+    /// immediately on a re-entry), then waits out the entrance/push settle before
+    /// paying the briefly-blocking `AVAudioEngine.start()` — keeping that cost off
+    /// every animation, especially the seed->play transition (GameView no longer
+    /// warms).
     private func warmFeedbackWhenIdle() async {
-        var waited = 0
-        while introRunning, waited < 4000, !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(100)); waited += 100
-        }
+        guard !introRunning else { return }
         try? await Task.sleep(for: .milliseconds(700))   // clear the settle / carousel push
         guard !Task.isCancelled else { return }
         Haptics.prepare()
