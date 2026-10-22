@@ -73,7 +73,9 @@ final class HandoffStage {
     }
 
     /// The blank was tapped: freeze where the home's pieces are and start flying.
+    /// Ignored while a flight is already in the air — its frames are spent.
     func begin(with node: ChainNode) {
+        guard !isFlying else { return }
         playFrames = [:]
         inputFocused = false
         let from = (homeFrames[node.id] ?? [:]).merging(homeFrames[""] ?? [:]) { own, _ in own }

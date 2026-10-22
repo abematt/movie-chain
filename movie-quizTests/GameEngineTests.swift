@@ -226,6 +226,47 @@ struct GameEngineTests {
         #expect(engine.score == 1, "the played start's own set validates its link")
     }
 
+    /// How the first (prefetched) filmography fetch goes wrong.
+    enum PrefetchMiss: Sendable { case failure, empty }
+
+    /// Fails or empties the first filmography fetch, then returns the actor's film.
+    @MainActor
+    final class MissFirstProvider: MovieDataProvider {
+        let miss: PrefetchMiss
+        private(set) var filmographyCalls = 0
+        init(miss: PrefetchMiss) { self.miss = miss }
+
+        func searchActors(_ query: String) async throws -> [Person] { [] }
+        func searchMovies(_ query: String) async throws -> [Movie] { [] }
+        func popularActors() async throws -> [Person] { [] }
+        func popularMovies() async throws -> [Movie] { [] }
+        func cast(of movie: Movie) async throws -> [Person] { [] }
+        func filmography(of actor: Person) async throws -> [Movie] {
+            filmographyCalls += 1
+            if filmographyCalls == 1 {
+                switch miss {
+                case .failure: throw URLError(.timedOut)
+                case .empty: return []
+                }
+            }
+            return [Movie(id: 101, title: "Film 101", year: 2001)]
+        }
+    }
+
+    @Test(arguments: [PrefetchMiss.failure, .empty])
+    func aMissedPrefetchFallsBackToALoad(_ miss: PrefetchMiss) async {
+        let provider = MissFirstProvider(miss: miss)
+        let engine = makeEngine(provider)
+        let seed = ChainNode.actor(Person(id: 1, name: "Actor 1"))
+
+        engine.prefetchCandidates(for: seed)
+        await engine.startGame(with: seed)
+        await engine.submit("Film 101")
+
+        #expect(provider.filmographyCalls == 2, "the miss is followed by a real load")
+        #expect(engine.score == 1, "the loaded set validates the first link")
+    }
+
     // MARK: Candidate-load resilience (the "stuck turn" fix)
 
     /// Fails the first N candidate fetches (a transient rate limit / timeout), then
