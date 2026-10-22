@@ -9,8 +9,9 @@
 //  start button: tapping it hands off to the play screen in place (see
 //  `Handoff.swift`), the sentence flying into the deck and the blank into the
 //  answer dock as the keyboard comes up. "Deal again" deals a fresh start;
-//  "Pick your own" drops down to the search flow. A quiet footer carries the best
-//  run and the one instruction the screen needs.
+//  "Pick your own" drops down to the search flow. The best run sits centred in
+//  the gap between the header and the start. There's no instruction: the sentence is the rule, and the blank
+//  nudges once, ever, to show it's the way in.
 //
 //  The dealt seed is owned by the engine (`engine.dealtSeed`, refreshed on every
 //  appearance and on resume). Once a start has sat on screen for a moment, the
@@ -70,8 +71,8 @@ struct SeedView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(HandoffStage.self) private var stage: HandoffStage?
 
-    /// Staggered slots for the intro cascade: the start(0), the blank(1),
-    /// deal again / pick your own(2), the footer(3).
+    /// Staggered slots for the intro cascade: the best run(0), the start(1),
+    /// the blank(2), deal again / pick your own(3).
     private static let controlSlotCount = 4
 
     /// How long a dealt start must stay on screen before its candidates are
@@ -300,14 +301,16 @@ struct SeedView: View {
     private var dealSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: Theme.Spacing.md)
+            // In the gap under the header, where the eye lands before the start.
+            cascade(bestRun, 0)
+            Spacer(minLength: Theme.Spacing.md)
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                cascade(sentenceHead, 0)
-                cascade(blank, 1)
-                cascade(dealLinks, 2)
+                cascade(sentenceHead, 1)
+                cascade(blank, 2)
+                cascade(dealLinks, 3)
                     .padding(.top, -Theme.Spacing.xs)
             }
             Spacer(minLength: Theme.Spacing.md)
-            cascade(footer, 3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
@@ -391,22 +394,20 @@ struct SeedView: View {
         .foregroundStyle(Theme.Color.ink)
     }
 
-    // The best run, then the one instruction the screen needs.
-    @ViewBuilder private var footer: some View {
+    // The best run, centred in the gap between the header and the start — and
+    // nothing before there is one. No "tap the blank": the sentence already reads
+    // as the rule, and the blank's one-time nudge (`playBlankHint`) shows a new
+    // player where to tap.
+    @ViewBuilder private var bestRun: some View {
         if engine.bestChain > 0 {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
                 Text("Best run").metaLabel()
-                Text("\(Text("\(engine.bestChain)").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink)) \(Text(engine.bestChain == 1 ? "link" : "links").font(Theme.Font.flourish(.body))) · tap the blank to start")
-                    .font(Theme.Font.body)
+                Text("\(Text("\(engine.bestChain)").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink)) \(Text(engine.bestChain == 1 ? "link" : "links").font(Theme.Font.flourish(.body)))")
                     .foregroundStyle(Theme.Color.muted)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
             }
+            .frame(maxWidth: .infinity)
             .accessibilityElement(children: .combine)
-        } else {
-            Text("Tap the blank to start")
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.muted)
         }
     }
 

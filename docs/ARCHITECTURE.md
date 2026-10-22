@@ -508,8 +508,9 @@ small, bold, uppercase and tracked.
   overlaid on its trailing edge; the dealt start as the head of a sentence (round
   avatar + kind chip, the name in Fraunces display, "*was in*" for an actor or
   "*starred*" for a movie); the **blank** ("a movie…" / "an actor…" over an ink rule,
-  with a coral arrow); "Deal again" and "Pick your own" links; and a footer line with
-  the best run and "tap the blank to start". The Reel pill is always reachable (count
+  with a coral arrow); "Deal again" and "Pick your own" links; and the best run,
+  centred in the gap between the header and the start (absent until there is one). No instruction text: the sentence
+  is the rule, and the blank nudges once, ever, for a new player. The Reel pill is always reachable (count
   hidden when empty) because the Reel sheet hosts the TMDB attribution.
   - **The sentence's head** sits in a fixed-height region pinned to its bottom, so the
     blank never moves: a long name grows upward and shrinks to fit three lines. Only

@@ -278,7 +278,8 @@ tapping it runs the **handoff** (`Handoff.swift`) — a `HandoffStage` owned by
 the name/chip/avatar/blank flying into the deck's start card and the dock on its own
 `TimelineView` clock, waiting for the answer field's first (main-thread-blocking) focus
 to pass. Seed → play is a cross-fade under it, not a push. "Deal again" deals on
-`.dealSentence`; "Pick your own" opens search; the best run is a footer line. The engine
+`.dealSentence`; "Pick your own" opens search; the best run sits centred in the gap under the header (no instruction text — the sentence is the
+rule, and the blank nudges once for a new player). The engine
 prefetches the dealt start's candidates (`prefetchCandidates`) so the first turn is
 ready on arrival. `-uiAutoHandoff` (DEBUG) taps the blank two seconds after a deal, to
 record the transition. The Reel pill is always reachable (count hidden when empty),
