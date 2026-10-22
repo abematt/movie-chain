@@ -23,6 +23,9 @@ import SwiftUI
 
 struct ChainCardStack: View {
     let chain: [ChainNode]
+    /// The node whose link passed the record; its hero card wears a "New best"
+    /// tab (record-cue prototype, card style). `nil` shows no tab.
+    var recordNodeID: String? = nil
     /// How many compact cards to show above the hero before collapsing. Two is
     /// what fits on an iPhone 16 with the keyboard docked while keeping the
     /// "+N earlier" marker on screen; a third gets clipped off the top.
@@ -52,7 +55,8 @@ struct ChainCardStack: View {
                     ))
             }
             if let newest = chain.last {
-                HeroChainCard(node: newest, position: chain.count - 1)
+                HeroChainCard(node: newest, position: chain.count - 1,
+                              isRecord: newest.id == recordNodeID)
                     // Re-identify per node so each new link drops in as a new card
                     // rather than the old hero morphing its text.
                     .id(newest.id)
@@ -75,6 +79,8 @@ struct HeroChainCard: View {
     let node: ChainNode
     /// Link number (0 = the dealt start), stamped quietly in the corner.
     var position: Int? = nil
+    /// This link passed the record: a green "New best" chip replaces its number.
+    var isRecord = false
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.Spacing.md) {
@@ -84,7 +90,18 @@ struct HeroChainCard: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     KindChip(kind: node.kind)
                     Spacer(minLength: 0)
-                    if let position {
+                    if isRecord {
+                        // Card style: the link that set the record says so
+                        // where its number would be.
+                        Text("New best")
+                            .metaLabel(Theme.Color.onAccent, size: .small)
+                            .padding(.horizontal, Theme.Spacing.sm)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Theme.Color.good))
+                            .overlay(Capsule().strokeBorder(Theme.Color.border,
+                                                            lineWidth: Theme.Border.width))
+                            .accessibilityLabel("This link set a new best")
+                    } else if let position {
                         // The start isn't a link; links count from 1, matching
                         // the score.
                         if position == 0 {

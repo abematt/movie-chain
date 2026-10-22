@@ -24,7 +24,16 @@ struct GameView: View {
     @FocusState private var fieldFocused: Bool
     @State private var gainToken = 0     // bumps to replay the "+N" pop
     @State private var shakeToken = 0    // bumps to shake the field on reject
-    @State private var showRecordCue = false  // the transient in-play "a new best" pill
+    @State private var showRecordCue = false  // the transient banner (banner style)
+    /// The chain node whose link passed the record (card style tags its card).
+    @State private var recordNodeID: String?
+    /// DEBUG screenshot hook: act as if this run had passed the record.
+    @State private var forceBeating = false
+    /// Prototype switch between record-cue treatments (Settings → Record cue).
+    @AppStorage("recordCueStyle") private var cueStyle: RecordCueStyle = .banner
+
+    /// This run is past the previous best (for the persistent cue styles).
+    private var beatingBest: Bool { engine.isBeatingBest || forceBeating }
 
     /// How many links stay visible in the rising window before older ones
     /// collapse into "+N earlier". Tuned to the band above the keyboard.
@@ -56,7 +65,8 @@ struct GameView: View {
                 .overlay(alignment: .bottom) {
                     switch chainStyle {
                     case .cards:
-                        ChainCardStack(chain: engine.chain)
+                        ChainCardStack(chain: engine.chain,
+                                       recordNodeID: cueStyle == .card ? recordNodeID : nil)
                             .fixedSize(horizontal: false, vertical: true)
                     case .tiles:
                         ChainStack(chain: engine.chain, maxVisible: visibleLinks)
@@ -90,7 +100,15 @@ struct GameView: View {
         #if DEBUG
         .onAppear {
             // Screenshot hook: show the record cue without having to beat a best.
-            if ProcessInfo.processInfo.arguments.contains("-uiDemoRecordCue") { showRecordCue = true }
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-uiDemoRecordCue") {
+                if i + 1 < args.count, let style = RecordCueStyle(rawValue: args[i + 1]) {
+                    cueStyle = style
+                }
+                forceBeating = true
+                showRecordCue = true
+                recordNodeID = engine.chain.last?.id
+            }
         }
         #endif
         .onChange(of: engine.score) { old, new in
@@ -146,7 +164,7 @@ struct GameView: View {
                 Text("\(engine.score)")
                     .font(Theme.Font.display(60))
                     .contentTransition(.numericText())
-                    .foregroundStyle(Theme.Color.ink)
+                    .foregroundStyle(scoreTurnsGreen ? Theme.Color.good : Theme.Color.ink)
                 Text(engine.score == 1 ? "link" : "links")
                     .font(Theme.Font.flourish(.title3))
                     .foregroundStyle(Theme.Color.muted)
@@ -159,26 +177,52 @@ struct GameView: View {
                         .offset(x: 34)
                 }
             }
+            // Stamp style: a tilted stamp pinned to the figure for the rest of
+            // the run.
+            .overlay(alignment: .topTrailing) {
+                if cueStyle == .stamp && beatingBest {
+                    RecordStamp()
+                        .offset(x: 58, y: -2)
+                        .transition(reduceMotion ? .opacity
+                                    : .scale(scale: 1.8).combined(with: .opacity))
+                }
+            }
 
-            Text("\(engine.points) pts")
-                .font(Theme.Font.numeral(.body))
-                .foregroundStyle(Theme.Color.muted)
-                .contentTransition(.numericText())
-                // The record cue floats in the open space under the score, so it
-                // costs the chain no vertical room.
-                .overlay(alignment: .bottom) {
-                    if showRecordCue {
-                        RecordCue()
+            pointsLine
+                // Banner style: hangs just below the score in the open space above
+                // the chain, so it costs the chain no vertical room. Sized to the
+                // screen (less the gutters), not to the narrow points line.
+                .overlay(alignment: .top) {
+                    if cueStyle == .banner && showRecordCue {
+                        RecordBanner(previousBest: engine.bestChain)
+                            .containerRelativeFrame(.horizontal) { width, _ in
+                                width - 2 * Theme.Spacing.gutter
+                            }
                             .offset(y: 40)
-                            .transition(reduceMotion
-                                        ? .opacity
-                                        : .scale(scale: 0.6).combined(with: .opacity))
+                            .transition(reduceMotion ? .opacity
+                                        : .move(edge: .top).combined(with: .opacity))
                     }
                 }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, Theme.Spacing.sm)
         .animation(.snappy, value: engine.score)
+        .animation(Theme.Motion.emphasized, value: beatingBest)
+    }
+
+    private var scoreTurnsGreen: Bool { cueStyle == .score && beatingBest }
+
+    // Score style adds "new best" to the points line for the rest of the run.
+    @ViewBuilder private var pointsLine: some View {
+        if scoreTurnsGreen {
+            Text("\(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("new best").font(Theme.Font.flourish(.body)).foregroundStyle(Theme.Color.good))")
+                .contentTransition(.numericText())
+        } else {
+            Text("\(engine.points) pts")
+                .font(Theme.Font.numeral(.body))
+                .foregroundStyle(Theme.Color.muted)
+                .contentTransition(.numericText())
+        }
     }
 
     // MARK: Next-up hint
@@ -271,10 +315,11 @@ struct GameView: View {
         // The link that passed the record: a bigger beat than a normal link.
         Haptics.celebrate()
         if soundEnabled { SoundPlayer.shared.record() }
+        recordNodeID = engine.chain.last?.id
         withAnimation(Theme.Motion.emphasized) { showRecordCue = true }
         AccessibilityNotification.Announcement("A new best").post()
         Task {
-            try? await Task.sleep(for: .seconds(1.8))
+            try? await Task.sleep(for: .seconds(2.4))
             withAnimation(Theme.Motion.standard) { showRecordCue = false }
         }
     }
@@ -293,19 +338,53 @@ struct GameView: View {
     }
 }
 
-// MARK: - Record cue
+// MARK: - Record cue (prototype: four treatments)
+//
+// What the play screen shows the moment a run passes the previous best. Every
+// style also fires the celebrate haptic and the record chime. Settings → Record
+// cue switches between them; delete the losers once one is chosen.
 
-/// The transient "a new best" pill shown the moment a run passes the record —
-/// the same green pill the game-over card uses, so the two moments read as one.
-private struct RecordCue: View {
+enum RecordCueStyle: String, CaseIterable, Identifiable {
+    case banner, stamp, score, card
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+}
+
+/// Banner: a full-width green card that says what was passed, then leaves.
+private struct RecordBanner: View {
+    let previousBest: Int
+
     var body: some View {
-        Text("a new best")
-            .font(Theme.Font.flourish(.subheadline))
-            .foregroundStyle(Theme.Color.onAccent)
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.xs + 1)
-            .neoSurface(radius: Theme.Radius.pill, fill: Theme.Color.good,
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "star.fill")
+                .font(Theme.Font.bodyStrong)
+                .foregroundStyle(Theme.Color.onAccent)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("New best").metaLabel(Theme.Color.onAccent)
+                Text("Past your \(previousBest)-link record")
+                    .font(Theme.Font.flourish(.subheadline))
+                    .foregroundStyle(Theme.Color.onAccent)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm + 2)
+        .frame(maxWidth: .infinity)
+        .neoSurface(radius: Theme.Radius.md, fill: Theme.Color.good)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Stamp: a tilted rubber-stamp badge on the score, for the rest of the run.
+private struct RecordStamp: View {
+    var body: some View {
+        Text("New best")
+            .metaLabel(Theme.Color.onAccent, size: .small)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, 4)
+            .neoSurface(radius: Theme.Radius.sm - 2, fill: Theme.Color.good,
                         shadow: Theme.Shadow.small)
+            .rotationEffect(.degrees(-8))
             .fixedSize()
             .accessibilityLabel("A new best")
     }

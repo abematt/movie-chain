@@ -11,6 +11,25 @@ import XCTest
 
 final class ScoringTests: XCTestCase {
 
+    // MARK: The record rule (most links, points break ties)
+
+    func testMoreLinksIsARecordEvenWithFewerPoints() {
+        XCTAssertTrue(Scoring.isNewRecord(links: 19, points: 100, bestLinks: 18, bestPoints: 848))
+    }
+
+    func testMorePointsAloneIsNotARecord() {
+        XCTAssertFalse(Scoring.isNewRecord(links: 17, points: 2000, bestLinks: 18, bestPoints: 848))
+    }
+
+    func testPointsBreakATieOnLinks() {
+        XCTAssertTrue(Scoring.isNewRecord(links: 18, points: 900, bestLinks: 18, bestPoints: 848))
+        XCTAssertFalse(Scoring.isNewRecord(links: 18, points: 848, bestLinks: 18, bestPoints: 848))
+    }
+
+    func testAZeroLinkRunIsNeverARecord() {
+        XCTAssertFalse(Scoring.isNewRecord(links: 0, points: 0, bestLinks: 0, bestPoints: 0))
+    }
+
     // MARK: Passing the record (the in-play "a new best" cue)
 
     func testPassesRecordFiresOnlyOnTheLinkThatPassesIt() {

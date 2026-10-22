@@ -312,7 +312,8 @@ audience knows you. Design accordingly: no prizes, no ranked tiers, no stakes th
 reward inflating a number.
 
 **Decide before starting:**
-- What's compared — links, points, or both?
+- ~~What's compared — links, points, or both?~~ **Decided 2026-10-22: links, with
+  points breaking a tie** — the same rule as the solo record (`Scoring.isNewRecord`).
 - Group size cap, and what happens when someone leaves.
 - Who can see whose history.
 

@@ -93,6 +93,12 @@ not a contract — if milestones land out of order, the version follows the work
   the score, the phone gives the celebration haptic, and a brighter two-note chime
   replaces the usual one. It fires once per run, never on a first game, and VoiceOver
   announces it. Previously the only signal came on the game-over screen.
+- **One record, defined.** The best run is the one with the most links, and points
+  only break a tie. Before, the best link count and the best points total were kept
+  separately, so "18 links · 848 pts" could pair two different games. Now both are
+  written together and always describe one run. A run with fewer links but more
+  points than ever is no longer a record of any kind. Existing saves keep their
+  numbers until the next record overwrites both.
 
 ### Changed
 

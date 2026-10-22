@@ -44,15 +44,21 @@ final class GameEngine {
 
     // MARK: Records & recap
 
-    /// Best chain length ever, persisted across launches.
+    /// The best run's link count, persisted across launches. The best run is the
+    /// one with the most links, points breaking a tie (`Scoring.isNewRecord`).
     private(set) var bestChain: Int
-    /// Best point total ever, persisted across launches.
+    /// The best run's points — always from the same run as `bestChain`, never a
+    /// separate all-time points maximum.
     private(set) var bestPoints: Int
     /// Set at game over when this run beat the previous best chain — the trigger
     /// for the celebration on the game-over screen.
     private(set) var isNewBest = false
     /// True right after the link that passed the previous best. `bestChain` only
     /// updates at game over, so during play it still holds the record to beat.
+    /// True for the rest of a run once it is past the previous best.
+    var isBeatingBest: Bool {
+        phase == .playing && bestChain > 0 && score > bestChain
+    }
     var justPassedBest: Bool {
         phase == .playing && Scoring.passesRecord(score: score, previousBest: bestChain)
     }
@@ -449,14 +455,14 @@ final class GameEngine {
         // manual quit: there was no missed turn.
         missedAnswer = quit ? nil : candidates.first { !usedIds.contains($0.id) }
 
-        // Commit records.
-        if score > bestChain {
+        // Commit the record: most links wins, points break a tie, and both
+        // numbers are written together so they always describe one run.
+        if Scoring.isNewRecord(links: score, points: points,
+                               bestLinks: bestChain, bestPoints: bestPoints) {
             bestChain = score
+            bestPoints = points
             isNewBest = true
             UserDefaults.standard.set(bestChain, forKey: Self.bestChainKey)
-        }
-        if points > bestPoints {
-            bestPoints = points
             UserDefaults.standard.set(bestPoints, forKey: Self.bestPointsKey)
         }
 
