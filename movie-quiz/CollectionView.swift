@@ -3,8 +3,10 @@
 //  movie-quiz
 //
 //  "Your Reel" — the collection screen. Every actor/movie the player has logged
-//  through play, shown as a grid of headshots/posters with pure count stats on
-//  top ("look how many you know"). Presented as a sheet from the seed and
+//  through play, with pure count stats on top ("look how many you know"):
+//  actors as a deck of playing cards earned through the films linked through
+//  them, movies as framed posters (`ReelCards.swift`), narrowed by decade and
+//  genre. Presented as a sheet from the seed and
 //  game-over screens.
 //
 //  Built entirely on the `Theme` tokens and the node-category identity (blue =
@@ -25,6 +27,15 @@ struct CollectionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var filter: Filter = .actors
+    @AppStorage("reelTiers") private var tierModel: ReelTierModel = .rank
+    /// Decade and genre narrowing, shared by both tabs.
+    @State private var narrow = ReelFilter()
+    /// The card or frame lifted out of the grid, if any, and whether it's
+    /// turned over.
+    @State private var expanded: CollectedEntity.ID?
+    @State private var flipped = false
+    /// Ties each grid slot to its lifted card, so a lift flies out and back.
+    @Namespace private var lift
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
 
@@ -56,6 +67,7 @@ struct CollectionView: View {
                             hero
                             regulars
                             filterControl
+                            narrowControls
                             grids
                             TMDBAttribution()
                         }
@@ -67,6 +79,7 @@ struct CollectionView: View {
                             else { withAnimation(Theme.Motion.emphasized) { statsIn = true } }
                         }
                     }
+                    .overlay { detail }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -200,6 +213,7 @@ struct CollectionView: View {
                         Text(f.label)
                         Text("\(count(for: f))")
                             .font(Theme.Font.numeral(.subheadline))
+                            .contentTransition(.numericText(value: Double(count(for: f))))
                             .opacity(0.6)
                             .monospacedDigit()
                     }
@@ -221,42 +235,196 @@ struct CollectionView: View {
         .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
     }
 
+    /// Counts follow the decade and genre narrowing, so each tab says what's
+    /// under it.
     private func count(for f: Filter) -> Int {
         switch f {
-        case .actors: store.actorCount
-        case .movies: store.movieCount
+        case .actors: store.actors(matching: narrow).count
+        case .movies: store.movies(matching: narrow).count
         }
+    }
+
+    // MARK: Narrow — decade and genre
+    //
+    // Two menus under the tabs. Both describe films; on the Actors tab they keep
+    // the actors linked through a matching film. The options come from the Reel
+    // itself, so a choice never comes up empty.
+
+    @ViewBuilder private var narrowControls: some View {
+        if !store.decades.isEmpty || !store.genres.isEmpty {
+            HStack(spacing: Theme.Spacing.sm) {
+                Menu {
+                    Picker("Decade", selection: $narrow.decade) {
+                        Text("Any decade").tag(Int?.none)
+                        ForEach(store.decades, id: \.self) { Text(decadeName($0)).tag(Int?.some($0)) }
+                    }
+                } label: {
+                    pill(narrow.decade.map(decadeName) ?? "Decade", active: narrow.decade != nil)
+                }
+                Menu {
+                    Picker("Genre", selection: $narrow.genre) {
+                        Text("Any genre").tag(Int?.none)
+                        ForEach(genreOptions, id: \.id) { Text($0.name).tag(Int?.some($0.id)) }
+                    }
+                } label: {
+                    pill(narrow.genre.flatMap(ReelGenre.name) ?? "Genre", active: narrow.genre != nil)
+                }
+                Spacer(minLength: 0)
+                if narrow.isActive {
+                    Button("Clear") { narrow = ReelFilter() }
+                        .font(Theme.Font.bodyStrong)
+                        .foregroundStyle(Theme.Color.ink)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Theme.Motion.standard, value: narrow)
+        }
+    }
+
+    private var genreOptions: [(id: Int, name: String)] {
+        store.genres
+            .compactMap { id in ReelGenre.name(id).map { (id: id, name: $0) } }
+            .sorted { $0.name < $1.name }
+    }
+
+    private func decadeName(_ decade: Int) -> String { "\(String(decade))s" }
+
+    private func pill(_ title: String, active: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+        }
+        .font(Theme.Font.button)
+        .textCase(.uppercase)
+        .tracking(Theme.Font.buttonTracking)
+        .foregroundStyle(active ? Theme.Color.onInk : Theme.Color.ink)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .neoSurface(radius: Theme.Radius.pill, fill: active ? Theme.Color.ink : Theme.Color.tile,
+                    shadow: Theme.Shadow.small)
     }
 
     // MARK: Grids
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm), count: 3)
+        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.md), count: 2)
     }
 
     @ViewBuilder private var grids: some View {
         Group {
             switch filter {
             case .actors:
-                grid(store.sortedActors)
+                deck
             case .movies:
-                grid(store.sortedMovies)
+                frames
             }
         }
         // Give each filter its own identity so switching cross-fades and re-deals
-        // the tiles, rather than reflowing one grid's contents into the other's.
+        // the cards, rather than reflowing one grid's contents into the other's.
         .id(filter)
         .transition(.opacity)
+        .animation(Theme.Motion.standard, value: narrow)
     }
 
-    // The tabs above already name the kind and its count, so the grid carries
-    // no header of its own.
-    private func grid(_ items: [CollectedEntity]) -> some View {
-        LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
-                ReelTile(entity: entity, isNew: store.isNew(entity))
-                    .appear(i)
+    // The tabs above already name the kind and its count, so neither grid
+    // carries a header of its own.
+    @ViewBuilder private var deck: some View {
+        let actors = store.actors(matching: narrow)
+        if actors.isEmpty {
+            nothingMatches
+        } else {
+            LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
+                ForEach(Array(actors.enumerated()), id: \.element.id) { i, entity in
+                    Button { expand(entity.id) } label: {
+                        let card = ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+                        if expanded == entity.id {
+                            card.hidden()   // holds the slot while the card is out
+                        } else {
+                            card.reelLift(id: entity.id, in: liftNamespace)
+                        }
+                    }
+                    .buttonStyle(.pressScale)
+                    // Only the first screenful cascades in. The grid is lazy, so
+                    // later cells are made as they scroll in and must arrive solid.
+                    .appear(i, enabled: i < Self.cascadeCount)
+                }
             }
+        }
+    }
+
+    @ViewBuilder private var frames: some View {
+        let movies = store.movies(matching: narrow)
+        if movies.isEmpty {
+            nothingMatches
+        } else {
+            LazyVGrid(columns: columns, alignment: .center, spacing: Theme.Spacing.lg) {
+                ForEach(Array(movies.enumerated()), id: \.element.id) { i, entity in
+                    Button { expand(entity.id) } label: {
+                        VStack(spacing: Theme.Spacing.sm) {
+                            let frame = ReelFrame(entity: entity, isNew: store.isNew(entity))
+                            // The label stays on the wall while its frame is out.
+                            if expanded == entity.id {
+                                frame.hidden()
+                            } else {
+                                frame.reelLift(id: entity.id, in: liftNamespace)
+                            }
+                            ReelFrameCaption(entity: entity)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    .buttonStyle(.pressScale)
+                    .appear(i, enabled: i < Self.cascadeCount)
+                }
+            }
+        }
+    }
+
+    /// Only reachable through the narrowing — e.g. actors on the Movies-only
+    /// side of a filter that matches no linked film.
+    private var nothingMatches: some View {
+        Text("Nothing here yet. Try another decade or genre.")
+            .font(Theme.Font.flourish(.subheadline))
+            .foregroundStyle(Theme.Color.muted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.xl)
+    }
+
+    /// Cells in the first screenful of a grid — the ones that cascade in.
+    private static let cascadeCount = 6
+
+    /// No travel under Reduce Motion: the card fades in place instead.
+    private var liftNamespace: Namespace.ID? { reduceMotion ? nil : lift }
+
+    /// The backdrop fades on its own; the card flies from its slot (identity
+    /// insertion, so it never fades in) and fades out over the card flying home.
+    @ViewBuilder private var detail: some View {
+        ZStack {
+            if expanded != nil {
+                Theme.Color.canvas.opacity(0.92)
+                    .ignoresSafeArea()
+                    .onTapGesture { expand(nil) }
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
+            }
+            if let id = expanded, let entity = store.entities[id] {
+                ReelCardDetail(entity: entity, linked: store.linked(to: entity), model: tierModel,
+                               namespace: liftNamespace, flipped: $flipped) {
+                    expand(nil)
+                }
+                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .identity, removal: .opacity))
+            }
+        }
+    }
+
+    /// Picking a card up is the deliberate moment, with a little settle;
+    /// putting it back is the system answering, so it snaps home.
+    private func expand(_ id: CollectedEntity.ID?) {
+        if id != nil { Haptics.lift() }
+        let animation: Animation = reduceMotion ? Theme.Motion.reducedFade
+            : id != nil ? .spring(duration: 0.4, bounce: 0.15) : Theme.Motion.standard
+        withAnimation(animation) {
+            expanded = id
+            flipped = false
         }
     }
 
@@ -313,109 +481,10 @@ struct TMDBAttribution: View {
     }
 }
 
-// MARK: - Reel tile
-
-/// One collection entry: a poster/headshot (or typographic placeholder) with the
-/// name, a "×N chains" chip, and a "New" badge for this session's discoveries.
-private struct ReelTile: View {
-    let entity: CollectedEntity
-    let isNew: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                entity.kind.accent
-                artContent
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(3.0 / 4.0, contentMode: .fit)
-            .clipped()
-            .overlay(alignment: .topTrailing) { countChip }
-            .overlay(alignment: .topLeading) { if isNew { newBadge } }
-
-            Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
-
-            nameBar
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
-    }
-
-    @ViewBuilder private var artContent: some View {
-        if let url = Config.imageURL(path: entity.imagePath, size: "w185") {
-            AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .empty, .failure:
-                    glyph
-                @unknown default:
-                    glyph
-                }
-            }
-        } else {
-            glyph
-        }
-    }
-
-    private var glyph: some View {
-        Image(systemName: entity.kind.symbol)
-            .font(.system(size: 32))
-            .foregroundStyle(entity.kind.onAccent.opacity(0.5))
-    }
-
-    // A solid name strip under the art, not a gradient scrim over it — the spec
-    // allows no gradients, and ink-on-white reads in both themes.
-    private var nameBar: some View {
-        Text(entity.displayName)
-            .font(Theme.Font.small.weight(.semibold))
-            .foregroundStyle(Theme.Color.ink)
-            .lineLimit(2, reservesSpace: true)
-            .minimumScaleFactor(0.85)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.vertical, Theme.Spacing.xs + 2)
-            .background(Theme.Color.tile)
-    }
-
-    private var countChip: some View {
-        Text("×\(entity.timesLogged)")
-            .font(Theme.Font.numeral(.caption))
-            .monospacedDigit()
-            .foregroundStyle(Theme.Color.ink)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Theme.Color.tile))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .padding(6)
-    }
-
-    private var newBadge: some View {
-        Text("New")
-            .metaLabel(Theme.Color.onAccent, size: .small)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Theme.Color.good))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .padding(6)
-    }
-}
-
 // MARK: - Preview
 
+#if DEBUG
 #Preview {
-    let store = CollectionStore(fileURL: nil)
-    // Seed some sample chains so the preview has content.
-    store.record(chain: [
-        .actor(Person(id: 1, name: "Samuel L. Jackson")),
-        .movie(Movie(id: 680, title: "Pulp Fiction", year: 1994)),
-        .actor(Person(id: 2, name: "Uma Thurman")),
-        .movie(Movie(id: 24, title: "Kill Bill", year: 2003)),
-    ])
-    store.record(chain: [
-        .actor(Person(id: 1, name: "Samuel L. Jackson")),
-        .movie(Movie(id: 954, title: "Mission: Impossible", year: 1996)),
-        .actor(Person(id: 3, name: "Tom Cruise")),
-    ])
-    return CollectionView(store: store)
+    CollectionView(store: .demo(), bestChain: 11)
 }
+#endif

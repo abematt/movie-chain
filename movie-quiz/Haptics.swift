@@ -56,6 +56,15 @@ enum Haptics {
         #endif
     }
 
+    /// Picking a card up out of the Reel: a light tap, the weight of a card
+    /// leaving the table.
+    static func lift() {
+        #if os(iOS)
+        lightGen.impactOccurred()
+        lightGen.prepare()
+        #endif
+    }
+
     /// A correct link. Intensity ramps with the streak so link #12 lands heavier
     /// than link #2 — the chain literally feels weightier as it grows.
     static func correct(streak: Int) {

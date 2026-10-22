@@ -230,10 +230,21 @@ style). The single logging rule lives in `record(chain:)`, called from
 `endGame()` only when `chain.count >= 2` **and the run is Hardcore** — those two
 conditions encode "successful combinations only, seed counts once a link lands, bare
 seed logs nothing, and nothing logged for a run where the answers were shown to
-you". Pure count stats only (no rarity). Tiles stream art via `AsyncImage`
-from `Config.imageURL(path:)` (system-cached, never stored on disk; nil path →
-typographic placeholder), fed by the new `imagePath` on `Person`/`Movie`. The
-store is owned at the app root and injected into the engine.
+you". Pure count stats from your own play — no TMDB rarity. `record` also links
+each adjacent pair both ways (`CollectedEntity.links`), so **actors are playing
+cards earned through the films linked through them** and **movies are framed
+posters**; either flips over to the other side of its links (no progress for movies
+— a cast is never completable). No numbers on the fronts; the finish is the reward.
+`ReelCards.swift` draws both. The Reel narrows by decade and genre (`ReelFilter`:
+films match directly, actors through a linked film; genre ids ride along on every
+TMDB movie response, names are a fixed table). An actor card's finish (paper / inked / holo) comes
+from the pure, tested `ReelTier`, under a model set in Settings → Reel cards (Rank
+default, Share, Plain) while they're compared. Share scales to a well-known-films
+snapshot the engine takes from the filmography it already loads — **no extra TMDB
+request; never add a fetch on Reel open**. Art streams via `AsyncImage` from
+`Config.imageURL(path:)` (system-cached, never stored on disk; nil path →
+monogram). The store is owned at the app root and injected into the engine.
+`-uiDemoReel -uiOpenReel` (DEBUG) opens a demo Reel without touching the saved one.
 
 **UI (NYT-Games / Connections treatment)** — `ContentView.swift` routes on
 `engine.phase` between `SeedView`, `GameView`, and `GameOverView` with a

@@ -46,6 +46,17 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
     /// Number of distinct completed chains this entity has appeared in — the
     /// "in N chains" figure. Incremented once per chain, never per submission.
     var timesLogged: Int
+    /// TMDB ids of the other kind linked *through* this one — an actor's films,
+    /// a movie's actors — taken from adjacent pairs in your chains, so only links
+    /// you actually made. On an actor this is the card's number.
+    var links: Set<Int>
+    /// Actors only: how many of their films are well known (see
+    /// `Config.wellKnownVoteCount`) as of the last time their filmography loaded
+    /// in play. `nil` until it has; the Share tiers scale to it.
+    var wellKnownFilms: Int?
+    /// Movies only: TMDB genre ids, for the Reel's genre filter. Empty for films
+    /// logged before genres were recorded, until they come up again.
+    var genres: [Int]
 
     /// Matches `ChainNode.id` ("p{id}" people, "m{id}" movies) so the store keys
     /// line up exactly with the game's no-repeat ids.
@@ -62,13 +73,61 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
         switch node {
         case .actor(let p):
             kind = .actor; tmdbID = p.id; name = p.name; year = nil; imagePath = p.imagePath
+            genres = []
         case .movie(let m):
             kind = .movie; tmdbID = m.id; name = m.title; year = m.year; imagePath = m.imagePath
+            genres = m.genreIDs
         }
         firstSeen = now
         lastSeen = now
         timesLogged = 1
+        links = []
+        wellKnownFilms = nil
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, tmdbID, name, year, imagePath, firstSeen, lastSeen, timesLogged
+        case links, wellKnownFilms, genres
+    }
+
+    /// Hand-written so a Reel saved before `links` existed still decodes (with
+    /// none). A failed decode makes `CollectionStore.load` start empty, which
+    /// would wipe the player's whole collection.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(NodeKind.self, forKey: .kind)
+        tmdbID = try c.decode(Int.self, forKey: .tmdbID)
+        name = try c.decode(String.self, forKey: .name)
+        year = try c.decodeIfPresent(Int.self, forKey: .year)
+        imagePath = try c.decodeIfPresent(String.self, forKey: .imagePath)
+        firstSeen = try c.decode(Date.self, forKey: .firstSeen)
+        lastSeen = try c.decode(Date.self, forKey: .lastSeen)
+        timesLogged = try c.decode(Int.self, forKey: .timesLogged)
+        links = try c.decodeIfPresent(Set<Int>.self, forKey: .links) ?? []
+        wellKnownFilms = try c.decodeIfPresent(Int.self, forKey: .wellKnownFilms)
+        genres = try c.decodeIfPresent([Int].self, forKey: .genres) ?? []
+    }
+}
+
+// MARK: - ReelFilter
+
+/// What the Reel is narrowed to. Both filters describe films: a movie passes
+/// on its own year and genres, an actor when a film linked through them does.
+struct ReelFilter: Equatable {
+    /// The decade's first year: 1990 means the 1990s.
+    var decade: Int?
+    /// A TMDB genre id.
+    var genre: Int?
+
+    var isActive: Bool { decade != nil || genre != nil }
+
+    func admits(movie: CollectedEntity) -> Bool {
+        if let decade, movie.year.map(Self.decade(of:)) != decade { return false }
+        if let genre, !movie.genres.contains(genre) { return false }
+        return true
+    }
+
+    static func decade(of year: Int) -> Int { year / 10 * 10 }
 }
 
 // MARK: - CollectionStore
@@ -114,12 +173,23 @@ final class CollectionStore {
     /// caller (`GameEngine.endGame`) only invokes this for chains of length ≥ 2;
     /// the guard here is belt-and-suspenders. Returns the number of brand-new
     /// entities added — the "+N to your Reel" figure.
+    ///
+    /// Each adjacent pair is linked both ways (`links`), and `wellKnownFilms`
+    /// (actor TMDB id → count, gathered by the engine as filmographies loaded
+    /// this run) refreshes each actor's snapshot.
     @discardableResult
-    func record(chain: [ChainNode]) -> Int {
+    func record(chain: [ChainNode], wellKnownFilms: [Int: Int] = [:]) -> Int {
         guard chain.count >= 2 else { return 0 }
         let now = clock()
         var added = 0
         for node in chain where upsert(node, at: now) { added += 1 }
+        for (a, b) in zip(chain, chain.dropFirst()) {
+            entities[a.id]?.links.insert(b.tmdbID)
+            entities[b.id]?.links.insert(a.tmdbID)
+        }
+        for (actorID, count) in wellKnownFilms {
+            entities["p\(actorID)"]?.wellKnownFilms = count
+        }
         chainsLogged += 1
         save()
         return added
@@ -133,6 +203,7 @@ final class CollectionStore {
             existing.lastSeen = now
             // Fill in art if a later encounter carried it.
             if existing.imagePath == nil { existing.imagePath = node.imagePath }
+            if existing.genres.isEmpty { existing.genres = node.genreIDs }
             entities[key] = existing
             return false
         } else {
@@ -149,9 +220,46 @@ final class CollectionStore {
     var total: Int { entities.count }
     var isEmpty: Bool { entities.isEmpty }
 
-    /// Most-logged first, then most-recent — the grid and "regulars" ordering.
+    /// Most links first, then most-logged, then most-recent — the deck's order,
+    /// so the cards with the highest numbers lead.
     var sortedActors: [CollectedEntity] { sorted(.actor) }
     var sortedMovies: [CollectedEntity] { sorted(.movie) }
+
+    /// The deck narrowed by `filter`: movies on their own year and genres,
+    /// actors when any film linked through them passes.
+    func movies(matching filter: ReelFilter) -> [CollectedEntity] {
+        filter.isActive ? sortedMovies.filter(filter.admits) : sortedMovies
+    }
+
+    func actors(matching filter: ReelFilter) -> [CollectedEntity] {
+        guard filter.isActive else { return sortedActors }
+        let films = Set(movies(matching: filter).map(\.tmdbID))
+        return sortedActors.filter { !$0.links.isDisjoint(with: films) }
+    }
+
+    /// The decades among logged films, newest first — the filter's options, so
+    /// it never offers one that would come up empty.
+    var decades: [Int] {
+        Set(entities.values.lazy.filter { $0.kind == .movie }.compactMap(\.year).map(ReelFilter.decade(of:)))
+            .sorted(by: >)
+    }
+
+    /// The genre ids among logged films, unordered (the view sorts by name).
+    var genres: Set<Int> {
+        Set(entities.values.lazy.filter { $0.kind == .movie }.flatMap(\.genres))
+    }
+
+    /// The entities linked through `entity`: an actor's films newest first, or a
+    /// movie's actors most-linked first. Every id resolves, since both ends of a
+    /// link are recorded in the same chain.
+    func linked(to entity: CollectedEntity) -> [CollectedEntity] {
+        let prefix = entity.kind == .actor ? "m" : "p"
+        let found = entity.links.compactMap { entities["\(prefix)\($0)"] }
+        if entity.kind == .actor {
+            return found.sorted { ($0.year ?? 0, $1.name) > ($1.year ?? 0, $0.name) }
+        }
+        return found.sorted(by: Self.deckOrder)
+    }
 
     var mostLoggedActor: CollectedEntity? { mostLogged(.actor) }
     var mostLoggedMovie: CollectedEntity? { mostLogged(.movie) }
@@ -172,7 +280,7 @@ final class CollectionStore {
     private func sorted(_ kind: NodeKind) -> [CollectedEntity] {
         entities.values
             .filter { $0.kind == kind }
-            .sorted(by: Self.loggedOrder)
+            .sorted(by: Self.deckOrder)
     }
 
     /// The first entry of `sorted(kind)`, in one pass instead of a full sort.
@@ -180,6 +288,12 @@ final class CollectionStore {
         entities.values.lazy
             .filter { $0.kind == kind }
             .min(by: Self.loggedOrder)
+    }
+
+    /// Most links first, then `loggedOrder`.
+    private static func deckOrder(_ a: CollectedEntity, _ b: CollectedEntity) -> Bool {
+        if a.links.count != b.links.count { return a.links.count > b.links.count }
+        return loggedOrder(a, b)
     }
 
     /// Most-logged first, then most-recent.
