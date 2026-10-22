@@ -66,6 +66,11 @@ struct ContentView: View {
         .overlay { HandoffFlight() }
         .coordinateSpace(.named(HandoffStage.space))
         .environment(handoff)
+        // A run that ends mid-flight (Quit is live during it) takes the copies
+        // with it, rather than leaving them over the game-over screen.
+        .onChange(of: engine.phase) { _, phase in
+            if phase != .playing { handoff.finish() }
+        }
         .onChange(of: scenePhase) { old, phase in
             // Guarantee the latest collection snapshot is on disk before the app
             // is suspended/killed, not just eventually via the async save.

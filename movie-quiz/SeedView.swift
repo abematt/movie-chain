@@ -326,7 +326,7 @@ struct SeedView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(BlankButtonStyle())
-        .disabled(engine.dealtSeed == nil)
+        .disabled(engine.dealtSeed == nil || handingOff)
         .handoffSource(.blank, stage)
         .opacity(handingOff ? 0 : 1)
         .animation(Theme.Motion.standard, value: engine.dealtSeed?.nextKind)
@@ -384,7 +384,9 @@ struct SeedView: View {
     }
 
     private func startFromBlank() {
-        guard let seed = engine.dealtSeed else { return }
+        // One handoff per run: the blank hides at opacity 0, which still takes
+        // taps, and a second `begin` would start a flight with no frames to fly.
+        guard !handingOff, let seed = engine.dealtSeed else { return }
         Haptics.selection()
         // Under Reduce Motion there's no flight: the screens just cross-fade.
         if !reduceMotion { stage?.begin(with: seed) }

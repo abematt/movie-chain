@@ -313,10 +313,12 @@ final class GameEngine {
 
     /// Fetch `node`'s candidates ahead of play — the home calls this once a dealt
     /// start has settled on screen. A fetch already in flight for the same node is
-    /// kept, not repeated; one for a different node is replaced. A failure just
-    /// means `startGame` loads them itself.
+    /// kept, not repeated; one for a different node is cancelled and replaced (so
+    /// a run of Deal agains doesn't leave requests running against the rate
+    /// limit). A failure just means `startGame` loads them itself.
     func prefetchCandidates(for node: ChainNode) {
         guard prefetch?.id != node.id else { return }
+        prefetch?.task.cancel()
         prefetch = (node.id, Task { try? await fetchCandidates(for: node) })
     }
 
