@@ -64,7 +64,7 @@ enum ReelLayout {
     /// across on a phone — before `ReelCanvas` scales them.
     static let designWidth: CGFloat = 110
     /// How wide a lifted card or frame is shown.
-    static let liftedWidth: CGFloat = 240
+    static let liftedWidth: CGFloat = 300
     /// Art size for grid slots — and the one warmed at launch.
     static let artSize = "w342"
     /// The sharper art a lifted card swaps to once it has loaded.
@@ -97,9 +97,9 @@ struct ReelActorCard: View {
     var isNew = false
     /// Lifted: swap the art for a sharper image once it has loaded.
     var sharpArt = false
-    /// Lifted: the laminate glare that catches the light, and a shadow that falls
-    /// on the table (`TableShadow`) rather than being printed on the card. Grid
-    /// cards are matte. Tilt itself arrives through `\.cardTilt`, read only by
+    /// Lifted: the laminate glare that catches the light, and no hard shadow —
+    /// a shadow under a card tipping in 3D never looked attached to it. Grid
+    /// cards are matte and keep theirs. Tilt itself arrives through `\.cardTilt`, read only by
     /// the leaf views below, so a tilt frame never re-runs this body.
     var lifted = false
 
@@ -178,6 +178,9 @@ struct ReelFrame: View {
     var isNew = false
     /// Lifted: swap the poster for a sharper image once it has loaded.
     var sharpArt = false
+    /// Lifted: glass over the poster that catches the light, the poster sitting
+    /// a little behind it, and no hard shadow (as `ReelActorCard.lifted`).
+    var lifted = false
 
     private static let mat: CGFloat = 7
     private static let moulding: CGFloat = 4
@@ -191,9 +194,14 @@ struct ReelFrame: View {
     }()
 
     var body: some View {
-        ReelArt(path: entity.imagePath, kind: .movie, name: entity.name,
-                sharpSize: sharpArt ? ReelLayout.liftedArtSize : nil)
+        ReelParallax {
+            ReelArt(path: entity.imagePath, kind: .movie, name: entity.name,
+                    sharpSize: sharpArt ? ReelLayout.liftedArtSize : nil)
+        }
             .aspectRatio(2.0 / 3.0, contentMode: .fit)
+            // Trims the parallax's overscan to the mat's window.
+            .clipped()
+            .overlay { if lifted { ReelGlare() } }
             .overlay(Rectangle().strokeBorder(Theme.Color.border, lineWidth: 0.75))
             .padding(Self.mat)
             .background(Theme.Color.tile)
@@ -201,8 +209,12 @@ struct ReelFrame: View {
             .overlay(Rectangle().strokeBorder(Theme.Color.hairline, lineWidth: 0.75).padding(0.75))
             .padding(Self.moulding)
             .background(Theme.Color.ink)
-            .background(Rectangle().fill(Theme.Color.shadow)
-                .offset(x: Theme.Shadow.small, y: Theme.Shadow.small))
+            .background {
+                if !lifted {
+                    Rectangle().fill(Theme.Color.shadow)
+                        .offset(x: Theme.Shadow.small, y: Theme.Shadow.small)
+                }
+            }
             .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 3, y: -5) } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(entity.displayName)
@@ -235,10 +247,10 @@ struct ReelFrameCaption: View {
 
 /// An actor card or framed poster lifted out of the grid, with its dimmed
 /// backdrop and Flip/Close controls. It turns over on a tap: an actor's back
-/// lists the films linked through them, a movie's the actors. An actor card
-/// tips with the phone (or a finger) here, and only here: its glare and holo
-/// foil catch the light, its photo shifts behind the face, and its shadow
-/// slides across the table (see `CardTilt`).
+/// lists the films linked through them, a movie's the actors. Either one tips
+/// with the phone (or a finger) here, and only here: glare catches the card's
+/// laminate or the frame's glass, a holo card's foil shimmers, and the photo or
+/// poster shifts behind the face (see `CardTilt`).
 ///
 /// The card makes the whole journey itself, drawn above everything: it starts
 /// exactly over its grid slot (`slot`), scaled down to it, grows to the centre,
@@ -265,7 +277,7 @@ struct ReelCardDetail: View {
     /// The card is out (the open animation drives this to true).
     @State private var arrived = false
     @State private var settled = false
-    /// The card's live tilt — actor cards only, never under Reduce Motion.
+    /// The card's live tilt — never under Reduce Motion.
     @State private var tilt: CardTilt?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -303,7 +315,7 @@ struct ReelCardDetail: View {
         .environment(\.cardTilt, tilt)
         .accessibilityAction(.escape, close)
         .onAppear {
-            guard isActor, !reduceMotion else { return }
+            guard !reduceMotion else { return }
             let t = CardTilt()
             t.start()
             tilt = t
@@ -320,7 +332,7 @@ struct ReelCardDetail: View {
             Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
             Button("Close", action: close).buttonStyle(.ghost)
         }
-        .frame(width: 270)
+        .frame(width: ReelLayout.liftedWidth)
     }
 
     /// The front is the grid's own drawing, scaled up (`ReelCanvas`); the back
@@ -338,23 +350,17 @@ struct ReelCardDetail: View {
                 if first { takeOff() }
             }
             .overlay {
-                ZStack {
-                    // On the table, under the card: flies with it, never tips.
-                    if isActor {
-                        TableShadow(angle: reduceMotion ? 0 : (flipped ? 180 : 0))
-                    }
-                    faces
-                        .contentShape(Rectangle())
-                        .onTapGesture(perform: toggle)
-                        // A drag tips the card (no gyro needed); a tap still flips.
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 4)
-                                .onChanged { value in tilt?.dragChanged(value.translation) }
-                                .onEnded { value in tilt?.dragEnded(velocity: value.velocity) }
-                        )
-                        .modifier(CardTiltRotation())
-                }
-                .modifier(LiftFlight(progress: travels ? (out ? 1 : 0) : 1, from: slot, to: rest))
+                faces
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: toggle)
+                    // A drag tips the card (no gyro needed); a tap still flips.
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 4)
+                            .onChanged { value in tilt?.dragChanged(value.translation) }
+                            .onEnded { value in tilt?.dragEnded(velocity: value.velocity) }
+                    )
+                    .modifier(CardTiltRotation())
+                    .modifier(LiftFlight(progress: travels ? (out ? 1 : 0) : 1, from: slot, to: rest))
                 // Hidden until measured, so its first frame is over the slot
                 // rather than flashing at the centre; without travel, it fades.
                 .opacity(rest == nil ? 0 : travels ? 1 : (out ? 1 : 0))
@@ -404,7 +410,7 @@ struct ReelCardDetail: View {
             if isActor {
                 ReelActorCard(entity: entity, sharpArt: true, lifted: true)
             } else {
-                ReelFrame(entity: entity, sharpArt: true)
+                ReelFrame(entity: entity, sharpArt: true, lifted: true)
             }
         }
     }
@@ -442,9 +448,8 @@ struct ReelCardDetail: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Theme.Color.tile)
         .clipShape(RoundedRectangle(cornerRadius: isActor ? Theme.Radius.md : 0))
-        // An actor's shadow is the table's (`TableShadow`); a movie keeps its own.
-        .neoSurface(radius: isActor ? Theme.Radius.md : 0, fill: .clear,
-                    shadow: isActor ? 0 : Theme.Shadow.large)
+        // No shadow on a lifted card, either face (see `ReelActorCard.lifted`).
+        .neoSurface(radius: isActor ? Theme.Radius.md : 0, fill: .clear, shadow: 0)
     }
 
     @ViewBuilder private func row(_ other: CollectedEntity) -> some View {
@@ -484,33 +489,6 @@ struct ReelCardDetail: View {
                 .font(Theme.Font.flourish(.footnote))
                 .foregroundStyle(Theme.Color.muted)
         }
-    }
-}
-
-/// The lifted card's shadow, cast on the table rather than printed on the
-/// card: it stays flat while the card tips, slides away from the tilt, and
-/// narrows as the card turns edge-on. At rest it matches the grid card's own
-/// shadow exactly, so the card lands on its slot without a seam.
-private struct TableShadow: View, Animatable {
-    /// The flip's angle, animated by the same spring as the flip.
-    var angle: Double
-    @Environment(\.cardTilt) private var tilt
-
-    var animatableData: Double {
-        get { angle }
-        set { angle = newValue }
-    }
-
-    var body: some View {
-        let k = ReelLayout.liftedWidth / ReelLayout.designWidth
-        let rest = Theme.Shadow.small * k
-        let t = tilt?.value ?? .zero
-        RoundedRectangle(cornerRadius: Theme.Radius.sm * k)
-            .fill(Theme.Color.shadow)
-            .scaleEffect(x: max(0.02, abs(cos(angle * .pi / 180))), y: 1)
-            .offset(x: rest - t.width * 5, y: rest - t.height * 5)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }
 

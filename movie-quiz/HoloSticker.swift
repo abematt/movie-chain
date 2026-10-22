@@ -294,11 +294,13 @@ final class TiltMotion {
     @ObservationIgnored private var baseline: CGSize?
     @ObservationIgnored private lazy var frames = DisplayLink { [weak self] dt in self?.advance(dt) }
 
-    /// Light smoothing so sensor jitter doesn't shimmer the foil (seconds).
-    private static let smoothing = 0.093
+    /// Light smoothing so sensor jitter doesn't shimmer the foil (seconds). Any
+    /// more and a lifted card feels heavy, trailing the phone.
+    private static let smoothing = 0.04
     /// How long a held angle takes to become "level" (seconds).
     private static let drift = 1.65
-    private static let gain: CGFloat = 3
+    /// How far the phone turns for a full tilt: 1 / gain of gravity, ~15°.
+    private static let gain: CGFloat = 4
 
     var isAvailable: Bool { manager.isDeviceMotionAvailable }
 

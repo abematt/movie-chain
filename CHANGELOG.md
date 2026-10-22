@@ -36,10 +36,10 @@ Unspool rebrand was inserted as 0.6.0.)
 
 ### Added
 
-- **A lifted Reel card is a card in your hand.** Pick up an actor and it tips with the
-  phone: the photo shifts behind the face, light slides across the laminate, a holo
-  card's foil shimmers, and its shadow moves across the table underneath it rather than
-  being printed on it. No gyro, or holding still? Drag it with a finger, and it swings
+- **A lifted Reel card is a card in your hand.** Pick up an actor or a film and it tips
+  with the phone: the photo or poster shifts behind the face, light slides across the
+  card's laminate or the frame's glass, and a holo card's foil shimmers. It comes out bigger than before, and without a hard shadow —
+  under a card tipping in 3D, one never looked attached. No gyro, or holding still? Drag it with a finger, and it swings
   back level carrying the flick. It flies out and home flat, so it still lands exactly
   on its slot, and Reduce Motion keeps it still with a quiet sheen.
 

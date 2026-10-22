@@ -9,7 +9,7 @@ built. Each plan is self-contained; run them in order.
 | 001 | [Run the tilt on the display clock](001-tilt-on-the-display-clock.md) | MEDIUM | — | DONE (120Hz key reverted — see note) |
 | 002 | [Move the holo foil by transform](002-foil-moves-by-transform.md) | HIGH | — | DONE |
 | 003 | [Lifted card tilts from leaf views](003-lifted-card-tilts-from-a-leaf-layer.md) | HIGH | 001, 002 | DONE |
-| 004 | [Table shadow for the lifted card](004-table-shadow-for-the-lifted-card.md) | HIGH | 003 | DONE |
+| 004 | [Table shadow for the lifted card](004-table-shadow-for-the-lifted-card.md) | HIGH | 003 | DROPPED after device test |
 | 005 | [Drag to tilt, spring back with the flick](005-drag-to-tilt-fallback.md) | MEDIUM | 001, 003 | DONE |
 
 ## Order
@@ -47,3 +47,7 @@ build on it.
 - **003–005** were built together; `-uiLiftFirst` (DEBUG) was added to lift the first
   card for checking. Device feel-checks (gyro, shadow/flick signs, frame rate) are
   still to do.
+- **Device test (iPhone 16 Pro)**: tilt felt heavy → smoothing 0.093 s → 0.04 s and
+  gain 3 → 4; lifted width 240 → 300pt. The table shadow looked off in both forms
+  (flat slab, then tipped silhouette) and was removed: the lifted actor card has no
+  shadow. Flick and mid-tilt landing felt right as built.
