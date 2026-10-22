@@ -4,7 +4,7 @@
 //
 //  End-of-run summary: final score, a quiet "new best" mark, the near-miss that
 //  ended the run, the full chain revealed (as compact cards, or as category
-//  tiles under the prototype's tile style), a share card, and a play-again.
+//  tiles under the Tiles chain style), a share card, and a play-again.
 //
 
 import SwiftUI
@@ -23,7 +23,7 @@ struct GameOverView: View {
     /// (fast), `stickerPressed` smooths it down from a big peel to a slight one.
     @State private var stickerPlaced = false
     @State private var stickerPressed = false
-    /// Prototype switch: the recap follows the play screen's chain treatment.
+    /// The player's chain style: the recap follows the play screen's treatment.
     @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     var body: some View {

@@ -74,9 +74,11 @@ changelog table before choosing a bump**. Each is documented in
 the relevant section before starting one.
 
 > Note: the visual design is **Cream Neobrutalist** as of 0.5.0 — no longer
-> placeholder. The chain is drawn as **cards** (`ChainCards.swift`); the old tile
-> stack stays behind Settings → Chain style until motion work confirms the cards, then
-> it should be deleted. **Motion is the open piece** (0.5.x). The recurring
+> placeholder. How the chain is drawn is a **player setting** (Settings → Chain style):
+> **Deck** (`ChainDeck.swift`, the default — a physical pile that fills the space above
+> the keyboard), **Cards** (`ChainCards.swift`) and **Tiles** (`ChainStack.swift`). All
+> three are kept on purpose; keep them working when touching the chain. The 0.5.x
+> motion re-tune is on `feature_motion-overhaul`. The recurring
 > constraint is still vertical room against the docked keyboard. Vocabulary is fixed:
 > a *chain* is a whole run, a *link* is one correct answer (the score counts links),
 > the dealt start is not a link, and the best run is the most links with points
@@ -258,11 +260,15 @@ per-node category identity — **blue = actor, yellow = movie**) and
 (`.appear(i)`)), all built on the
 Cream Neobrutalist palette (0.5.0) defined in `Assets.xcassets`
 (Canvas/Ink/Tile/Shadow/Hairline/Coral/ActorBlue/MovieYellow/Good/OnAccent, each
-light+dark). The play screen draws the chain as **cards** by default
-(`ChainCards.swift`: a hero card for the newest link, compact cards for the two
-before it); Settings → Chain style switches back to the tile stack for comparison. The signature visual is
-`ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category
-tiles** — a new link drops in and older ones collapse into "+N earlier". The play
+light+dark). The chain has three player-selectable styles (Settings → Chain style,
+`ChainStyle`): **Deck** by default (`ChainDeck.swift`: every link is one card for its
+whole life — a new one is dealt in from below and pushes the last back into a pile
+that peeks out above it, sized to the room above the keyboard), **Cards**
+(`ChainCards.swift`: a hero card for the newest link, compact cards for the two before
+it) and **Tiles** (`ChainStack.swift`: a **rising Tetris-style stack of category
+tiles** — a new link drops in and older ones collapse into "+N earlier"). The dealt
+start wears a holographic sticker (`HoloSticker.swift`, gyro-lit foil) instead of a
+number, as does a new best on game over. The play
 screen docks the text input via `.safeAreaInset(.bottom)` above the
 **always-present keyboard** (with `TimerBar.swift` as a slim linear countdown), and
 swaps it for a **Retry** button if a candidate load failed

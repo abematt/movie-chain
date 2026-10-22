@@ -34,11 +34,11 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ### Added
 
-- **Chain style → Deck (prototype).** The chain as a physical pile: each new link is
+- **Chain style → Deck, now the default.** The chain as a physical pile: each new link is
   dealt in from below and pushes the previous card back (smaller, higher, shadow
-  sinking), two cards peek out with their names, and the next one back tucks under
-  the pile. Nothing cross-fades. It sits beside Cards and Tiles in Settings so the
-  three can be judged on a device; the losers get deleted. The pile fills whatever
+  sinking), earlier cards peek out with their names, and the oldest tucks under the
+  pile. Nothing cross-fades. Cards and Tiles stay available in Settings → Chain style
+  as a player preference (the setting is no longer labelled a prototype). The pile fills whatever
   height the screen can spare above the keyboard — named peeks while they fit, then
   card edges for the pile's thickness.
 - **Holographic stickers.** The dealt start wears a foil "START" flag instead of a

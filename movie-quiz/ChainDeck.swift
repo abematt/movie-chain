@@ -2,7 +2,7 @@
 //  ChainDeck.swift
 //  movie-quiz
 //
-//  Prototype (Settings → Chain style → Deck): the chain as a physical pile of
+//  The default chain style (Settings → Chain style → Deck): the chain as a physical pile of
 //  cards. Every link is the same full-size card for its whole life — when a new
 //  link is dealt in from below, the card it lands on is *pushed back* into the
 //  pile (smaller, higher, its shadow sinking) instead of being swapped for a
@@ -14,8 +14,6 @@
 //  thickness), and anything older tucks under and counts into "+N earlier".
 //  Each step back peeks a little less and shrinks a little more, so the pile
 //  reads in perspective.
-//
-//  To drop the prototype, delete this file and the `.deck` case.
 //
 
 import SwiftUI

@@ -15,8 +15,8 @@
 //    • Anything older collapses into "+N earlier".
 //
 //  Newest sits at the bottom, nearest the docked input, so the eye travels from
-//  "what I'm linking from" straight to "where I type". Settings → Chain style
-//  switches between this and the tile stack for side-by-side judging on device.
+//  "what I'm linking from" straight to "where I type". One of the three chain
+//  styles a player can pick in Settings → Chain style (see `ChainStyle`).
 //
 
 import SwiftUI
@@ -247,10 +247,10 @@ private struct DevelopingImage: View {
     }
 }
 
-// MARK: - Chain style switch (prototype)
+// MARK: - Chain style
 
-/// Which chain treatment the play screen draws. A prototype switch so the
-/// candidates can be judged running on a device; delete it once one wins.
+/// Which chain treatment the play screen draws — a player preference in
+/// Settings, persisted under the `chainStyle` key. Deck is the default.
 enum ChainStyle: String, CaseIterable, Identifiable {
     case cards
     /// Same cards, but earlier links are pushed back into a physical pile

@@ -17,7 +17,7 @@ struct GameView: View {
 
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Prototype switch between chain treatments (Settings → Chain style).
+    /// The player's chain style (Settings → Chain style); Deck by default.
     @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     @State private var answer = ""

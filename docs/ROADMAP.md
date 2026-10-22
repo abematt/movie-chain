@@ -56,9 +56,10 @@ keep the endless mode as the always-available path.)*
 > Neobrutalist** — cream canvas, white cards with a 2pt ink border and a hard offset
 > shadow, a coral call-to-action, Fraunces for display type and numerals, blue = actor,
 > yellow = movie. The chain is drawn as **cards** (a hero card for the newest link,
-> compact cards for earlier ones); the old tile stack survives behind a Settings switch
-> until the card treatment is confirmed with motion. **Still open: the motion re-tune**,
-> which follows as 0.5.x. Details of what changed are in the
+> compact cards for earlier ones). **Motion re-tune (0.5.x, `feature_motion-overhaul`):**
+> the prototyping below settled on a **Deck** — a physical pile — as the default, and
+> rather than deleting the losers, all three treatments (Deck, Cards, Tiles) stay as a
+> player setting. Details of what changed are in the
 > [changelog](../CHANGELOG.md). The planning notes below are kept as written.
 
 **The current look is placeholder.** It's a competent NYT-Games/Connections pastiche, but
