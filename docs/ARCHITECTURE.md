@@ -352,10 +352,13 @@ pure-value + observable-store split as the rest of the app:
   movies as framed posters. No numbers are printed on the fronts. Tapping either
   lifts it out and flips it to the other side of its links — an actor's films, a
   movie's actors. Genres come from `genre_ids` on every TMDB movie response
-  (`Movie.genreIDs`), named from a fixed table (`ReelGenre`). Finishes (paper / inked / holo) come from `ReelTier` under the
-  Settings → Reel cards model; Share reads `wellKnownFilms`, a count the engine
-  snapshots from the filmography it already fetched for that actor's turn, so the
-  Reel costs no TMDB requests. Cards, stamps and tiers live in `ReelCards.swift`. Also
+  (`Movie.genreIDs`), named from a fixed table (`ReelGenre`). Finishes (paper /
+  inked at 5 links / holo at 11) come from `ReelTier`, so the Reel costs no TMDB
+  requests. Three across: cards and frames are drawn once at a design width and
+  scaled (`ReelCanvas`), which makes the lift a pure zoom. Art reads through
+  `ArtCache` (memory + disk cache, off-main decode) so a reopened Reel draws at
+  once; the first screen is warmed at launch. Cards, frames and tiers live in
+  `ReelCards.swift`. Also
   hosts the **`TMDBAttribution`** view (TMDB logo + the required non-endorsement
   disclaimer) in both its populated and empty states — TMDB's API terms require
   in-app attribution. Because of that, the seed-screen Reel pill is shown
@@ -438,20 +441,14 @@ small, bold, uppercase and tracked.
   yet arrive **solid** on a "Play again" re-entry, so they don't run their own
   motion *while the carousel is already pushing the screen in* (that clash read as
   whiplash).
-- Feature components in their own files: [`ChainStack.swift`](../movie-quiz/ChainStack.swift)
-  is the signature visual — the chain as a **rising Tetris-style stack of category
-  tiles**: each accepted link drops in from the top and the column builds; in the
-  play window older links collapse into "+N earlier" to fit the band above the
-  keyboard, while the game-over recap shows the whole chain numbered and, via
-  `staggered:`, reveals its tiles one-after-another (through `StaggeredAppear`) as
-  a rare end-of-run delight beat — a no-op during play, where tiles land
-  individually on the `drop` transition.
-  **`ChainStack` was replaced as the default by `ChainCards` in the 0.5.0 overhaul** — the replacement
-  isn't decided (a stacked list of cards is the leading candidate). Worth knowing: its
-  *information architecture* (stack, collapse older, emphasise newest) probably survives
-  whatever wins, so the change may be a re-skin of this component rather than a new
-  layout model. See [`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul) for the open
-  options and the vertical-room constraint against the docked keyboard.
+- Feature components in their own files: [`ChainDeck.swift`](../movie-quiz/ChainDeck.swift)
+  is the signature visual — every link is one card for its whole life: a new one is
+  dealt in from below and pushes the last back into a pile that peeks out above it,
+  sized to the room above the keyboard. [`ChainCards.swift`](../movie-quiz/ChainCards.swift)
+  holds the pieces it shares with the game-over recap (`CompactChainCard`, `KindChip`,
+  `ChainArt`). The original `ChainStack` tile stack, and the Cards style that briefly
+  replaced it, sat behind a Settings → Chain style picker until the Deck won; both
+  were removed.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
   (drains in ink, shifts to a warning red in the final quarter).
 - App-wide `.tint(.accentColor)` (ink) is applied once at the root in
@@ -529,7 +526,7 @@ small, bold, uppercase and tracked.
     controls are inert until assembly, so the catcher never eats a real tap).
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·
   seconds · quit) + `TimerBar`, the centered **serif score hero** (chain number +
-  points), the rising `ChainStack`, and the next-up hint, with the answer input
+  points), the `ChainDeck`, and the next-up hint, with the answer input
   **docked via `.safeAreaInset(.bottom)`** directly above the keys (auto-focused;
   the keyboard's Go submits) — laid out around the **always-present software
   keyboard**, the dominant constraint of a typing game. A **Retry** button replaces
@@ -540,8 +537,8 @@ small, bold, uppercase and tracked.
   points, a quiet "a new best" mark (a serif-italic green pill, no confetti), the
   **Personal best fenced between hairlines** so it never reads as this run, the
   "you were one away" near-miss, **a "+N new to your Reel" line that opens the
-  collection sheet**, the full chain revealed as a numbered `ChainStack`
-  recap, and **Play again** + **Share** (the 🟦🟪 card).
+  collection sheet**, the full chain revealed as a numbered recap of
+  compact cards, and **Play again** + **Share** (the 🟦🟪 card).
 - [`SettingsView.swift`](../movie-quiz/SettingsView.swift) — the app's settings
   surface, a `.sheet` opened from a **gear pill** on `SeedView` (mirroring the Reel
   pill on the opposite corner). A small on-brand card layout (not a stock grouped

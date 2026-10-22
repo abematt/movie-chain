@@ -18,6 +18,7 @@ struct ContentView: View {
     /// each return to `.seed`) starts assembled. Owned here, above `SeedView`, and
     /// kept out of `GameEngine` so the engine stays free of view state.
     @AppStorage("seedIntroPlayed") private var seedIntroDone = false
+    @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -59,7 +60,21 @@ struct ContentView: View {
             // Deal a fresh start when returning from the background while still on
             // the home screen — "a new start every open/resume". Cold launch is
             // handled by SeedView's `.task`; this covers background → foreground.
-            if old == .background, phase == .active { engine.dealFreshOnResume() }
+            if old == .background, phase == .active {
+                engine.dealFreshOnResume()
+                // iOS often stops the audio engine while we're away; restart it
+                // now so the next chime isn't the one that pays for it.
+                if soundEnabled { SoundPlayer.shared.warm() }
+            }
+        }
+        .task {
+            // Warm the first screen of Your Reel, so even its first open arrives
+            // with art in place instead of each card fading in. Image CDN only
+            // (no TMDB API calls), and a no-op from disk after the first time.
+            let leading = collection.sortedActors.prefix(12) + collection.sortedMovies.prefix(12)
+            await ArtCache.shared.warm(leading.compactMap {
+                Config.imageURL(path: $0.imagePath, size: ReelLayout.artSize)
+            })
         }
         .onAppear {
             #if DEBUG

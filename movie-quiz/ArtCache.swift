@@ -2,14 +2,22 @@
 //  ArtCache.swift
 //  movie-quiz
 //
-//  A tiny in-memory cache for the art of the *dealt start*. The home screen warms
-//  it as each start is dealt, so when the player taps Start the first chain card
-//  draws its poster/headshot synchronously — already in place as the play screen
-//  slides in, with nothing loading (and nothing animating) mid-push.
+//  The app's in-memory cache of decoded posters and headshots. Two jobs:
 //
-//  Only the dealt start is known ahead of time; every later link's art still
-//  streams through `AsyncImage` in `ChainArt`. Kept deliberately small: the
-//  last few deals, decoded once, never written to disk.
+//  • The dealt start. The home screen warms its art as each start is dealt, so
+//    when the player taps Start the first chain card draws it synchronously —
+//    already in place as the play screen slides in, with nothing loading (and
+//    nothing animating) mid-push.
+//  • Your Reel. Every card and frame reads through here, so reopening the Reel
+//    draws its art at once instead of every card fading in again, and a lifted
+//    card shows the image its grid slot already had. The first screen of the Reel
+//    is warmed at launch, so even the first open arrives with its art.
+//
+//  `AsyncImage` keeps no memory cache, which is why it isn't used for these.
+//  Downloads go through a session whose disk cache is sized for art (the shared
+//  one holds ~10MB), images decode off the main actor, and decoded images live
+//  in an `NSCache` bounded by bytes, so memory pressure evicts rather than grows.
+//  Never written anywhere but the URL cache.
 //
 
 import SwiftUI
@@ -19,34 +27,77 @@ import ImageIO
 final class ArtCache {
     static let shared = ArtCache()
 
-    /// How many decoded images to keep — a handful of recent deals is plenty.
-    private let capacity = 8
-    private var images: [URL: Image] = [:]
-    private var order: [URL] = []
+    private let images = NSCache<NSURL, CachedImage>()
+    /// One in-flight load per URL, so a grid card and its lifted copy — or a
+    /// warm and a card appearing — share a single download.
+    private var loading: [URL: Task<Image?, Never>] = [:]
+    private let session: URLSession
 
-    /// The cached art for `url`, if this node was warmed.
-    func image(for url: URL) -> Image? { images[url] }
+    private init() {
+        images.totalCostLimit = 80 * 1024 * 1024      // decoded bytes
+        let config = URLSessionConfiguration.default
+        config.urlCache = URLCache(memoryCapacity: 0, diskCapacity: 150 * 1024 * 1024)
+        config.requestCachePolicy = .returnCacheDataElseLoad   // TMDB art never changes at a URL
+        config.timeoutIntervalForRequest = Config.requestTimeout
+        session = URLSession(configuration: config)
+    }
 
-    /// Download and decode `node`'s art so `ChainArt` can draw it at once.
-    /// Silent on failure: the card simply falls back to `AsyncImage`.
+    /// The decoded art for `url`, if it's in memory — for drawing synchronously.
+    func image(for url: URL) -> Image? { images.object(forKey: url as NSURL)?.image }
+
+    /// Download (or read from disk) and decode `url`'s art, keeping it in memory.
+    /// `nil` on failure; callers fall back to their placeholder.
+    @discardableResult
+    func load(_ url: URL) async -> Image? {
+        if let hit = image(for: url) { return hit }
+        if let inFlight = loading[url] { return await inFlight.value }
+        let task = Task { () -> Image? in
+            guard let (data, _) = try? await session.data(from: url),
+                  let cgImage = await Self.decode(data)
+            else { return nil }
+            let image = Image(decorative: cgImage, scale: 1)
+            images.setObject(CachedImage(image), forKey: url as NSURL,
+                             cost: cgImage.bytesPerRow * cgImage.height)
+            return image
+        }
+        loading[url] = task
+        let result = await task.value
+        loading[url] = nil
+        return result
+    }
+
+    /// Warm the dealt start's art so `ChainArt` can draw it at once.
     func warm(_ node: ChainNode) async {
-        guard let url = Config.imageURL(path: node.imagePath, size: "w185"),
-              images[url] == nil,
-              let (data, _) = try? await URLSession.shared.data(from: url),
-              let cgImage = await Self.decode(data)
-        else { return }
-        images[url] = Image(decorative: cgImage, scale: 1)
-        order.append(url)
-        if order.count > capacity {
-            images[order.removeFirst()] = nil
+        guard let url = Config.imageURL(path: node.imagePath, size: "w185") else { return }
+        await load(url)
+    }
+
+    /// Warm several images, four at a time so a long list doesn't open dozens of
+    /// connections at once.
+    func warm(_ urls: [URL]) async {
+        for start in stride(from: 0, to: urls.count, by: 4) {
+            await withTaskGroup(of: Void.self) { group in
+                for url in urls[start..<min(start + 4, urls.count)] {
+                    group.addTask { await self.load(url) }
+                }
+            }
         }
     }
 
     /// Off-main decode, `@concurrent` for the same reason as `TMDBProvider.decode`:
     /// a plain `nonisolated async` function would run on the caller's actor (Main).
+    /// `ShouldCacheImmediately` decodes now, not lazily on first draw — which
+    /// would land on the main thread mid-animation.
     @concurrent
     nonisolated private static func decode(_ data: Data) async -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
+        return CGImageSourceCreateImageAtIndex(source, 0, options)
     }
+}
+
+/// `NSCache` holds objects; this boxes a decoded image.
+private final class CachedImage {
+    let image: Image
+    init(_ image: Image) { self.image = image }
 }

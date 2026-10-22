@@ -17,8 +17,6 @@ struct GameView: View {
 
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The player's chain style (Settings → Chain style); Deck by default.
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     @State private var answer = ""
     @FocusState private var fieldFocused: Bool
@@ -40,8 +38,6 @@ struct GameView: View {
 
     /// How many links stay visible in the rising window before older ones
     /// collapse into "+N earlier". Tuned to the band above the keyboard.
-    private let visibleLinks = 5
-
     private var timeFraction: Double {
         Double(engine.secondsRemaining) / Double(Config.secondsPerTurn)
     }
@@ -66,17 +62,8 @@ struct GameView: View {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .bottom) {
-                    switch chainStyle {
-                    case .cards:
-                        ChainCardStack(chain: engine.chain)
-                            .fixedSize(horizontal: false, vertical: true)
-                    case .deck:
-                        ChainDeck(chain: engine.chain, availableHeight: chainBandHeight)
-                            .fixedSize(horizontal: false, vertical: true)
-                    case .tiles:
-                        ChainStack(chain: engine.chain, maxVisible: visibleLinks)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    ChainDeck(chain: engine.chain, availableHeight: chainBandHeight)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 // The deck sizes its pile to this (it shrinks as the keyboard rises).
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { chainBandHeight = $0 }

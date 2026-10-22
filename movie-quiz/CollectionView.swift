@@ -5,7 +5,7 @@
 //  "Your Reel" — the collection screen. Every actor/movie the player has logged
 //  through play, with pure count stats on top ("look how many you know"):
 //  actors as a deck of playing cards earned through the films linked through
-//  them, movies as framed posters (`ReelCards.swift`), narrowed by decade and
+//  them, movies as framed posters, three across (`ReelCards.swift`), narrowed by decade and
 //  genre. Presented as a sheet from the seed and
 //  game-over screens.
 //
@@ -27,7 +27,6 @@ struct CollectionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var filter: Filter = .actors
-    @AppStorage("reelTiers") private var tierModel: ReelTierModel = .rank
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
     /// The card or frame lifted out of the grid, if any, and whether it's
@@ -307,7 +306,7 @@ struct CollectionView: View {
     // MARK: Grids
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.md), count: 2)
+        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm + 2), count: 3)
     }
 
     @ViewBuilder private var grids: some View {
@@ -319,8 +318,10 @@ struct CollectionView: View {
                 frames
             }
         }
-        // Give each filter its own identity so switching cross-fades and re-deals
-        // the cards, rather than reflowing one grid's contents into the other's.
+        // Give each filter its own identity so switching cross-fades the grids
+        // rather than reflowing one grid's contents into the other's. Nothing
+        // cascades in: the cards arrive with the sheet, and only their art
+        // fades in, the first time, as it lands (`ArtCache`).
         .id(filter)
         .transition(.opacity)
         .animation(Theme.Motion.standard, value: narrow)
@@ -334,9 +335,11 @@ struct CollectionView: View {
             nothingMatches
         } else {
             LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
-                ForEach(Array(actors.enumerated()), id: \.element.id) { i, entity in
+                ForEach(actors) { entity in
                     Button { expand(entity.id) } label: {
-                        let card = ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+                        let card = ReelCanvas(aspect: ReelActorCard.aspect) {
+                            ReelActorCard(entity: entity, isNew: store.isNew(entity))
+                        }
                         if expanded == entity.id {
                             card.hidden()   // holds the slot while the card is out
                         } else {
@@ -344,9 +347,6 @@ struct CollectionView: View {
                         }
                     }
                     .buttonStyle(.pressScale)
-                    // Only the first screenful cascades in. The grid is lazy, so
-                    // later cells are made as they scroll in and must arrive solid.
-                    .appear(i, enabled: i < Self.cascadeCount)
                 }
             }
         }
@@ -358,10 +358,12 @@ struct CollectionView: View {
             nothingMatches
         } else {
             LazyVGrid(columns: columns, alignment: .center, spacing: Theme.Spacing.lg) {
-                ForEach(Array(movies.enumerated()), id: \.element.id) { i, entity in
+                ForEach(movies) { entity in
                     Button { expand(entity.id) } label: {
-                        VStack(spacing: Theme.Spacing.sm) {
-                            let frame = ReelFrame(entity: entity, isNew: store.isNew(entity))
+                        VStack(spacing: Theme.Spacing.xs + 2) {
+                            let frame = ReelCanvas(aspect: ReelFrame.aspect) {
+                                ReelFrame(entity: entity, isNew: store.isNew(entity))
+                            }
                             // The label stays on the wall while its frame is out.
                             if expanded == entity.id {
                                 frame.hidden()
@@ -373,7 +375,6 @@ struct CollectionView: View {
                         .accessibilityElement(children: .combine)
                     }
                     .buttonStyle(.pressScale)
-                    .appear(i, enabled: i < Self.cascadeCount)
                 }
             }
         }
@@ -388,9 +389,6 @@ struct CollectionView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.xl)
     }
-
-    /// Cells in the first screenful of a grid — the ones that cascade in.
-    private static let cascadeCount = 6
 
     /// No travel under Reduce Motion: the card fades in place instead.
     private var liftNamespace: Namespace.ID? { reduceMotion ? nil : lift }
@@ -407,7 +405,7 @@ struct CollectionView: View {
                     .transition(.opacity)
             }
             if let id = expanded, let entity = store.entities[id] {
-                ReelCardDetail(entity: entity, linked: store.linked(to: entity), model: tierModel,
+                ReelCardDetail(entity: entity, linked: store.linked(to: entity),
                                namespace: liftNamespace, flipped: $flipped) {
                     expand(nil)
                 }

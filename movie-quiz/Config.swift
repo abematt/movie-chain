@@ -88,11 +88,6 @@ enum Config {
     /// don't keep handing back the same few faces. Small relative to the pool.
     static let seedRecentWindow = 8
 
-    /// A film counts as one of an actor's *well-known* films at this many TMDB
-    /// votes. The Reel's Share tiers scale to that count, snapshotted from the
-    /// filmography the game already loads for each actor's turn — no extra fetch.
-    static let wellKnownVoteCount = 1000
-
     /// Pages (~20 films each) of most-watched films to load for the deal pool.
     /// Fetched once per session and cached, so a few extra requests buy real variety
     /// — at 2 pages a run of shuffles recycled the same ~40 titles.

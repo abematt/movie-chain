@@ -18,16 +18,12 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("soundEnabled") private var soundEnabled = true
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
-    @AppStorage("reelTiers") private var reelTiers: ReelTierModel = .rank
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
-                    chainStyleSection
-                    reelTiersSection
                     aboutSection
                 }
                 .padding(.horizontal, Theme.Spacing.gutter)
@@ -64,36 +60,6 @@ struct SettingsView: View {
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
-        }
-    }
-
-    // MARK: Chain style
-    //
-    // A player preference: how the play screen draws the chain — Deck (the
-    // default), Cards or Tiles. The game-over recap follows it.
-
-    private var chainStyleSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            sectionTitle("Chain style")
-            NeoSegmented(selection: $chainStyle,
-                         options: ChainStyle.allCases.map { (value: $0, label: $0.label) })
-        }
-    }
-
-    // MARK: Reel cards
-    //
-    // How an actor card in Your Reel earns its finish — Rank (the default),
-    // Share or Plain. A setting while the three are compared in real play.
-
-    private var reelTiersSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            sectionTitle("Reel cards")
-            NeoSegmented(selection: $reelTiers,
-                         options: ReelTierModel.allCases.map { (value: $0, label: $0.label) })
-            Text(reelTiers.rule)
-                .font(Theme.Font.flourish(.footnote))
-                .foregroundStyle(Theme.Color.muted)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -32,6 +32,35 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sounds stop going missing.** iOS stops the audio engine on its own — a call,
+  Siri, AirPods connecting or disconnecting, sometimes a trip to the background — and
+  the game only ever checked a flag it set at launch, so after the first interruption
+  every chime played into a stopped engine until the app was relaunched. It now
+  checks the engine itself before each sound and restarts it when needed, and warms
+  it again on returning to the app so the next chime isn't late. (Silent mode still
+  mutes the game, as it should.)
+- **Your Reel opens smoothly.** Cards used to arrive in a cascade while each photo
+  loaded separately, showing initials first and swapping to the photo whenever it
+  landed — every time the Reel opened, because the image loader kept nothing in
+  memory. Art now goes through a real cache (memory and disk), so a reopened Reel
+  draws at once, its first screen is fetched at launch, and a card loading for the
+  first time goes straight from colour to photo in one fade. The cascade is gone.
+
+### Changed
+
+- **Smaller cards, three across.** The Reel fits half as many again on a screen.
+  Cards and frames are drawn once at that size and scaled, so lifting one is a pure
+  zoom — the same card brought closer — and the lifted card swaps in a sharper photo.
+
+### Removed
+
+- **The Chain style and Reel cards settings.** The Deck is the chain, and an actor
+  card is inked at 5 films linked and holo at 11, for everyone. The Cards and Tiles
+  chain styles and the Share and Plain card rules are gone, along with the
+  well-known-films count that only Share used.
+
 ## [0.5.2] — 2026-10-22
 
 Your Reel becomes a collection. Actors are playing cards earned through the films you

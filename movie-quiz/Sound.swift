@@ -12,6 +12,12 @@
 //  other audio and honours the ringer/silent switch — muted phone, no chime.
 //  All failures degrade silently to "no sound"; audio is pure polish.
 //
+//  iOS stops the engine on its own — a call, Siri, AirPods connecting or
+//  disconnecting, sometimes a trip to the background — without telling us. So
+//  every sound asks the engine whether it is *actually* running and restarts it
+//  if not, rather than trusting a flag set once at launch (which left the game
+//  silent until relaunch after the first interruption).
+//
 
 import Foundation
 import AVFoundation
@@ -24,7 +30,6 @@ final class SoundPlayer {
     private let player = AVAudioPlayerNode()
     private let sampleRate = 44_100.0
     private let format: AVAudioFormat
-    private var started = false
 
     private init() {
         format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
@@ -38,20 +43,23 @@ final class SoundPlayer {
     /// breaking the visual/sound/haptic harmony a correct link should have.
     func warm() { startIfNeeded() }
 
+    /// Whether the engine is up and the player node is rolling. Both are
+    /// asked fresh: iOS can stop either behind our back.
+    private var isReady: Bool { engine.isRunning && player.isPlaying }
+
     private func startIfNeeded() {
-        guard !started else { return }
+        guard !isReady else { return }
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true)
         #endif
-        do {
-            try engine.start()
-            player.play()
-            started = true
-        } catch {
-            started = false
+        if !engine.isRunning {
+            // A stopped engine resets its nodes; prepare before restarting.
+            engine.prepare()
+            try? engine.start()
         }
+        if engine.isRunning, !player.isPlaying { player.play() }
     }
 
     /// A chime for a correct link. `streak` (chain length) picks a note from a
@@ -86,7 +94,7 @@ final class SoundPlayer {
     /// would cut each note off with the next).
     private func play(notes: [(frequency: Double, duration: Double)]) {
         startIfNeeded()
-        guard started else { return }
+        guard isReady else { return }
 
         let total = notes.reduce(0) { $0 + $1.duration }
         let frameCount = AVAudioFrameCount(sampleRate * total)

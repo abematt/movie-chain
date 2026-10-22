@@ -50,10 +50,6 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
     /// a movie's actors — taken from adjacent pairs in your chains, so only links
     /// you actually made. On an actor this is the card's number.
     var links: Set<Int>
-    /// Actors only: how many of their films are well known (see
-    /// `Config.wellKnownVoteCount`) as of the last time their filmography loaded
-    /// in play. `nil` until it has; the Share tiers scale to it.
-    var wellKnownFilms: Int?
     /// Movies only: TMDB genre ids, for the Reel's genre filter. Empty for films
     /// logged before genres were recorded, until they come up again.
     var genres: [Int]
@@ -82,12 +78,11 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
         lastSeen = now
         timesLogged = 1
         links = []
-        wellKnownFilms = nil
     }
 
     private enum CodingKeys: String, CodingKey {
         case kind, tmdbID, name, year, imagePath, firstSeen, lastSeen, timesLogged
-        case links, wellKnownFilms, genres
+        case links, genres
     }
 
     /// Hand-written so a Reel saved before `links` existed still decodes (with
@@ -104,7 +99,6 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
         lastSeen = try c.decode(Date.self, forKey: .lastSeen)
         timesLogged = try c.decode(Int.self, forKey: .timesLogged)
         links = try c.decodeIfPresent(Set<Int>.self, forKey: .links) ?? []
-        wellKnownFilms = try c.decodeIfPresent(Int.self, forKey: .wellKnownFilms)
         genres = try c.decodeIfPresent([Int].self, forKey: .genres) ?? []
     }
 }
@@ -172,13 +166,10 @@ final class CollectionStore {
     /// `timesLogged` counts distinct chains (a chain never repeats an id). The
     /// caller (`GameEngine.endGame`) only invokes this for chains of length ≥ 2;
     /// the guard here is belt-and-suspenders. Returns the number of brand-new
-    /// entities added — the "+N to your Reel" figure.
-    ///
-    /// Each adjacent pair is linked both ways (`links`), and `wellKnownFilms`
-    /// (actor TMDB id → count, gathered by the engine as filmographies loaded
-    /// this run) refreshes each actor's snapshot.
+    /// entities added — the "+N to your Reel" figure. Each adjacent pair is
+    /// linked both ways (`links`).
     @discardableResult
-    func record(chain: [ChainNode], wellKnownFilms: [Int: Int] = [:]) -> Int {
+    func record(chain: [ChainNode]) -> Int {
         guard chain.count >= 2 else { return 0 }
         let now = clock()
         var added = 0
@@ -186,9 +177,6 @@ final class CollectionStore {
         for (a, b) in zip(chain, chain.dropFirst()) {
             entities[a.id]?.links.insert(b.tmdbID)
             entities[b.id]?.links.insert(a.tmdbID)
-        }
-        for (actorID, count) in wellKnownFilms {
-            entities["p\(actorID)"]?.wellKnownFilms = count
         }
         chainsLogged += 1
         save()
