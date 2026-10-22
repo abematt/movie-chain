@@ -143,9 +143,9 @@ struct GameView: View {
                     }
                 }
 
-            Text("\(engine.points) pts")
-                .font(Theme.Font.flourish(.body))
-                .monospacedDigit()
+            // Same line as the game-over card: the score's unit, then points.
+            // A chain is the whole run; a link is one correct answer.
+            Text("\(Text(engine.score == 1 ? "link" : "links").font(Theme.Font.flourish(.body))) · \(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)))")
                 .foregroundStyle(Theme.Color.muted)
                 .contentTransition(.numericText())
         }

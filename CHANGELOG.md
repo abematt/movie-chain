@@ -75,6 +75,15 @@ not a contract — if milestones land out of order, the version follows the work
   tucked under Shuffle instead of floating at the bottom. The title sits a little
   lower, so the whole composition centers on the screen with the start button just
   below the middle, where the thumb rests.
+- **One summary card on game over, and one vocabulary.** The "Time's up" / "Chain
+  ended" label is gone, since the screen itself says the run is over. A single card
+  leads with this run: the link count as the hero, with "links · 179 pts" under it.
+  Below a rule sit the personal best and the Reel in small, quiet type; the best is
+  hidden on a new best, where it would only repeat the run. The words are fixed
+  app-wide: a *chain* is a whole run, a *link* is one correct answer, and the score
+  counts links. The dealt start isn't a link, so the recap marks it with a flag and
+  numbers the links from 1, matching the score instead of running one past it. The
+  play screen's newest card reads "Link 4" (or "Start") on the same rule.
 
 ### Changed
 

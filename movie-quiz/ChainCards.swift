@@ -52,7 +52,7 @@ struct ChainCardStack: View {
                     ))
             }
             if let newest = chain.last {
-                HeroChainCard(node: newest, position: chain.count)
+                HeroChainCard(node: newest, position: chain.count - 1)
                     // Re-identify per node so each new link drops in as a new card
                     // rather than the old hero morphing its text.
                     .id(newest.id)
@@ -73,7 +73,7 @@ struct ChainCardStack: View {
 
 struct HeroChainCard: View {
     let node: ChainNode
-    /// 1-based position in the chain, stamped quietly in the corner.
+    /// Link number (0 = the dealt start), stamped quietly in the corner.
     var position: Int? = nil
 
     var body: some View {
@@ -85,10 +85,15 @@ struct HeroChainCard: View {
                     KindChip(kind: node.kind)
                     Spacer(minLength: 0)
                     if let position {
-                        Text("#\(position)")
-                            .font(Theme.Font.numeral(.footnote))
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.Color.muted)
+                        // The start isn't a link; links count from 1, matching
+                        // the score.
+                        if position == 0 {
+                            Text("Start").metaLabel(size: .small)
+                        } else {
+                            Text("Link \(position)")
+                                .font(Theme.Font.numeral(.footnote))
+                                .foregroundStyle(Theme.Color.muted)
+                        }
                     }
                 }
                 Text(node.matchText)
@@ -115,15 +120,23 @@ struct HeroChainCard: View {
 
 struct CompactChainCard: View {
     let node: ChainNode
-    /// 1-based position, shown as a leading numeral (the game-over recap).
+    /// Link number, shown as a leading numeral (the game-over recap). Links
+    /// count from 1; the start is not a link.
     var position: Int? = nil
+    /// The dealt start: shows a flag in the numeral column instead of a number.
+    var isStart = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm + 2) {
-            if let position {
+            if isStart {
+                Image(systemName: "flag.fill")
+                    .font(Theme.Font.labelSmall)
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(minWidth: 18)
+                    .accessibilityLabel("Start")
+            } else if let position {
                 Text("\(position)")
-                    .font(Theme.Font.heading(.subheadline))
-                    .monospacedDigit()
+                    .font(Theme.Font.numeral(.subheadline))
                     .foregroundStyle(Theme.Color.muted)
                     .frame(minWidth: 18)
             }

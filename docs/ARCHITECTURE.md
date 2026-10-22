@@ -367,6 +367,11 @@ pure-value + observable-store split as the rest of the app:
 > and per-node category identity — so a re-skin is a `Theme`/`Components` change
 > rather than a rewrite of every screen.
 
+**Vocabulary (fixed app-wide):** a *chain* is one whole run, from the dealt start
+to the end; a *link* is one correct answer, and the score counts links; the dealt
+*start* is not a link. Copy, numbering and the recap all follow this, so the last
+link number always equals the score.
+
 **Cream Neobrutalist** (the 0.6.0 prototype, on the `feature_cream-neobrutalist`
 branch): a cream canvas, white surfaces with a 2pt ink border and a hard unblurred
 offset shadow, one coral call-to-action, and two category accents — **blue for

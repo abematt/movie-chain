@@ -23,13 +23,7 @@ struct GameOverView: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
-            scoreHeader
-
-            HStack(spacing: Theme.Spacing.sm) {
-                bestLine
-                reelLine
-            }
-            .fixedSize(horizontal: false, vertical: true)
+            summaryCard
 
             if let missed = engine.missedAnswer {
                 oneAway(missed)
@@ -61,48 +55,44 @@ struct GameOverView: View {
         }
     }
 
-    // MARK: Reel — what this run added to the collection
+    // MARK: Summary card — this run first, then best and Reel, quieter
+    //
+    // One card answers "how did I do?". The top half is this run, emphasised:
+    // the link count as the hero numeral and the points beside its unit. Below a
+    // rule sit two quiet cells: the personal best (hidden on a new best, where
+    // it would just repeat this run) and the Reel, tappable. Terminology is
+    // fixed app-wide: a *chain* is a whole run, a *link* is one correct answer
+    // (the score counts links), and the dealt start is not a link.
 
-    @ViewBuilder private var reelLine: some View {
-        if collection.total > 0 {
-            Button { showReel = true } label: {
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    HStack(spacing: Theme.Spacing.xs) {
-                        Text("Your Reel").metaLabel()
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(Theme.Font.label)
-                            .foregroundStyle(Theme.Color.muted)
+    private var summaryCard: some View {
+        VStack(spacing: 0) {
+            runHero
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.Spacing.md)
+                .padding(.horizontal, Theme.Spacing.md)
+
+            if showsBest || showsReel {
+                Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+                HStack(spacing: 0) {
+                    if showsBest { bestCell }
+                    if showsBest && showsReel {
+                        Rectangle().fill(Theme.Color.border).frame(width: Theme.Border.width)
                     }
-                    Text(reelMessage)
-                        .font(Theme.Font.numeral())
-                        .foregroundStyle(Theme.Color.ink)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
+                    if showsReel { reelCell }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(Theme.Spacing.sm + 4)
-                .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.pressScale)
         }
+        .neoSurface(radius: Theme.Radius.card)
     }
 
-    private var reelMessage: String {
-        if engine.reelAdditions > 0 {
-            let n = engine.reelAdditions
-            return "+\(n) new · \(collection.total) total"
-        }
-        return "\(collection.total) logged"
-    }
+    private var showsBest: Bool { !engine.isNewBest && engine.bestChain > 0 }
+    private var showsReel: Bool { collection.total > 0 }
 
-    // MARK: Score header
+    private var linkWord: String { engine.score == 1 ? "link" : "links" }
 
-    private var scoreHeader: some View {
+    private var runHero: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            Text(engine.endedByQuit ? "Chain ended" : "Time's up")
-                .metaLabel()
-
             if engine.isNewBest {
                 Text("a new best")
                     .font(Theme.Font.flourish(.subheadline))
@@ -111,13 +101,12 @@ struct GameOverView: View {
                     .padding(.vertical, Theme.Spacing.xs + 1)
                     .neoSurface(radius: Theme.Radius.pill, fill: Theme.Color.good,
                                 shadow: Theme.Shadow.small)
-                    .padding(.top, 2)
                     .transition(.scale.combined(with: .opacity))
             }
 
             Text("\(engine.score)")
                 .font(Theme.Font.display(72))
-                .monospacedDigit()
+                .foregroundStyle(Theme.Color.ink)
                 .contentTransition(.numericText())
                 // One-shot bounce (up then settle) fired by `scorePop` on a new
                 // best. Resting scale is 1, so it can never get stuck oversized.
@@ -130,32 +119,58 @@ struct GameOverView: View {
                     }
                 }
 
-            Text("\(engine.points) pts")
-                .font(Theme.Font.flourish(.title3))
-                .monospacedDigit()
-                .foregroundStyle(Theme.Color.muted)
+            Text("\(Text(linkWord).font(Theme.Font.flourish(.title3)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("\(engine.points) pts").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink))")
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(engine.score) \(linkWord), \(engine.points) points\(engine.isNewBest ? ", a new best" : "")")
     }
 
-    // MARK: Personal best — fenced off so it never reads as this run
-
-    private var bestLine: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            HStack(spacing: Theme.Spacing.xs) {
-                Image(systemName: "star.fill")
-                    .font(Theme.Font.label)
-                    .foregroundStyle(Theme.Color.muted)
-                Text("Personal best").metaLabel()
-            }
+    // The personal best, deliberately quiet: small label, small muted figures.
+    private var bestCell: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Best").metaLabel(size: .small)
             Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
-                .font(Theme.Font.numeral())
-                .monospacedDigit()
-                .foregroundStyle(Theme.Color.ink)
+                .font(Theme.Font.numeral(.footnote))
+                .foregroundStyle(Theme.Color.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(Theme.Spacing.sm + 4)
-        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm + 2)
         .accessibilityElement(children: .combine)
+    }
+
+    // What this run added to the Reel, one line, tappable into the sheet.
+    private var reelCell: some View {
+        Button { showReel = true } label: {
+            HStack(spacing: Theme.Spacing.xs) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your Reel").metaLabel(size: .small)
+                    Text(reelMessage)
+                        .font(Theme.Font.numeral(.footnote))
+                        .foregroundStyle(Theme.Color.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(Theme.Font.labelSmall)
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm + 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressScale)
+    }
+
+    private var reelMessage: String {
+        if engine.reelAdditions > 0 {
+            return "+\(engine.reelAdditions) new · \(collection.total) total"
+        }
+        return "\(collection.total) logged"
     }
 
     // MARK: One-away near-miss
@@ -188,7 +203,11 @@ struct GameOverView: View {
                 case .cards:
                     VStack(spacing: Theme.Spacing.xs + 2) {
                         ForEach(Array(engine.chain.enumerated()), id: \.element.id) { i, node in
-                            CompactChainCard(node: node, position: i + 1)
+                            // The start isn't a link: it gets a flag, and the
+                            // links count from 1, so the last number matches
+                            // the score above.
+                            CompactChainCard(node: node, position: i == 0 ? nil : i,
+                                             isStart: i == 0)
                                 .appear(i, animation: Theme.Motion.cascade, offset: 14)
                         }
                     }
