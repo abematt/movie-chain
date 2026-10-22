@@ -161,7 +161,11 @@ struct CollectionView: View {
                 Text(entity.name)
                     .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
-                    .lineLimit(1)
+                    // Two lines: at the 24pt gutter a half-width card truncates
+                    // ordinary names ("Hugh Jac…") on one.
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("in \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
                     .font(Theme.Font.flourish(.footnote))
                     .foregroundStyle(Theme.Color.muted)
