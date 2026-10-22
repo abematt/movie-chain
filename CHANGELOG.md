@@ -18,8 +18,8 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 | Version | Milestone |
 |---|---|
 | **0.4.0** | Solo game complete — engine, matching, providers, collection, tests |
-| 0.5.0 | [**Foundations & safety net**](docs/ROADMAP.md#050--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
-| 0.6.0 | [**Design overhaul**](docs/ROADMAP.md#060--design-overhaul) — the real visual identity (today's look, including the chain treatment, is placeholder) |
+| **0.5.0** | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity: Cream Neobrutalist, Fraunces, the chain as cards (motion re-tune follows as 0.5.x) |
+| 0.6.0 | [**Foundations & safety net**](docs/ROADMAP.md#060--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
 | 0.7.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#070--the-service) — takes the shared key out of the app and caches it |
 | 0.8.0 | [**Accounts**](docs/ROADMAP.md#080--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
 | 0.9.0 | [**The Daily Chain**](docs/ROADMAP.md#090--the-daily-chain) — one puzzle a day: longest route from A to B ([spec](docs/DAILY-CHAIN.md)) |
@@ -27,13 +27,23 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 | 1.0.0 | [**Launch**](docs/ROADMAP.md#100--launch) — share images + links, onboarding demo, store listing |
 
 Until 1.0, breaking internal changes land in minor bumps. The order above is a plan,
-not a contract — if milestones land out of order, the version follows the work.
+not a contract — if milestones land out of order, the version follows the work. (It
+already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-22
+
+The visual design overhaul. The placeholder NYT-Games look is replaced by a real
+identity — **Cream Neobrutalist**: a cream canvas, white cards wrapped in a 2pt ink
+border with a hard offset shadow, one coral call-to-action per screen, Fraunces for
+display type and every number, and SF for body and labels. Alongside the look, the
+game settled two definitions it had been fudging: what a *link* is, and what counts as
+your *best*. Motion is next and lands as 0.5.x.
+
 ### Added
 
-- **Design overhaul prototype: Cream Neobrutalist** (0.6.0 groundwork, on a branch).
+- **Cream Neobrutalist, the new visual identity.**
   White cards with a 2pt ink border and a hard offset shadow on a cream canvas, a
   coral call-to-action, and a neobrutalist press where the shadow collapses. Actor
   stays blue and movie moves from purple to yellow, the most colour-blind-safe

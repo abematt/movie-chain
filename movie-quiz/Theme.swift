@@ -7,11 +7,11 @@
 //  reference these tokens instead of hardcoding magic numbers, so the whole app
 //  can be re-tuned from one place and stays visually consistent.
 //
-//  The look is **Cream Neobrutalist** (0.6.0 prototype): a cream canvas, white
+//  The look is **Cream Neobrutalist** (0.5.0): a cream canvas, white
 //  surfaces wrapped in a 2pt ink border with a hard, unblurred offset shadow,
 //  one coral call-to-action, and two category accents — blue for actors,
-//  yellow for movies (the most colour-blind-safe pair). See `docs/ROADMAP.md`
-//  → 0.6.0; the direction is still being judged on device.
+//  yellow for movies (the most colour-blind-safe pair). Shipped in 0.5.0;
+//  see `docs/ROADMAP.md` → 0.5.0.
 //  Color is defined in the asset catalog (light + dark variants) so light/dark
 //  adaptation and Dynamic Type come for free; `Theme.Color` just names them.
 //

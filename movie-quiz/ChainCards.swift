@@ -2,7 +2,7 @@
 //  ChainCards.swift
 //  movie-quiz
 //
-//  PROTOTYPE (0.6.0 design overhaul) — the chain drawn as a stack of
+//  0.5.0 design overhaul — the chain drawn as a stack of
 //  neobrutalist cards, the roadmap's leading candidate. It keeps `ChainStack`'s
 //  information architecture (stack, collapse older, emphasise newest) and spends
 //  the vertical room differently:

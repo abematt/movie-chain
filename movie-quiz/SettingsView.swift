@@ -65,7 +65,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Chain style (0.6.0 prototype)
+    // MARK: Chain style (prototype switch, kept until motion work confirms cards)
     //
     // Flips the play screen between chain treatments so they can be judged on a
     // device. Remove once the overhaul picks one.

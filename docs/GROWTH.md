@@ -70,7 +70,8 @@ The honest read of the code, because it sets what's cheap and what isn't:
   of **D9**.
 - **Nothing is measurable.** No analytics, no attribution, no crash reporting. All state
   is local (`UserDefaults` + a JSON file).
-- **The app isn't shipped** — v0.4.0, no App Store listing, no TestFlight, no git remote.
+- **The app isn't shipped** — v0.4.0 when this was written (0.5.0 now), no App Store
+  listing, no TestFlight. The repo is on GitHub, but nothing is distributed.
 
 ---
 
@@ -234,7 +235,7 @@ a complete video: timer pressure, a rising chain, the shake on reject, the score
 the near-miss. Camera-shyness is a non-issue, and going faceless isn't a deviation from
 the playbook — it's the correct application of it to a different product.
 
-**Which makes 0.6.0 (the design overhaul) a distribution deliverable.** If the screen is the creative, the
+**Which made 0.5.0 (the design overhaul) a distribution deliverable.** If the screen is the creative, the
 screen's quality is the creative's quality — and it's also the App Store screenshots and
 the preview video. The design overhaul is the one "feature" on the roadmap that is
 straightforwardly acquisition work.

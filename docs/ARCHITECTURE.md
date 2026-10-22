@@ -16,7 +16,7 @@
 | [`ASSISTED-MODE.md`](ASSISTED-MODE.md) | Postmortem of a removed mode — **read before building anything that picks chain links for the player** |
 | [`GROWTH.md`](GROWTH.md) | Growth mechanics as a build catalog — the share/daily/challenge/replay features that make distribution possible, sized and mapped to the code |
 
-Current version **0.4.0**; **1.0.0 means launch**. When you change the architecture,
+Current version **0.5.0**; **1.0.0 means launch**. When you change the architecture,
 providers, rules, or stack, update *this* file; when you land a user-visible change,
 add a changelog entry; when a plan changes, edit the roadmap.
 
@@ -359,7 +359,7 @@ pure-value + observable-store split as the rest of the app:
 
 > ⚠️ **The current visual treatment is placeholder**, including the chain rendering —
 > a full design overhaul is the next milestone: **[`ROADMAP.md` →
-> 0.6.0](ROADMAP.md#060--design-overhaul)**, which holds the options still being
+> 0.5.0](ROADMAP.md#050--design-overhaul)**, which holds the options still being
 > explored (a stacked list of cards is currently leading) and the constraints. Read it
 > before changing anything visual — the direction is **not settled yet**.
 > Treat what follows as a description of *what exists today*, not a settled identity.
@@ -372,8 +372,7 @@ to the end; a *link* is one correct answer, and the score counts links; the deal
 *start* is not a link. Copy, numbering and the recap all follow this, so the last
 link number always equals the score.
 
-**Cream Neobrutalist** (the 0.6.0 prototype, on the `feature_cream-neobrutalist`
-branch): a cream canvas, white surfaces with a 2pt ink border and a hard unblurred
+**Cream Neobrutalist** (0.5.0): a cream canvas, white surfaces with a 2pt ink border and a hard unblurred
 offset shadow, one coral call-to-action, and two category accents — **blue for
 actors, yellow for movies** (the most colour-blind-safe pair). Dark mode flips the
 borders to cream on a warm charcoal canvas. A bold serif with an italic flourish
@@ -432,11 +431,11 @@ small, bold, uppercase and tracked.
   `staggered:`, reveals its tiles one-after-another (through `StaggeredAppear`) as
   a rare end-of-run delight beat — a no-op during play, where tiles land
   individually on the `drop` transition.
-  **`ChainStack` is the most likely casualty of the 0.6.0 overhaul** — the replacement
+  **`ChainStack` was replaced as the default by `ChainCards` in the 0.5.0 overhaul** — the replacement
   isn't decided (a stacked list of cards is the leading candidate). Worth knowing: its
   *information architecture* (stack, collapse older, emphasise newest) probably survives
   whatever wins, so the change may be a re-skin of this component rather than a new
-  layout model. See [`ROADMAP.md` → 0.6.0](ROADMAP.md#060--design-overhaul) for the open
+  layout model. See [`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul) for the open
   options and the vertical-room constraint against the docked keyboard.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
   (drains in ink, shifts to a warning red in the final quarter).
@@ -458,7 +457,7 @@ small, bold, uppercase and tracked.
 > placeholder.** The routing, state ownership, and layout *constraints* (keyboard
 > docking, portrait-only, Reduce Motion) are real and load-bearing; the styling is not
 > settled, and the chain's replacement is still an open question. See **[`ROADMAP.md` →
-> 0.6.0](ROADMAP.md#060--design-overhaul)** before changing anything visual.
+> 0.5.0](ROADMAP.md#050--design-overhaul)** before changing anything visual.
 
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
@@ -652,7 +651,7 @@ scratch:
   + an `apple-app-site-association` file) fix both and are the eventual target —
   and since the codec already speaks URLs, only the transport changes.
 
-Accounts arrive at 0.8.0 on the roadmap; the per-device player id (now a 0.5.0
+Accounts arrive at 0.8.0 on the roadmap; the per-device player id (now a 0.6.0
 foundation), plus the local session/collection data, are all
 forward-compatible with a future sync.
 
@@ -695,7 +694,7 @@ of the login-free core, never a gate in front of it.
 
 ## Dev workflow
 
-- **Versioning:** the app is versioned (currently **0.4.0**; **1.0.0 means launch**,
+- **Versioning:** the app is versioned (currently **0.5.0**; **1.0.0 means launch**,
   with each remaining pre-launch milestone allocated a minor version — see the
   roadmap table in the changelog header) and every notable change is recorded in
   [`CHANGELOG.md`](../CHANGELOG.md) (Keep a Changelog + SemVer). `MARKETING_VERSION`
