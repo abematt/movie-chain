@@ -145,6 +145,9 @@ struct HandoffFlight: View {
             guard !Task.isCancelled else { return }
             stage.finish()
             launchedAt = nil
+            // The tap opened the loop; the card landing closes it, and the clock
+            // starts on this beat.
+            Haptics.selection()
         }
         .task(id: stage.flight?.node.id) {
             guard stage.isFlying else { return }
@@ -252,11 +255,13 @@ private struct FlightLayers: View {
                 .frame(width: a.width, height: a.height, alignment: .topLeading)
                 .scaleEffect(size / SentenceType.nameSize, anchor: .topLeading)
                 .opacity(1 - ramp(p, 0.05, 0.35))
+                .blur(radius: bridge(p, 0.05, 0.45))
                 .offset(x: origin.x, y: origin.y)
             DeckName(text: node.matchText)
                 .frame(width: b.width, height: b.height, alignment: .topLeading)
                 .scaleEffect(size / DeckType.nameSize, anchor: .topLeading)
                 .opacity(ramp(p, 0.15, 0.45))
+                .blur(radius: bridge(p, 0.05, 0.45))
                 .offset(x: origin.x, y: origin.y)
         }
     }
@@ -283,11 +288,13 @@ private struct FlightLayers: View {
                 .frame(width: a.width, height: a.height)
                 .scaleEffect(x: rect.width / max(a.width, 1), y: 1, anchor: .topLeading)
                 .opacity(1 - ramp(p, 0.2, 0.6))
+                .blur(radius: bridge(p, 0.2, 0.9))
                 .offset(x: rect.minX, y: rect.minY)
             DockLook(kind: node.nextKind)
                 .frame(width: b.width, height: b.height)
                 .compositingGroup()
                 .opacity(ramp(p, 0.4, 0.9))
+                .blur(radius: bridge(p, 0.2, 0.9))
                 .offset(x: rect.minX, y: rect.minY + (rect.height - b.height) / 2)
         }
     }
@@ -404,29 +411,61 @@ struct SentenceVerb: View {
 }
 
 /// The blank: the next link's placeholder over an ink rule, with the coral arrow.
+/// Presses through `\.blankPressed` (set by the home's button style). `nudge`
+/// bumps to play the first-run hint once: the arrow nudges toward the play
+/// screen and the placeholder brightens (only the brightening under Reduce
+/// Motion).
 struct SentenceBlank: View {
     let kind: NodeKind
+    var nudge = 0
+    @Environment(\.blankPressed) private var pressed
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             HStack(alignment: .center) {
                 Text(kind == .movie ? "a movie…" : "an actor…")
                     .font(Theme.Font.flourish(size: SentenceType.blankSize))
-                    .foregroundStyle(Theme.Color.muted.opacity(0.6))
+                    .foregroundStyle(Theme.Color.muted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .keyframeAnimator(initialValue: 0.6, trigger: nudge) { view, opacity in
+                        view.opacity(opacity)
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            CubicKeyframe(1.0, duration: 0.3)
+                            CubicKeyframe(0.6, duration: 0.3)
+                        }
+                    }
                 Spacer(minLength: Theme.Spacing.sm)
                 Image(systemName: "arrow.right")
                     .font(.headline.weight(.bold))
                     .foregroundStyle(Theme.Color.ink)
+                    .keyframeAnimator(initialValue: 0.0, trigger: nudge) { [reduceMotion] view, x in
+                        view.offset(x: reduceMotion ? 0 : x)
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            CubicKeyframe(3, duration: 0.3)
+                            CubicKeyframe(0, duration: 0.3)
+                        }
+                    }
                     .frame(width: 48, height: 48)
-                    .neoSurface(radius: Theme.Radius.md, fill: Theme.Color.primary, shadow: Theme.Shadow.small)
+                    .neoSurface(radius: Theme.Radius.md,
+                                fill: pressed ? Theme.Color.primaryPressed : Theme.Color.primary,
+                                shadow: Theme.Shadow.small,
+                                pressed: pressed && !reduceMotion)
+                    .animation(Theme.Motion.press, value: pressed)
             }
             Rectangle()
                 .fill(Theme.Color.ink)
                 .frame(height: 3)
         }
     }
+}
+
+extension EnvironmentValues {
+    /// The home's blank is held down.
+    @Entry var blankPressed = false
 }
 
 // MARK: - Interpolation
@@ -436,6 +475,13 @@ private func ramp(_ p: CGFloat, _ start: CGFloat, _ end: CGFloat) -> CGFloat {
 }
 
 private func lerp(_ a: CGFloat, _ b: CGFloat, _ p: CGFloat) -> CGFloat { a + (b - a) * p }
+
+/// The blur that bridges a crossfade between two copies: none at either end,
+/// peaking at 2pt mid-window, so the two read as one shape changing rather than
+/// two shapes overlapping.
+private func bridge(_ p: CGFloat, _ start: CGFloat, _ end: CGFloat) -> CGFloat {
+    2 * sin(.pi * ramp(p, start, end))
+}
 
 private func lerp(_ a: CGPoint, _ b: CGPoint, _ p: CGFloat) -> CGPoint {
     CGPoint(x: lerp(a.x, b.x, p), y: lerp(a.y, b.y, p))

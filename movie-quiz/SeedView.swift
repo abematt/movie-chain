@@ -62,6 +62,10 @@ struct SeedView: View {
     @State private var reelBump = 0
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    /// The first-run hint on the blank has played (it plays once, ever).
+    @AppStorage("blankHintPlayed") private var blankHintPlayed = false
+    /// Bumped to play that hint.
+    @State private var blankNudge = 0
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(HandoffStage.self) private var stage: HandoffStage?
@@ -151,6 +155,7 @@ struct SeedView: View {
         // lands on an animation.
         .task(id: introRunning) { await warmFeedbackWhenIdle() }
         .task(id: introRunning) { await revealReelGrowth() }
+        .task(id: "\(introRunning)-\(engine.dealtSeed == nil)") { await playBlankHint() }
         #if DEBUG
         // QA hook: tap the blank a moment after launch, to watch the handoff.
         .task(id: engine.dealtSeed == nil) {
@@ -316,11 +321,11 @@ struct SeedView: View {
     // The blank is the start button: tapping it plays.
     private var blank: some View {
         Button(action: startFromBlank) {
-            SentenceBlank(kind: engine.dealtSeed?.nextKind ?? .movie)
+            SentenceBlank(kind: engine.dealtSeed?.nextKind ?? .movie, nudge: blankNudge)
                 .contentTransition(.opacity)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.pressScale)
+        .buttonStyle(BlankButtonStyle())
         .disabled(engine.dealtSeed == nil)
         .handoffSource(.blank, stage)
         .opacity(handingOff ? 0 : 1)
@@ -605,6 +610,18 @@ struct SeedView: View {
         reelTotalShown = total
     }
 
+    /// Before a first game, once the screen has assembled and a start is dealt,
+    /// point at the blank once: the arrow nudges toward play and the placeholder
+    /// brightens. Never again after that, and never for someone with a best run.
+    private func playBlankHint() async {
+        guard !introRunning, engine.dealtSeed != nil,
+              !blankHintPlayed, engine.bestChain == 0 else { return }
+        try? await Task.sleep(for: .milliseconds(800))
+        guard !Task.isCancelled, !searching, !handingOff else { return }
+        blankNudge += 1
+        blankHintPlayed = true
+    }
+
     private func skipIntro() {
         guard playsIntro, !introDone else { return }
         introTask?.cancel()
@@ -643,6 +660,17 @@ private struct SentenceHead: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The blank's press: the arrow presses like every other bordered button (its
+/// shadow collapses, it shifts into the page) and the row itself doesn't scale.
+/// The tap's release is the flight's first frame, which draws the row at full
+/// size — a scaled row would jump back on exactly that frame.
+private struct BlankButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .environment(\.blankPressed, configuration.isPressed)
     }
 }
 
@@ -685,6 +713,7 @@ private extension AnyTransition {
         .asymmetric(
             insertion: .modifier(active: DealShift(y: 36, scale: 0.96, opacity: 0), identity: DealShift()),
             removal: .modifier(active: DealShift(x: -440, y: -16, angle: -8), identity: DealShift())
+                .animation(Theme.Motion.dealOut)
         )
     }
 }

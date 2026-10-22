@@ -547,9 +547,15 @@ small, bold, uppercase and tracked.
   a shared letter size (the home's lines fading out, the card's line fading in), since
   text can't reflow mid-flight; the card's surface and start sticker assemble in
   place around them; the blank crossfades into a still of the dock. At
-  `handoffDuration` the stage finishes and the real start card and dock appear in the
-  same frame the copies go; `GameView` then releases the first turn's clock
-  (`playerReady`). Fallbacks: launch after 450ms without the focus, and give up (show
+  `handoffDuration` (0.55s — it plays every run, so it stays short) the stage
+  finishes and the real start card and dock appear in the same frame the copies go,
+  with a selection haptic; `GameView` then releases the first turn's clock
+  (`playerReady`). The name's and the blank's crossfades carry a 2pt blur at their
+  midpoint (`bridge`), so the two copies read as one shape changing. Underneath, the
+  home's chrome fades out fast (`handoffExit`, 150ms) and play's fades in a beat later
+  (`handoffEnter`), so they never sit half-faded over each other. The blank presses
+  through `\.blankPressed` (the arrow's neo press, no row scale) so the release frame
+  matches the flight's first. Fallbacks: launch after 450ms without the focus, and give up (show
   play) after 1s without destinations. `ContentView` makes seed → play a cross-fade
   under it rather than a push.
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·

@@ -48,8 +48,10 @@ Unspool rebrand was inserted as 0.6.0.)
   "Inception *starred* an actor…"), so a new player reads the rule instead of being
   told it. Tap the blank and the home turns into the play screen in place: the name,
   its chip and its photo fly down into the start card, the card assembles around them,
-  and the blank settles into the answer box as the keyboard comes up. The clock starts
-  once it lands. **Deal again** flicks the start away and deals a fresh one; **Pick
+  and the blank settles into the answer box as the keyboard comes up. It takes about
+  half a second, since you see it every run, and a soft tap on landing marks the
+  moment the clock starts. The first time you open the game, the blank's arrow nudges
+  once to show you where to tap. **Deal again** flicks the start away and deals a fresh one; **Pick
   your own** opens the search as before. Your best run sits in a quiet line at the
   bottom.
 - **The first turn is ready when you get there.** The dealt start's films (or cast)

@@ -46,14 +46,16 @@ struct ContentView: View {
             switch engine.phase {
             // Home → play is not a push: the home *becomes* the play screen (the
             // handoff flies its sentence into the deck and dock), so the two
-            // cross-fade underneath the flight. Every other change pushes.
+            // cross-fade underneath the flight — the home out fast, play in a beat
+            // later, so the two never sit half-faded over each other. Every other
+            // change pushes.
             case .seed:
                 SeedView(engine: engine, collection: collection, introDone: $seedIntroDone)
                     .transition(.asymmetric(insertion: .screenPush(reduceMotion: reduceMotion),
-                                            removal: .opacity))
+                                            removal: .opacity.animation(Theme.Motion.handoffExit)))
             case .playing:
                 GameView(engine: engine)
-                    .transition(.asymmetric(insertion: .opacity,
+                    .transition(.asymmetric(insertion: .opacity.animation(Theme.Motion.handoffEnter),
                                             removal: .screenPush(reduceMotion: reduceMotion)))
             case .gameOver(let summary):
                 GameOverView(engine: engine, collection: collection, summary: summary)
