@@ -32,6 +32,13 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-10-22
+
+Your Reel becomes a collection. Actors are playing cards earned through the films you
+linked through them, movies are framed posters, and either lifts out of the grid and
+turns over to show the other side of its links. Decade and genre filters narrow it
+down. Not a roadmap milestone, so a patch: the minors stay reserved for them.
+
 ### Changed
 
 - **Your Reel is now a collection.** Actors are playing cards earned through the
