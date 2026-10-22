@@ -61,24 +61,26 @@ drive SwiftUI canvas previews.
 ## Versioning & changelog
 
 The app is versioned and every notable change is recorded in
-[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.4.0`;
+[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.5.0`;
 `1.0.0` means launch.** Each remaining pre-launch milestone is allocated a minor
-version — foundations & safety net (0.5.0), design overhaul (0.6.0), the service /
+version — design overhaul (0.5.0, **landed**; motion follows as 0.5.x), foundations &
+safety net (0.6.0), the service /
 TMDB proxy (0.7.0), accounts (0.8.0), the Daily Chain (0.9.0), friend groups (0.10.0);
 share images ship with launch (1.0.0). Global leaderboards are dropped — **check the
 changelog table before choosing a bump**. Each is documented in
 [`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
 the relevant section before starting one.
 
-> Note: the current **visual design is placeholder** (including the chain treatment) —
-> the 0.6.0 overhaul replaces it. The **direction is still open** — a stacked list of
-> cards is the leading candidate, with a filmstrip / linked thread / constellation also
-> live; don't treat any of them as settled. `ChainStack`'s information architecture
-> (stack, collapse older, emphasise newest) probably survives whichever wins, and the
-> recurring constraint is vertical room against the docked keyboard. The design-system structure
-> (`Theme` tokens, owned `Components`, per-node category identity) is also meant to
-> survive. See [`docs/ROADMAP.md`](docs/ROADMAP.md#060--design-overhaul) before
-> touching anything visual.
+> Note: the visual design is **Cream Neobrutalist** as of 0.5.0 — no longer
+> placeholder. The chain is drawn as **cards** (`ChainCards.swift`); the old tile
+> stack stays behind Settings → Chain style until motion work confirms the cards, then
+> it should be deleted. **Motion is the open piece** (0.5.x). The recurring
+> constraint is still vertical room against the docked keyboard. Vocabulary is fixed:
+> a *chain* is a whole run, a *link* is one correct answer (the score counts links),
+> the dealt start is not a link, and the best run is the most links with points
+> breaking ties (`Scoring.isNewRecord`). Reuse `Theme` tokens and `Components` — never
+> hardcode fonts, colours or sizes. See
+> [`docs/ROADMAP.md`](docs/ROADMAP.md#050--design-overhaul).
 
 - **Where the version lives:** `MARKETING_VERSION` (e.g. `0.4.0`) and
   `CURRENT_PROJECT_VERSION` (the build number) in build settings — set in all four
@@ -92,9 +94,9 @@ the relevant section before starting one.
   `MARKETING_VERSION` (and `CURRENT_PROJECT_VERSION` for a submitted build), then
   tag it:
   ```bash
-  sed -i '' 's/MARKETING_VERSION = 0.4.0;/MARKETING_VERSION = 0.5.0;/g' \
+  sed -i '' 's/MARKETING_VERSION = 0.5.0;/MARKETING_VERSION = 0.6.0;/g' \
     movie-quiz.xcodeproj/project.pbxproj
-  git tag -a v0.5.0 -m "0.5.0"
+  git tag -a v0.6.0 -m "0.6.0"
   ```
   Bump **minor** when a roadmap milestone lands, **patch** for fixes/polish in
   between. Pre-1.0, breaking internal changes go in a minor bump.
@@ -205,13 +207,16 @@ Reel** shrunk to a corner pill (personal best folded into that sheet; the pill i
 always reachable, count hidden when empty, because the Reel sheet hosts the
 required **TMDB attribution**). Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
-per-node category identity — **blue = actor, purple = movie**) and
-`Components.swift` (`PrimaryButtonStyle` = ink pill, `GhostButtonStyle`,
+per-node category identity — **blue = actor, yellow = movie**) and
+`Components.swift` (`.neoSurface` = border + hard shadow, `PrimaryButtonStyle` = coral, `GhostButtonStyle`,
 `PressScaleStyle` = `.pressScale` subtle press feedback, `.card()`,
 `NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
 (`.appear(i)`)), all built on the
-warm-paper palette defined in `Assets.xcassets` (Canvas/Ink/Tile/Hairline/
-ActorBlue/MoviePurple/Good/OnAccent, each light+dark). The signature visual is
+Cream Neobrutalist palette (0.5.0) defined in `Assets.xcassets`
+(Canvas/Ink/Tile/Shadow/Hairline/Coral/ActorBlue/MovieYellow/Good/OnAccent, each
+light+dark). The play screen draws the chain as **cards** by default
+(`ChainCards.swift`: a hero card for the newest link, compact cards for the two
+before it); Settings → Chain style switches back to the tile stack for comparison. The signature visual is
 `ChainStack.swift`: the chain builds as a **rising Tetris-style stack of category
 tiles** — a new link drops in and older ones collapse into "+N earlier". The play
 screen docks the text input via `.safeAreaInset(.bottom)` above the

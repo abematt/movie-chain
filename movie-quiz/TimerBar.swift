@@ -20,14 +20,17 @@ struct TimerBar: View {
 
     var body: some View {
         GeometryReader { geo in
+            // The spec's progress bar: 6pt, muted track, full radius, no border
+            // and no shadow.
             ZStack(alignment: .leading) {
-                Capsule().fill(Theme.Color.tile)
+                Capsule().fill(Theme.Color.hairline)
                 Capsule()
-                    .fill(lowTime ? Color.red : Theme.Color.ink)
+                    .fill(lowTime ? Theme.Color.danger : Theme.Color.ink)
                     .frame(width: clamped * geo.size.width)
             }
+            .clipShape(Capsule())
         }
-        .frame(height: 4)
+        .frame(height: 6)
         .animation(.linear(duration: 0.25), value: clamped)
         .animation(Theme.Motion.standard, value: lowTime)
     }

@@ -45,8 +45,7 @@ struct ChainStack: View {
         VStack(spacing: Theme.Spacing.xs + 2) {
             if hiddenCount > 0 {
                 Text("+\(hiddenCount) earlier")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .metaLabel(size: .small)
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
             }

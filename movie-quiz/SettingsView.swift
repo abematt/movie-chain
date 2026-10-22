@@ -18,24 +18,31 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
+                    chainStyleSection
                     aboutSection
                 }
-                .padding()
+                .padding(.horizontal, Theme.Spacing.gutter)
+                .padding(.vertical, Theme.Spacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Theme.Color.canvas.ignoresSafeArea())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .neoNavigationBar {
+                Text("Settings").font(Theme.Font.heading(.headline)).foregroundStyle(Theme.Color.ink)
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
+                    Button { dismiss() } label: {
+                        Text("Done").font(Theme.Font.bodyStrong).foregroundStyle(Theme.Color.ink)
+                    }
                 }
             }
         }
@@ -48,13 +55,26 @@ struct SettingsView: View {
             sectionTitle("Sound")
             Toggle(isOn: $soundEnabled) {
                 Text("Sound effects")
-                    .font(.body.weight(.semibold))
+                    .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
             }
             .tint(Theme.Color.ink)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
-            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+        }
+    }
+
+    // MARK: Chain style (prototype switch, kept until motion work confirms cards)
+    //
+    // Flips the play screen between chain treatments so they can be judged on a
+    // device. Remove once the overhaul picks one.
+
+    private var chainStyleSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("Chain style · prototype")
+            NeoSegmented(selection: $chainStyle,
+                         options: ChainStyle.allCases.map { (value: $0, label: $0.label) })
         }
     }
 
@@ -68,28 +88,31 @@ struct SettingsView: View {
             sectionTitle("About")
             HStack {
                 Text("Movie Chain")
-                    .font(.body.weight(.semibold))
+                    .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
                 Spacer()
                 Text(Config.versionString)
-                    .font(.footnote)
+                    .font(Theme.Font.flourish(.footnote))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
-            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Movie Chain version \(Config.appVersion), build \(Config.buildNumber)")
+
+            // The SIL Open Font License asks that the license travel with the
+            // font; the full text ships in the bundle as Fonts/Fraunces-OFL.txt.
+            Text("Set in Fraunces by Undercase Type, used under the SIL Open Font License 1.1.")
+                .font(Theme.Font.flourish(.footnote))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, Theme.Spacing.xs)
         }
     }
 
     private func sectionTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.heavy))
-            .textCase(.uppercase)
-            .tracking(1.5)
-            .foregroundStyle(.tertiary)
+        Text(text).metaLabel()
     }
 }
 

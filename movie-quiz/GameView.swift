@@ -16,11 +16,22 @@ struct GameView: View {
     @Bindable var engine: GameEngine
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Prototype switch between chain treatments (Settings → Chain style).
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
 
     @State private var answer = ""
     @FocusState private var fieldFocused: Bool
     @State private var gainToken = 0     // bumps to replay the "+N" pop
     @State private var shakeToken = 0    // bumps to shake the field on reject
+    /// Bumps to fire the one-shot score bounce when a run passes the record.
+    @State private var recordPop = 0
+    /// DEBUG screenshot hook: act as if this run had passed the record.
+    @State private var forceBeating = false
+
+    /// This run is past the previous best: the score shows green with "new best"
+    /// for the rest of the run.
+    private var beatingBest: Bool { engine.isBeatingBest || forceBeating }
 
     /// How many links stay visible in the rising window before older ones
     /// collapse into "+N earlier". Tuned to the band above the keyboard.
@@ -41,6 +52,7 @@ struct GameView: View {
             header
             TimerBar(fraction: timeFraction)
             scoreHero
+                .zIndex(1)   // the record cue floats over the chain band
 
             // The stack renders at its *natural* height, pinned to the bottom of
             // this flexible region; any overflow (the oldest links) is clipped off
@@ -49,14 +61,20 @@ struct GameView: View {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .bottom) {
-                    ChainStack(chain: engine.chain, maxVisible: visibleLinks)
-                        .fixedSize(horizontal: false, vertical: true)
+                    switch chainStyle {
+                    case .cards:
+                        ChainCardStack(chain: engine.chain)
+                            .fixedSize(horizontal: false, vertical: true)
+                    case .tiles:
+                        ChainStack(chain: engine.chain, maxVisible: visibleLinks)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .clipped()
 
             nextHint
         }
-        .padding(.horizontal)
+        .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.xs)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
@@ -76,6 +94,15 @@ struct GameView: View {
             guard !Task.isCancelled else { return }
             fieldFocused = true
         }
+        #if DEBUG
+        .onAppear {
+            // Screenshot hook: show the record state without having to beat a best.
+            if ProcessInfo.processInfo.arguments.contains("-uiDemoRecordCue") {
+                forceBeating = true
+                recordPop += 1
+            }
+        }
+        #endif
         .onChange(of: engine.score) { old, new in
             if new > old { onCorrect() }
         }
@@ -93,7 +120,7 @@ struct GameView: View {
             } label: {
                 Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                     .contentTransition(.symbolEffect(.replace))
                     // Fixed slot: the two speaker glyphs differ in width, so let the
                     // symbol swap inside a stable box rather than nudging the header.
@@ -104,17 +131,17 @@ struct GameView: View {
             Spacer()
 
             Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
-                .font(.subheadline.weight(.semibold))
+                .font(Theme.Font.numeral(.subheadline))
                 .monospacedDigit()
-                .foregroundStyle(lowTime ? Color.red : .secondary)
+                .foregroundStyle(lowTime ? Theme.Color.danger : Theme.Color.muted)
                 .contentTransition(.numericText())
 
             Spacer()
 
-            Button("Quit") { engine.quit() }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .buttonStyle(.plain)
+            Button { engine.quit() } label: {
+                Text("Quit").metaLabel()
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -122,28 +149,59 @@ struct GameView: View {
 
     private var scoreHero: some View {
         VStack(spacing: 2) {
-            Text("\(engine.score)")
-                .font(.system(size: 60, weight: .bold, design: .serif))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .foregroundStyle(Theme.Color.ink)
-                .overlay(alignment: .trailing) {
-                    if gainToken > 0 {
-                        FloatingGain(value: engine.lastGain)
-                            .id(gainToken)
-                            .offset(x: 30)
-                    }
+            // Same as the game-over card: the unit on the numeral's baseline so
+            // "4 links" reads as one figure, points on their own line. A chain is
+            // the whole run; a link is one correct answer.
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.xs + 2) {
+                Text("\(engine.score)")
+                    .font(Theme.Font.display(60))
+                    .contentTransition(.numericText())
+                    .foregroundStyle(beatingBest ? Theme.Color.good : Theme.Color.ink)
+                Text(engine.score == 1 ? "link" : "links")
+                    .font(Theme.Font.flourish(.title3))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            // The "+N" rises off the end of the whole figure, clear of the unit.
+            .overlay(alignment: .trailing) {
+                if gainToken > 0 {
+                    FloatingGain(value: engine.lastGain)
+                        .id(gainToken)
+                        .offset(x: 34)
                 }
+            }
+            // The record bounce: on the link that passes the best, the figure
+            // swells, dips just under its size, and settles — fired once by
+            // `recordPop`. Resting scale is 1, so it can never get stuck large.
+            // Reduce Motion keeps the colour change and drops the bounce.
+            .keyframeAnimator(initialValue: 1.0, trigger: recordPop) { view, scale in
+                view.scaleEffect(reduceMotion ? 1 : scale, anchor: .center)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(1.15, duration: 0.16)
+                    CubicKeyframe(0.97, duration: 0.14)
+                    SpringKeyframe(1.0, duration: 0.36, spring: .snappy)
+                }
+            }
 
-            Text("\(engine.points) pts")
-                .font(.subheadline)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .contentTransition(.numericText())
+            pointsLine
         }
         .frame(maxWidth: .infinity)
         .padding(.top, Theme.Spacing.sm)
         .animation(.snappy, value: engine.score)
+        .animation(Theme.Motion.emphasized, value: beatingBest)
+    }
+
+    // Past the record, the points line adds "new best" for the rest of the run.
+    @ViewBuilder private var pointsLine: some View {
+        if beatingBest {
+            Text("\(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("new best").font(Theme.Font.flourish(.body)).foregroundStyle(Theme.Color.good))")
+                .contentTransition(.numericText())
+        } else {
+            Text("\(engine.points) pts")
+                .font(Theme.Font.numeral(.body))
+                .foregroundStyle(Theme.Color.muted)
+                .contentTransition(.numericText())
+        }
     }
 
     // MARK: Next-up hint
@@ -152,8 +210,8 @@ struct GameView: View {
         HStack(spacing: Theme.Spacing.sm) {
             NodeDot(kind: engine.expectedKind)
             Text(hintText)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(Theme.Font.body)
+                .foregroundStyle(Theme.Color.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
@@ -175,8 +233,8 @@ struct GameView: View {
         VStack(spacing: Theme.Spacing.sm) {
             if let feedback = engine.feedback {
                 Text(feedback)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(Theme.Font.small)
+                    .foregroundStyle(Theme.Color.danger)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
             }
@@ -192,27 +250,20 @@ struct GameView: View {
                         .submitLabel(.go)
                         .onSubmit(submit)
                         .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.vertical, Theme.Spacing.sm + 4)
-                        .background(Theme.Color.tile, in: Capsule())
+                        .frame(minHeight: 44)
+                        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
 
-                    Button(action: submit) {
-                        Text("Go")
-                            .font(.headline)
-                            .foregroundStyle(Theme.Color.onInk)
-                            .padding(.horizontal, Theme.Spacing.md + 2)
-                            .padding(.vertical, Theme.Spacing.sm + 4)
-                            .background(Theme.Color.ink, in: Capsule())
-                    }
-                    .buttonStyle(.pressScale)
-                    .disabled(!canSubmit)
-                    .opacity(canSubmit ? 1 : 0.4)
+                    Button("Go", action: submit)
+                        .buttonStyle(.primary)
+                        .fixedSize()
+                        .disabled(!canSubmit)
                 }
                 .shake(shakeToken)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.sm)
-        .padding(.bottom, Theme.Spacing.xs)
+        .padding(.bottom, Theme.Spacing.sm)
         .background(Theme.Color.canvas)
         .animation(.snappy, value: engine.feedback)
     }
@@ -234,9 +285,18 @@ struct GameView: View {
     // MARK: Feedback reactions
 
     private func onCorrect() {
-        Haptics.correct(streak: engine.score)
-        if soundEnabled { SoundPlayer.shared.correct(streak: engine.score) }
         gainToken += 1
+        guard engine.justPassedBest else {
+            Haptics.correct(streak: engine.score)
+            if soundEnabled { SoundPlayer.shared.correct(streak: engine.score) }
+            return
+        }
+        // The link that passed the record: the score turns green and bounces,
+        // with the celebrate haptic and the record chime on the same beat.
+        Haptics.celebrate()
+        if soundEnabled { SoundPlayer.shared.record() }
+        recordPop += 1
+        AccessibilityNotification.Announcement("A new best").post()
     }
 
     private func onReject() {

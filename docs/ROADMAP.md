@@ -1,7 +1,8 @@
 # Roadmap to 1.0 (launch)
 
 > **1.0.0 means launch.** The solo game loop is complete and tested at
-> [`0.4.0`](../CHANGELOG.md). This plan was re-cut on **2026-08-08** after a planning
+> [`0.4.0`](../CHANGELOG.md), and the visual design overhaul landed as `0.5.0`
+> (2026-10-22) — ahead of Foundations, so the two swapped version numbers. This plan was re-cut on **2026-08-08** after a planning
 > conversation that changed the launch scope, dropped global leaderboards, and added a
 > new headline mode. Six milestones stand between here and a public release.
 >
@@ -13,10 +14,10 @@
 
 | Version | Milestone | Depends on |
 |---|---|---|
-| 0.5.0 | [Foundations & safety net](#050--foundations--safety-net) | — |
-| 0.6.0 | [Design overhaul](#060--design-overhaul) | — |
+| 0.5.0 | [Design overhaul](#050--design-overhaul) — **landed 2026-10-22** (motion follows) | — |
+| 0.6.0 | [Foundations & safety net](#060--foundations--safety-net) | — |
 | 0.7.0 | [The service — TMDB proxy first](#070--the-service) | — |
-| 0.8.0 | [Accounts](#080--accounts) | 0.5.0 (device id), 0.7.0 (a backend) |
+| 0.8.0 | [Accounts](#080--accounts) | 0.6.0 (device id), 0.7.0 (a backend) |
 | 0.9.0 | [The Daily Chain](#090--the-daily-chain) | 0.7.0 (generation job) |
 | 0.10.0 | [Friend groups](#0100--friend-groups) | 0.8.0 |
 | 1.0.0 | [Launch](#100--launch) | all of the above |
@@ -49,62 +50,16 @@ keep the endless mode as the always-available path.)*
 
 ---
 
-## 0.5.0 — Foundations & safety net
+## 0.5.0 — Design overhaul
 
-**Why first:** none of it depends on a design decision, none of it can be wasted, and
-until it exists we're blind. The app currently has **zero logging statements and 18
-places where an error is caught and discarded** — including the path where a
-rate-limited launch leaves the home screen stuck on "Dealing…" forever. A tester saying
-"it froze" is currently unactionable.
-
-**Scope:**
-
-- **Back the code up.** A private remote. There isn't one — the project exists on one
-  laptop. Also the prerequisite for automated builds.
-- **Logging.** `OSLog` with categories (engine / network / storage). Free, no SDK,
-  privacy-aware by default, pullable off a real device. Wire it through the 18 silent
-  failure paths.
-- **Crash reporting.** Start with Xcode's built-in reports — zero work, no SDK, no
-  privacy-label change. Add a real tool (Sentry) at 0.7.0 so app and server errors land
-  in one place.
-- **Automated builds → TestFlight.** The release pipeline as a habit rather than an
-  event, even though testers come later.
-- **Stable device id.** A random identifier generated on first launch and stored locally;
-  every score and Reel entry stamped with it. Today the local data has **no owner at
-  all**, so there is nothing for a future account to claim. Pass & Play needs one anyway.
-- **The merge rule — decided 2026-08-08.** What happens when local data meets account
-  data (a device with a best of 11 and 200 Reel entries signing into an account with 7
-  and 40):
-
-  > **Highest best score wins. Reels combine. Streak takes the longer one.**
-
-  It exists as a written rule *before* the auth code because the default behaviour of
-  most sync implementations is "the server is the truth", which silently deletes the
-  player's record. Nothing is ever lost by merging — the rule only ever moves a value
-  upward or unions a set.
-
-  **Three sub-cases the headline rule doesn't cover, with defaults:**
-  - **Per-entity Reel counters.** `CollectedEntity` carries `timesLogged`; the same actor
-    may be on both sides with different counts. **Take the max, don't sum.** Summing is
-    more truthful across two genuinely-different devices, but it isn't idempotent — a
-    merge that runs twice double-counts. Same for `chainsLogged`. Merging must be safe to
-    repeat.
-  - **Streaks.** Store the **set of completed days** and recompute the streak from the
-    union, rather than merging the streak number itself. Same answer as "longer wins" in
-    the normal case, and correct in the cases where it isn't.
-  - **Two results for the same day.** One attempt per day is a rule; two devices is the
-    loophole. **Highest wins**, and the daily should read its "already played today" state
-    from the server once accounts exist.
-- **Disk-cache the deal pool.** A cold launch fires ~24 concurrent TMDB requests (5
-  `discover` pages + 1 page and 18 cast fetches for the derived actor pool), the pools
-  are in-memory only, and it repeats every launch. The pool is a fixed
-  `vote_count.desc` query — near-static and identical for every player. A ~24h disk cache
-  removes most of that burst with no server. See [`GROWTH.md`](GROWTH.md) for the full
-  rate-limit derivation.
-
----
-
-## 0.6.0 — Design overhaul
+> **Landed in 0.5.0 (2026-10-22), visuals only.** The direction chosen is **Cream
+> Neobrutalist** — cream canvas, white cards with a 2pt ink border and a hard offset
+> shadow, a coral call-to-action, Fraunces for display type and numerals, blue = actor,
+> yellow = movie. The chain is drawn as **cards** (a hero card for the newest link,
+> compact cards for earlier ones); the old tile stack survives behind a Settings switch
+> until the card treatment is confirmed with motion. **Still open: the motion re-tune**,
+> which follows as 0.5.x. Details of what changed are in the
+> [changelog](../CHANGELOG.md). The planning notes below are kept as written.
 
 **The current look is placeholder.** It's a competent NYT-Games/Connections pastiche, but
 it isn't an identity of its own — and that includes the chain rendering, the app's most
@@ -168,6 +123,61 @@ with a card/poster direction.
 - **The app name** is a separate, larger question that shouldn't be drifted into — and
   it's now an ASO decision too. "Chain" stays accurate as *domain* vocabulary regardless
   (`ChainNode`, `bestChain`); only `ChainStack.swift` is presentation-named.
+
+---
+
+## 0.6.0 — Foundations & safety net
+
+**Why first:** none of it depends on a design decision, none of it can be wasted, and
+until it exists we're blind. The app currently has **zero logging statements and 18
+places where an error is caught and discarded** — including the path where a
+rate-limited launch leaves the home screen stuck on "Dealing…" forever. A tester saying
+"it froze" is currently unactionable.
+
+**Scope:**
+
+- **Back the code up.** A private remote. There isn't one — the project exists on one
+  laptop. Also the prerequisite for automated builds.
+- **Logging.** `OSLog` with categories (engine / network / storage). Free, no SDK,
+  privacy-aware by default, pullable off a real device. Wire it through the 18 silent
+  failure paths.
+- **Crash reporting.** Start with Xcode's built-in reports — zero work, no SDK, no
+  privacy-label change. Add a real tool (Sentry) at 0.7.0 so app and server errors land
+  in one place.
+- **Automated builds → TestFlight.** The release pipeline as a habit rather than an
+  event, even though testers come later.
+- **Stable device id.** A random identifier generated on first launch and stored locally;
+  every score and Reel entry stamped with it. Today the local data has **no owner at
+  all**, so there is nothing for a future account to claim. Pass & Play needs one anyway.
+- **The merge rule — decided 2026-08-08.** What happens when local data meets account
+  data (a device with a best of 11 and 200 Reel entries signing into an account with 7
+  and 40):
+
+  > **Highest best score wins. Reels combine. Streak takes the longer one.**
+
+  It exists as a written rule *before* the auth code because the default behaviour of
+  most sync implementations is "the server is the truth", which silently deletes the
+  player's record. Nothing is ever lost by merging — the rule only ever moves a value
+  upward or unions a set.
+
+  **Three sub-cases the headline rule doesn't cover, with defaults:**
+  - **Per-entity Reel counters.** `CollectedEntity` carries `timesLogged`; the same actor
+    may be on both sides with different counts. **Take the max, don't sum.** Summing is
+    more truthful across two genuinely-different devices, but it isn't idempotent — a
+    merge that runs twice double-counts. Same for `chainsLogged`. Merging must be safe to
+    repeat.
+  - **Streaks.** Store the **set of completed days** and recompute the streak from the
+    union, rather than merging the streak number itself. Same answer as "longer wins" in
+    the normal case, and correct in the cases where it isn't.
+  - **Two results for the same day.** One attempt per day is a rule; two devices is the
+    loophole. **Highest wins**, and the daily should read its "already played today" state
+    from the server once accounts exist.
+- **Disk-cache the deal pool.** A cold launch fires ~24 concurrent TMDB requests (5
+  `discover` pages + 1 page and 18 cast fetches for the derived actor pool), the pools
+  are in-memory only, and it repeats every launch. The pool is a fixed
+  `vote_count.desc` query — near-static and identical for every player. A ~24h disk cache
+  removes most of that burst with no server. See [`GROWTH.md`](GROWTH.md) for the full
+  rate-limit derivation.
 
 ---
 
@@ -260,14 +270,14 @@ rationale, not architecture.*
 prerequisite for friend groups (0.10.0).
 
 **Shape — anonymous first, upgradeable:**
-1. The **stable device id** from 0.5.0 is already carrying local data.
+1. The **stable device id** from 0.6.0 is already carrying local data.
 2. **Sign in with Apple** as the upgrade path. Lowest friction on iOS, no password
    infrastructure, privacy-preserving.
 
 You can play forever without an account; signing in is a migration, never a gate.
 
 **Traps:**
-- **Migration must merge, not clobber** — apply the rule written at 0.5.0.
+- **Migration must merge, not clobber** — apply the rule written at 0.6.0.
 - Sign in with Apple gives a **stable but app-specific** user id, and the email may be a
   private relay — don't use email as the identity key.
 - **Account deletion is an App Store requirement** once you offer accounts, and the
@@ -312,7 +322,8 @@ audience knows you. Design accordingly: no prizes, no ranked tiers, no stakes th
 reward inflating a number.
 
 **Decide before starting:**
-- What's compared — links, points, or both?
+- ~~What's compared — links, points, or both?~~ **Decided 2026-10-22: links, with
+  points breaking a tie** — the same rule as the solo record (`Scoring.isNewRecord`).
 - Group size cap, and what happens when someone leaves.
 - Who can see whose history.
 

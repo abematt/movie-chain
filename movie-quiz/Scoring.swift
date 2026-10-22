@@ -18,6 +18,21 @@ import Foundation
 
 enum Scoring {
 
+    /// The record rule: the best run is the one with the **most links**, and
+    /// points only break a tie. One record, so the stored best always describes
+    /// a single run ("18 links · 848 pts" never pairs two different games).
+    static func isNewRecord(links: Int, points: Int, bestLinks: Int, bestPoints: Int) -> Bool {
+        links > bestLinks || (links == bestLinks && links > 0 && points > bestPoints)
+    }
+
+    /// True on the one link that takes a run past the previous best — the
+    /// moment for the in-play "a new best" cue. Fires once (on `previousBest + 1`,
+    /// not every link after), and never on a first-ever game, where there is no
+    /// record to pass.
+    static func passesRecord(score: Int, previousBest: Int) -> Bool {
+        previousBest > 0 && score == previousBest + 1
+    }
+
     /// Flat points every accepted link is worth, before bonuses.
     static let base = 10
 

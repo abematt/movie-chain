@@ -10,43 +10,207 @@
 
 import SwiftUI
 
-// MARK: - Primary button (ink-filled pill)
+// MARK: - Neo surface (the neobrutalist atom)
 //
-// The one prominent call-to-action ("Play again"). A solid near-black (ink)
-// capsule with inverted text — the Connections "Submit" affordance. Fills width
-// and gives tactile press feedback.
+// White (or tinted) fill, a 2pt ink border, and a solid shadow offset
+// down-right with no blur. Everything bordered in the app — cards, buttons,
+// inputs — is drawn by this one modifier, so the border weight and shadow depth
+// stay one system. `pressed` is the spec's press: the shadow collapses and the
+// surface shifts 1pt down-right.
 
-struct PrimaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.md)
-            .foregroundStyle(Theme.Color.onInk)
-            .background(Theme.Color.ink, in: Capsule())
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(Theme.Motion.standard, value: configuration.isPressed)
+struct NeoSurface<S: InsettableShape>: ViewModifier {
+    var shape: S
+    var fill: Color = Theme.Color.tile
+    var shadow: CGFloat = Theme.Shadow.large
+    var pressed = false
+
+    func body(content: Content) -> some View {
+        let depth = pressed ? 0 : shadow
+        let shift: CGFloat = pressed ? 1 : 0
+        content
+            .background(shape.fill(fill))
+            .overlay(shape.strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+            .background(shape.fill(Theme.Color.shadow).offset(x: depth, y: depth))
+            .offset(x: shift, y: shift)
     }
 }
 
-// MARK: - Ghost button (outlined pill)
+extension View {
+    /// Usage: `content.neoSurface(fill: Theme.Color.primary, shadow: Theme.Shadow.small)`
+    func neoSurface(radius: CGFloat = Theme.Radius.md,
+                    fill: Color = Theme.Color.tile,
+                    shadow: CGFloat = Theme.Shadow.large,
+                    pressed: Bool = false) -> some View {
+        modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: radius),
+                            fill: fill, shadow: shadow, pressed: pressed))
+    }
+}
+
+// MARK: - Primary button (coral, hard shadow)
 //
-// The quieter secondary action ("Share"): a hairline-outlined capsule with
-// muted text. Sits under the primary CTA without competing with it.
+// The one prominent call-to-action per screen ("Play again", "Retry"). Coral
+// fill, ink border, 4pt hard shadow; pressing darkens it to the pressed coral,
+// collapses the shadow and shifts it 1pt into the page. Under Reduce Motion the
+// shift and collapse are dropped and only the colour change remains.
+
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        NeoButtonBody(configuration: configuration,
+                      fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
+                      foreground: .white,
+                      shadow: Theme.Shadow.large)
+    }
+}
+
+// MARK: - Ghost button (secondary)
+//
+// The quieter secondary action ("Share", "Shuffle"): white surface, ink text,
+// a small 2pt shadow so it sits visibly below the primary.
 
 struct GhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
+        NeoButtonBody(configuration: configuration,
+                      fill: Theme.Color.tile,
+                      foreground: Theme.Color.ink,
+                      shadow: Theme.Shadow.small)
+    }
+}
+
+/// Shared body for the bordered buttons, so both read the environment (Reduce
+/// Motion) and press the same way.
+private struct NeoButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let fill: Color
+    let foreground: Color
+    let shadow: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
         configuration.label
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.md)
-            .foregroundStyle(.secondary)
-            .background(
-                Capsule().strokeBorder(Theme.Color.hairline, lineWidth: 1.5)
-            )
-            .opacity(configuration.isPressed ? 0.6 : 1)
-            .animation(Theme.Motion.standard, value: configuration.isPressed)
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
+            .padding(.horizontal, Theme.Spacing.lg - 4)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            // Disabled reads as "flat and empty", not as a faded copy: muted
+            // fill, secondary text, no shadow — the border stays solid.
+            .foregroundStyle(isEnabled ? foreground : Theme.Color.muted)
+            .modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: Theme.Radius.md),
+                                 fill: isEnabled ? fill : Theme.Color.hairline,
+                                 shadow: isEnabled ? shadow : 0,
+                                 pressed: configuration.isPressed && !reduceMotion))
+            .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Meta label
+//
+// The one uppercase-label recipe. Every "ACTOR", "TIME'S UP", "YOUR CHAIN" and
+// section title goes through this, so size, case and tracking stay identical.
+
+/// The spec's two label sizes: `.medium` (label-md) for section titles and
+/// metadata, `.small` (label-sm) for stamps inside cards and chips.
+enum MetaLabelSize { case medium, small }
+
+extension View {
+    /// Usage: `Text("Your chain").metaLabel()` · `Text("Actor").metaLabel(size: .small)`
+    func metaLabel(_ color: Color = Theme.Color.muted, size: MetaLabelSize = .medium) -> some View {
+        self.font(size == .medium ? Theme.Font.label : Theme.Font.labelSmall)
+            .textCase(.uppercase)
+            .tracking(size == .medium ? Theme.Font.labelTracking : Theme.Font.labelSmallTracking)
+            .foregroundStyle(color)
+    }
+}
+
+// MARK: - Node name
+//
+// A node's name with the movie year as an italic flourish ("Les Misérables
+// *2012*") instead of a parenthetical. One definition so every row, card and
+// recap shows years the same way.
+
+struct NodeName: View {
+    let node: ChainNode
+    var font: Font = Theme.Font.bodyStrong
+    var yearFont: Font = Theme.Font.flourish(.subheadline)
+
+    var body: some View {
+        if case .movie(let m) = node, let year = m.year {
+            Text("\(Text(m.title).font(font).foregroundStyle(Theme.Color.ink)) \(Text(String(year)).font(yearFont).foregroundStyle(Theme.Color.muted))")
+        } else {
+            Text(node.matchText).font(font).foregroundStyle(Theme.Color.ink)
+        }
+    }
+}
+
+// MARK: - Split heading
+//
+// The spec's heading recipe: a bold roman phrase followed by an italic
+// flourish word ("Your *regulars*", "Movie *Chain*").
+
+struct SplitHeading: View {
+    let roman: String
+    let flourish: String
+    var style: Font.TextStyle = .title3
+
+    var body: some View {
+        Text("\(Text(roman).font(Theme.Font.heading(style))) \(Text(flourish).font(Theme.Font.flourish(style)))")
+            .foregroundStyle(Theme.Color.ink)
+    }
+}
+
+// MARK: - Neo segmented control
+//
+// The bordered segmented picker: a white neo surface holding the options, the
+// selected one filled ink. Replaces the stock `Picker(.segmented)`, which
+// can't take the border, shadow or label type.
+
+struct NeoSegmented<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(value: Value, label: String)]
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            ForEach(options, id: \.value) { option in
+                let selected = option.value == selection
+                Button {
+                    withAnimation(Theme.Motion.standard) { selection = option.value }
+                } label: {
+                    Text(option.label)
+                        .font(Theme.Font.button)
+                        .textCase(.uppercase)
+                        .tracking(Theme.Font.buttonTracking)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .foregroundStyle(selected ? Theme.Color.onInk : Theme.Color.muted)
+                        .background(RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .fill(selected ? Theme.Color.ink : .clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+    }
+}
+
+// MARK: - Sheet chrome (the spec's top app bar)
+//
+// Cream bar, serif title, a 2pt ink rule under it. Applied to a sheet's
+// NavigationStack content so the Reel and Settings sheets match the app
+// instead of showing the stock translucent bar.
+
+extension View {
+    func neoNavigationBar<Title: View>(@ViewBuilder title: () -> Title) -> some View {
+        self
+            .toolbarBackground(Theme.Color.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar { ToolbarItem(placement: .principal) { title() } }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+            }
     }
 }
 
@@ -95,14 +259,14 @@ extension ButtonStyle where Self == GhostButtonStyle {
 
 // MARK: - Card container
 //
-// Wraps content in a padded warm-tile surface — the standard way to visually
-// cluster related content (the game-over near-miss uses it).
+// Wraps content in a padded neo surface — the standard way to visually cluster
+// related content (the game-over near-miss uses it).
 
 struct CardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(Theme.Spacing.md)
-            .background(Theme.Color.tile, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .neoSurface(radius: Theme.Radius.card)
     }
 }
 
@@ -113,7 +277,7 @@ extension View {
 
 // MARK: - Node dot
 //
-// A small category chip (blue = actor, purple = movie) used where a full tile
+// A small category chip (blue = actor, yellow = movie) used where a full tile
 // would be too heavy — seed results, the "what comes next" hint.
 
 struct NodeDot: View {
@@ -123,6 +287,7 @@ struct NodeDot: View {
     var body: some View {
         Circle()
             .fill(kind.accent)
+            .overlay(Circle().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
             .frame(width: size, height: size)
     }
 }
@@ -148,27 +313,24 @@ struct NodeTile: View {
         HStack(spacing: Theme.Spacing.sm) {
             if showKind {
                 Text(node.kind.tileLabel)
-                    .font(.system(size: 10, weight: .heavy))
-                    .tracking(1.2)
-                    .foregroundStyle(Theme.Color.onAccent.opacity(0.5))
+                    .metaLabel(node.kind.onAccent.opacity(0.7), size: .small)
             }
             Text(node.displayName)
-                .font(.system(.subheadline, weight: .bold))
+                .font(Theme.Font.bodyStrong)
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
-                .foregroundStyle(Theme.Color.onAccent)
+                .foregroundStyle(node.kind.onAccent)
             Spacer(minLength: 0)
             if let index {
                 Text("\(index)")
-                    .font(.caption.weight(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(Theme.Color.onAccent.opacity(0.45))
+                    .metaLabel(node.kind.onAccent.opacity(0.6), size: .small)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(node.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.tile))
+        .neoSurface(radius: Theme.Radius.tile, fill: node.accent, shadow: Theme.Shadow.small)
         .opacity(dimmed ? 0.32 : 1)
     }
 }
@@ -222,7 +384,7 @@ struct FloatingGain: View {
 
     var body: some View {
         Text("+\(value)")
-            .font(.system(.subheadline, weight: .bold))
+            .font(Theme.Font.numeral(.subheadline))
             .monospacedDigit()
             .foregroundStyle(Theme.Color.good)
             .opacity(rise ? 0 : 1)

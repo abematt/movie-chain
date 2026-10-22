@@ -64,6 +64,12 @@ final class SoundPlayer {
         play(frequency: frequency, duration: 0.18)
     }
 
+    /// The record chime: two rising notes, a fourth apart, an octave above the
+    /// correct-link register — the in-play "you just passed your best" beat.
+    func record() {
+        play(notes: [(1046.50, 0.12), (1396.91, 0.28)])   // C6 → F6
+    }
+
     /// A short low buzz for a wrong answer.
     func wrong() {
         play(frequency: 160, duration: 0.22)
@@ -72,10 +78,18 @@ final class SoundPlayer {
     // MARK: Synthesis
 
     private func play(frequency: Double, duration: Double) {
+        play(notes: [(frequency, duration)])
+    }
+
+    /// Synthesises a sequence of enveloped sine notes into one buffer, so a
+    /// multi-note chime plays as a single unit (`.interrupts` on separate buffers
+    /// would cut each note off with the next).
+    private func play(notes: [(frequency: Double, duration: Double)]) {
         startIfNeeded()
         guard started else { return }
 
-        let frameCount = AVAudioFrameCount(sampleRate * duration)
+        let total = notes.reduce(0) { $0 + $1.duration }
+        let frameCount = AVAudioFrameCount(sampleRate * total)
         guard
             frameCount > 0,
             let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount),
@@ -83,13 +97,17 @@ final class SoundPlayer {
         else { return }
         buffer.frameLength = frameCount
 
-        let count = Int(frameCount)
         let attack = 0.008                              // seconds
-        let decay = 6.0 / duration                      // exp fall-off across the note
-        for i in 0..<count {
-            let t = Double(i) / sampleRate
-            let envelope = min(1.0, t / attack) * exp(-t * decay)
-            channel[i] = Float(sin(2.0 * .pi * frequency * t) * envelope * 0.28)
+        var offset = 0
+        for note in notes {
+            let count = Int(sampleRate * note.duration)
+            let decay = 6.0 / note.duration             // exp fall-off across the note
+            for i in 0..<count where offset + i < Int(frameCount) {
+                let t = Double(i) / sampleRate
+                let envelope = min(1.0, t / attack) * exp(-t * decay)
+                channel[offset + i] = Float(sin(2.0 * .pi * note.frequency * t) * envelope * 0.28)
+            }
+            offset += count
         }
 
         // `.interrupts` so rapid answers cut the previous tone instead of piling up.

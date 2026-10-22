@@ -16,7 +16,7 @@
 | [`ASSISTED-MODE.md`](ASSISTED-MODE.md) | Postmortem of a removed mode — **read before building anything that picks chain links for the player** |
 | [`GROWTH.md`](GROWTH.md) | Growth mechanics as a build catalog — the share/daily/challenge/replay features that make distribution possible, sized and mapped to the code |
 
-Current version **0.4.0**; **1.0.0 means launch**. When you change the architecture,
+Current version **0.5.0**; **1.0.0 means launch**. When you change the architecture,
 providers, rules, or stack, update *this* file; when you land a user-visible change,
 add a changelog entry; when a plan changes, edit the roadmap.
 
@@ -359,7 +359,7 @@ pure-value + observable-store split as the rest of the app:
 
 > ⚠️ **The current visual treatment is placeholder**, including the chain rendering —
 > a full design overhaul is the next milestone: **[`ROADMAP.md` →
-> 0.6.0](ROADMAP.md#060--design-overhaul)**, which holds the options still being
+> 0.5.0](ROADMAP.md#050--design-overhaul)**, which holds the options still being
 > explored (a stacked list of cards is currently leading) and the constraints. Read it
 > before changing anything visual — the direction is **not settled yet**.
 > Treat what follows as a description of *what exists today*, not a settled identity.
@@ -367,27 +367,49 @@ pure-value + observable-store split as the rest of the app:
 > and per-node category identity — so a re-skin is a `Theme`/`Components` change
 > rather than a rewrite of every screen.
 
-An **editorial, puzzle-page treatment** (NYT Games / Connections): paper-warm
-neutrals, near-black ink, and two "category" accents — **blue for actors, purple
-for movies** — used the way Connections uses its group colors. A serif wordmark +
-system sans carry the type; there is no flame, confetti, or radial-heat.
+**Vocabulary (fixed app-wide):** a *chain* is one whole run, from the dealt start
+to the end; a *link* is one correct answer, and the score counts links; the dealt
+*start* is not a link. Copy, numbering and the recap all follow this, so the last
+link number always equals the score.
+
+**Cream Neobrutalist** (0.5.0): a cream canvas, white surfaces with a 2pt ink border and a hard unblurred
+offset shadow, one coral call-to-action, and two category accents — **blue for
+actors, yellow for movies** (the most colour-blind-safe pair). Dark mode flips the
+borders to cream on a warm charcoal canvas. A bold serif with an italic flourish
+carries display type in **Fraunces**, bundled in `movie-quiz/Fonts/` as four static
+cuts (bold and italic at a 72pt and a 24pt optical size) with its SIL OFL license, and
+registered at first use by `FontRegistry` in `Theme.swift`. Body, buttons and labels
+stay in SF rather than the spec's Inter, since SF is the iOS-native equivalent. Two
+other deliberate deviations: everything but the big numerals scales with Dynamic Type,
+and icons are SF Symbols rather than Phosphor. UI labels are
+small, bold, uppercase and tracked.
 - **Color** lives in `Assets.xcassets` as named sets with light+dark variants —
-  `Canvas`, `Ink`, `Tile` (warm grey surface), `Hairline`, `ActorBlue`,
-  `MoviePurple`, `Good` (correct-link green), and `OnAccent` (near-black text that
-  stays legible on the pastels in *both* themes). `Theme.Color` just names them;
+  `Canvas` (cream), `Ink` (text and every border), `Tile` (white surface),
+  `Shadow` (the hard offset shadow), `Hairline` (muted track), `Coral` (the CTA),
+  `ActorBlue`, `MovieYellow`, `Good` (correct-link green), and `OnAccent`
+  (near-black text for the light accents; actor blue takes white instead, via
+  `NodeKind.onAccent`). `Theme.Color` just names them;
   muted text still uses Apple's semantic `.secondary`/`.tertiary`.
-- `Theme` — token namespaces: `Color`, `Spacing`, `Radius`, `Motion` (incl.
+- `Theme` — token namespaces: `Color`, `Spacing`, `Border`, `Shadow` (`small`
+  2pt for chrome, `large` 4pt for primary cards and the CTA), `Font` (the whole
+  type system: serif `display`/`heading` with an italic `flourish`, sans `body`/
+  `bodyStrong`/`small`, and the tracked uppercase `label` — everything but the big
+  numerals rides a Dynamic Type text style), `Radius`, `Motion` (incl.
   `drop`, the spring a new tile lands on; `screen`, the soft spring the
   screen-to-screen carousel rides; `intro`, the seed cold-launch reveal; and
   `cascade`, the springy wave a staggered group of siblings rises in on).
   Views reference these, never literals. `AnyTransition.screenPush(reduceMotion:)`
   (also here) is the router's directional page push — see the UI section.
-- `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/purple),
+- `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/yellow), an `onAccent` text colour,
   a `tileLabel` ("ACTOR"/"MOVIE"), and a `symbol`, eliminating color/label logic
   that was duplicated across views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
-  `PrimaryButtonStyle` (`.buttonStyle(.primary)`, an ink-filled pill),
-  `GhostButtonStyle` (`.ghost`, outlined), `PressScaleStyle` (`.pressScale` — a
+  `.metaLabel()` (the one uppercase-label recipe), `NodeName` (a name with the
+  movie year as an italic flourish, never a parenthetical),
+  `.neoSurface(...)` (the neobrutalist atom: fill, ink border, hard shadow, and a
+  `pressed` state that collapses the shadow), `PrimaryButtonStyle`
+  (`.buttonStyle(.primary)`, coral with a 4pt shadow), `GhostButtonStyle`
+  (`.ghost`, white with a 2pt shadow), `PressScaleStyle` (`.pressScale` — a
   near-imperceptible press squish+dim for buttons that carry their own chrome but
   lacked an `isPressed` state, e.g. the in-game "Go"), `CardModifier` (`.card()`), `NodeTile`
   (the Connections category tile — the atom of the chain), `NodeDot` (small
@@ -409,11 +431,11 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
   `staggered:`, reveals its tiles one-after-another (through `StaggeredAppear`) as
   a rare end-of-run delight beat — a no-op during play, where tiles land
   individually on the `drop` transition.
-  **`ChainStack` is the most likely casualty of the 0.6.0 overhaul** — the replacement
+  **`ChainStack` was replaced as the default by `ChainCards` in the 0.5.0 overhaul** — the replacement
   isn't decided (a stacked list of cards is the leading candidate). Worth knowing: its
   *information architecture* (stack, collapse older, emphasise newest) probably survives
   whatever wins, so the change may be a re-skin of this component rather than a new
-  layout model. See [`ROADMAP.md` → 0.6.0](ROADMAP.md#060--design-overhaul) for the open
+  layout model. See [`ROADMAP.md` → 0.5.0](ROADMAP.md#050--design-overhaul) for the open
   options and the vertical-room constraint against the docked keyboard.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
   (drains in ink, shifts to a warning red in the final quarter).
@@ -435,7 +457,7 @@ system sans carry the type; there is no flame, confetti, or radial-heat.
 > placeholder.** The routing, state ownership, and layout *constraints* (keyboard
 > docking, portrait-only, Reduce Motion) are real and load-bearing; the styling is not
 > settled, and the chain's replacement is still an open question. See **[`ROADMAP.md` →
-> 0.6.0](ROADMAP.md#060--design-overhaul)** before changing anything visual.
+> 0.5.0](ROADMAP.md#050--design-overhaul)** before changing anything visual.
 
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
@@ -629,7 +651,7 @@ scratch:
   + an `apple-app-site-association` file) fix both and are the eventual target —
   and since the codec already speaks URLs, only the transport changes.
 
-Accounts arrive at 0.8.0 on the roadmap; the per-device player id (now a 0.5.0
+Accounts arrive at 0.8.0 on the roadmap; the per-device player id (now a 0.6.0
 foundation), plus the local session/collection data, are all
 forward-compatible with a future sync.
 
@@ -672,7 +694,7 @@ of the login-free core, never a gate in front of it.
 
 ## Dev workflow
 
-- **Versioning:** the app is versioned (currently **0.4.0**; **1.0.0 means launch**,
+- **Versioning:** the app is versioned (currently **0.5.0**; **1.0.0 means launch**,
   with each remaining pre-launch milestone allocated a minor version — see the
   roadmap table in the changelog header) and every notable change is recorded in
   [`CHANGELOG.md`](../CHANGELOG.md) (Keep a Changelog + SemVer). `MARKETING_VERSION`
