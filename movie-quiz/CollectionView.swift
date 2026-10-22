@@ -5,7 +5,7 @@
 //  "Your Reel" — the collection screen. Every actor/movie the player has logged
 //  through play, with pure count stats on top ("look how many you know"):
 //  actors as a deck of playing cards earned through the films linked through
-//  them, movies as framed posters (`ReelCards.swift`), narrowed by decade and
+//  them, movies as framed posters, three across (`ReelCards.swift`), narrowed by decade and
 //  genre. Presented as a sheet from the seed and
 //  game-over screens.
 //
@@ -27,15 +27,17 @@ struct CollectionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var filter: Filter = .actors
-    @AppStorage("reelTiers") private var tierModel: ReelTierModel = .rank
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
-    /// The card or frame lifted out of the grid, if any, and whether it's
-    /// turned over.
+    /// The card or frame lifted out of the grid — set for the whole time it's
+    /// out, including its flight home — whether it's on the way back, and
+    /// whether it's turned over.
     @State private var expanded: CollectedEntity.ID?
+    @State private var closing = false
     @State private var flipped = false
-    /// Ties each grid slot to its lifted card, so a lift flies out and back.
-    @Namespace private var lift
+    /// Where each grid card sits on screen, for the lift to start from and
+    /// land on. A plain object, so measuring never re-renders the grid.
+    @State private var slots = SlotFrames()
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
 
@@ -307,7 +309,7 @@ struct CollectionView: View {
     // MARK: Grids
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.md), count: 2)
+        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm + 2), count: 3)
     }
 
     @ViewBuilder private var grids: some View {
@@ -319,34 +321,33 @@ struct CollectionView: View {
                 frames
             }
         }
-        // Give each filter its own identity so switching cross-fades and re-deals
-        // the cards, rather than reflowing one grid's contents into the other's.
+        // Give each filter its own identity so switching cross-fades the grids
+        // rather than reflowing one grid's contents into the other's. Nothing
+        // cascades in: the cards arrive with the sheet, and only their art
+        // fades in, the first time, as it lands (`ArtCache`).
         .id(filter)
         .transition(.opacity)
         .animation(Theme.Motion.standard, value: narrow)
     }
 
     // The tabs above already name the kind and its count, so neither grid
-    // carries a header of its own.
+    // carries a header of its own. A card that's out stays in its slot, unseen,
+    // until its lifted copy has landed back on it — never rebuilt, so its art is
+    // just there.
     @ViewBuilder private var deck: some View {
         let actors = store.actors(matching: narrow)
         if actors.isEmpty {
             nothingMatches
         } else {
             LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
-                ForEach(Array(actors.enumerated()), id: \.element.id) { i, entity in
+                ForEach(actors) { entity in
                     Button { expand(entity.id) } label: {
-                        let card = ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
-                        if expanded == entity.id {
-                            card.hidden()   // holds the slot while the card is out
-                        } else {
-                            card.reelLift(id: entity.id, in: liftNamespace)
+                        ReelCanvas(aspect: ReelActorCard.aspect) {
+                            ReelActorCard(entity: entity, isNew: store.isNew(entity))
                         }
+                        .modifier(Slot(id: entity.id, slots: slots, out: expanded == entity.id))
                     }
-                    .buttonStyle(.pressScale)
-                    // Only the first screenful cascades in. The grid is lazy, so
-                    // later cells are made as they scroll in and must arrive solid.
-                    .appear(i, enabled: i < Self.cascadeCount)
+                    .buttonStyle(.reelPress)
                 }
             }
         }
@@ -358,22 +359,19 @@ struct CollectionView: View {
             nothingMatches
         } else {
             LazyVGrid(columns: columns, alignment: .center, spacing: Theme.Spacing.lg) {
-                ForEach(Array(movies.enumerated()), id: \.element.id) { i, entity in
+                ForEach(movies) { entity in
                     Button { expand(entity.id) } label: {
-                        VStack(spacing: Theme.Spacing.sm) {
-                            let frame = ReelFrame(entity: entity, isNew: store.isNew(entity))
-                            // The label stays on the wall while its frame is out.
-                            if expanded == entity.id {
-                                frame.hidden()
-                            } else {
-                                frame.reelLift(id: entity.id, in: liftNamespace)
+                        VStack(spacing: Theme.Spacing.xs + 2) {
+                            ReelCanvas(aspect: ReelFrame.aspect) {
+                                ReelFrame(entity: entity, isNew: store.isNew(entity))
                             }
+                            // The label stays on the wall while its frame is out.
+                            .modifier(Slot(id: entity.id, slots: slots, out: expanded == entity.id))
                             ReelFrameCaption(entity: entity)
                         }
                         .accessibilityElement(children: .combine)
                     }
-                    .buttonStyle(.pressScale)
-                    .appear(i, enabled: i < Self.cascadeCount)
+                    .buttonStyle(.reelPress)
                 }
             }
         }
@@ -389,42 +387,39 @@ struct CollectionView: View {
             .padding(.vertical, Theme.Spacing.xl)
     }
 
-    /// Cells in the first screenful of a grid — the ones that cascade in.
-    private static let cascadeCount = 6
-
-    /// No travel under Reduce Motion: the card fades in place instead.
-    private var liftNamespace: Namespace.ID? { reduceMotion ? nil : lift }
-
-    /// The backdrop fades on its own; the card flies from its slot (identity
-    /// insertion, so it never fades in) and fades out over the card flying home.
+    /// The lifted card with its backdrop and controls, drawn over the whole
+    /// sheet. It flies itself out of its slot and back (see `ReelCardDetail`).
     @ViewBuilder private var detail: some View {
-        ZStack {
-            if expanded != nil {
-                Theme.Color.canvas.opacity(0.92)
-                    .ignoresSafeArea()
-                    .onTapGesture { expand(nil) }
-                    .accessibilityHidden(true)
-                    .transition(.opacity)
-            }
-            if let id = expanded, let entity = store.entities[id] {
-                ReelCardDetail(entity: entity, linked: store.linked(to: entity), model: tierModel,
-                               namespace: liftNamespace, flipped: $flipped) {
-                    expand(nil)
-                }
-                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .identity, removal: .opacity))
-            }
+        if let id = expanded, let entity = store.entities[id] {
+            ReelCardDetail(entity: entity, linked: store.linked(to: entity),
+                           slot: slots.frames[id], closing: closing,
+                           flipped: $flipped, close: { expand(nil) })
         }
     }
 
-    /// Picking a card up is the deliberate moment, with a little settle;
-    /// putting it back is the system answering, so it snaps home.
+    /// Flying home: quick and unbouncy — the system putting the card back.
+    private static let homeFlight: Animation = .spring(duration: 0.38, bounce: 0)
+
+    /// Lift a card out (`id`), or send the one that's out home (`nil`). Picking
+    /// a card up is the deliberate moment and the detail runs its own open;
+    /// putting it back is the system answering, so it goes home quickly — a
+    /// flipped card turning to its front on the way — and only when it has
+    /// landed is it removed and the grid card shown again.
     private func expand(_ id: CollectedEntity.ID?) {
-        if id != nil { Haptics.lift() }
-        let animation: Animation = reduceMotion ? Theme.Motion.reducedFade
-            : id != nil ? .spring(duration: 0.4, bounce: 0.15) : Theme.Motion.standard
-        withAnimation(animation) {
-            expanded = id
+        if let id {
+            guard expanded == nil else { return }
+            Haptics.lift()
             flipped = false
+            expanded = id
+            return
+        }
+        guard expanded != nil, !closing else { return }
+        withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.homeFlight) {
+            closing = true
+            flipped = false
+        } completion: {
+            expanded = nil
+            closing = false
         }
     }
 
@@ -488,3 +483,27 @@ struct TMDBAttribution: View {
     CollectionView(store: .demo(), bestChain: 11)
 }
 #endif
+
+// MARK: - Grid slots
+
+/// Where each grid card is on screen. Deliberately not observed: the grid
+/// measures into it as it lays out and scrolls, and that must never re-render.
+final class SlotFrames {
+    var frames: [CollectedEntity.ID: CGRect] = [:]
+}
+
+/// A grid card's slot: records where it is on screen for the lift, and keeps it
+/// unseen (but in place) while its lifted copy is out.
+private struct Slot: ViewModifier {
+    let id: CollectedEntity.ID
+    let slots: SlotFrames
+    let out: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(out ? 0 : 1)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                slots.frames[id] = frame
+            }
+    }
+}

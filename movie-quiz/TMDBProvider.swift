@@ -273,7 +273,6 @@ nonisolated private struct MovieDTO: Decodable {
     let release_date: String?
     let popularity: Double?
     let poster_path: String?
-    let vote_count: Int?
     let genre_ids: [Int]?
     /// Role name, present on person `movie_credits` (nil on movie search results).
     let character: String?
@@ -291,7 +290,6 @@ nonisolated private struct MovieDTO: Decodable {
     func toMovie() -> Movie {
         let year = release_date.flatMap { Int($0.prefix(4)) }
         return Movie(id: id, title: title ?? "Untitled", year: year,
-                     popularity: popularity, imagePath: poster_path, voteCount: vote_count,
-                     genreIDs: genre_ids ?? [])
+                     popularity: popularity, imagePath: poster_path, genreIDs: genre_ids ?? [])
     }
 }

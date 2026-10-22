@@ -8,91 +8,37 @@
 //  actor's films, or a movie's actors — a reverse reference with no progress,
 //  since a cast runs to extras and could never be completed.
 //
-//  No numbers are printed on the front: the card's finish is the reward. `ReelTier`
-//  is the pure part (which finish a card earns) and is unit-tested; the views
-//  only draw what it decides. The tier model is a setting for now — Rank, Share
-//  or Plain — so the three can be compared in real play before one is kept.
+//  No numbers are printed on the front: the card's finish is the reward. Cards
+//  and frames are drawn once, at their grid size, and scaled to whatever size
+//  they're shown at (`ReelCanvas`) — so lifting one is a pure zoom, the same
+//  picture brought closer, with nothing re-flowing on the way.
 //
 
 import SwiftUI
 
 // MARK: - Tiers (pure)
 
-/// How an actor card earns its finish. A player setting while the three are
-/// compared (Settings → Reel cards).
-enum ReelTierModel: String, CaseIterable, Identifiable {
-    /// The same thresholds for everyone.
-    case rank
-    /// Thresholds scale with the actor's well-known films, clamped so a huge
-    /// filmography never puts holo out of reach and a small one never gives it away.
-    case share
-    /// No tiers: every card is paper.
-    case plain
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .rank: "Rank"
-        case .share: "Share"
-        case .plain: "Plain"
-        }
-    }
-
-    /// One line for the setting, saying what the model does.
-    var rule: String {
-        switch self {
-        case .rank: "The same for everyone: inked at 5 films linked, holo at 11."
-        case .share: "Scaled to each actor: inked at a quarter of their well-known films, holo at half."
-        case .plain: "No tiers. Every card is paper."
-        }
-    }
-}
-
 /// The finish a card is printed in, lowest first.
 enum ReelFinish: Comparable {
     case paper, inked, holo
-}
 
-enum ReelTier {
-    /// Rank's thresholds: inked from 5 links, holo from 11.
-    static let rankThresholds = (inked: 5, holo: 11)
-
-    /// The links an actor needs for inked and holo; `nil` for Plain, which has
-    /// no tiers. Share falls back to Rank's thresholds until the actor's
-    /// filmography has loaded in play (Reels saved before the snapshot existed).
-    static func thresholds(wellKnown: Int?, model: ReelTierModel) -> (inked: Int, holo: Int)? {
-        switch model {
-        case .plain:
-            return nil
-        case .rank:
-            return rankThresholds
-        case .share:
-            guard let wellKnown else { return rankThresholds }
-            return (scaled(wellKnown, share: 0.25, within: 2...5),
-                    scaled(wellKnown, share: 0.5, within: 4...10))
-        }
-    }
-
-    static func finish(links: Int, wellKnown: Int?, model: ReelTierModel) -> ReelFinish {
-        guard let t = thresholds(wellKnown: wellKnown, model: model) else { return .paper }
-        if links >= t.holo { return .holo }
-        return links >= t.inked ? .inked : .paper
-    }
-
-    private static func scaled(_ wellKnown: Int, share: Double, within range: ClosedRange<Int>) -> Int {
-        let wanted = Int((Double(wellKnown) * share).rounded(.up))
-        return min(range.upperBound, max(range.lowerBound, wanted))
-    }
-}
-
-extension ReelFinish {
     var label: String {
         switch self {
         case .paper: "Paper"
         case .inked: "Inked"
         case .holo: "Holo"
         }
+    }
+}
+
+enum ReelTier {
+    /// Films linked through an actor before their card is inked, then holo.
+    static let inkedAt = 5
+    static let holoAt = 11
+
+    static func finish(links: Int) -> ReelFinish {
+        if links >= holoAt { return .holo }
+        return links >= inkedAt ? .inked : .paper
     }
 }
 
@@ -111,52 +57,79 @@ enum ReelGenre {
     ]
 }
 
+// MARK: - Sizes
+
+enum ReelLayout {
+    /// The width cards and frames are drawn at — about a grid slot at three
+    /// across on a phone — before `ReelCanvas` scales them.
+    static let designWidth: CGFloat = 110
+    /// How wide a lifted card or frame is shown.
+    static let liftedWidth: CGFloat = 240
+    /// Art size for grid slots — and the one warmed at launch.
+    static let artSize = "w342"
+    /// The sharper art a lifted card swaps to once it has loaded.
+    static let liftedArtSize = "w780"
+}
+
+/// Lays `content` out once at `ReelLayout.designWidth` and scales it to the
+/// width it's offered, so a card is the same picture at every size: in its grid
+/// slot, mid-lift, and lifted. Borders and shadows scale with it, like a card
+/// held closer.
+struct ReelCanvas<Content: View>: View {
+    let aspect: CGFloat
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        GeometryReader { g in
+            let width = ReelLayout.designWidth
+            content
+                .frame(width: width, height: width / aspect)
+                .scaleEffect(g.size.width / width, anchor: .topLeading)
+        }
+        .aspectRatio(aspect, contentMode: .fit)
+    }
+}
+
 // MARK: - Actor card (playing card)
 
 struct ReelActorCard: View {
     let entity: CollectedEntity
-    let model: ReelTierModel
-    /// Live tilt for the expanded card. The grid passes `.zero`, so a deck full
-    /// of holo never runs the gyro.
+    /// Live tilt for the lifted card. The grid passes `.zero`, so a deck full of
+    /// holo never runs the gyro.
     var tilt: CGSize = .zero
-    var large = false
     var isNew = false
+    /// Lifted: swap the art for a sharper image once it has loaded.
+    var sharpArt = false
 
     /// A poker card's proportions.
     static let aspect: CGFloat = 5.0 / 7.0
 
     private var links: Int { entity.links.count }
-    private var finish: ReelFinish {
-        ReelTier.finish(links: links, wellKnown: entity.wellKnownFilms, model: model)
-    }
+    private var finish: ReelFinish { ReelTier.finish(links: links) }
     private var ink: Color { finish == .holo ? Theme.Color.onAccent : Theme.Color.ink }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            // One size for grid and lift: the lifted card reuses the cached image
-            // instead of flashing its monogram mid-flight.
-            ReelArt(path: entity.imagePath, kind: .actor, name: entity.name, size: "w342")
+        VStack(spacing: 5) {
+            ReelArt(path: entity.imagePath, kind: .actor, name: entity.name,
+                    sharpSize: sharpArt ? ReelLayout.liftedArtSize : nil)
                 // The photo takes whatever the name and pips leave, so the card
-                // is truly 5:7 — the lift sizes it by that ratio, and a card
-                // taller than it would spill out of its frame.
+                // stays 5:7.
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                    .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+                .overlay(RoundedRectangle(cornerRadius: 5)
+                    .strokeBorder(Theme.Color.border, lineWidth: 1.5))
             Text(entity.name)
-                .font(Theme.Font.heading(large ? .title3 : .subheadline))
+                .font(Theme.Font.heading(.caption))
                 .foregroundStyle(ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            if model != .plain, links > 0 { pips }
+                .minimumScaleFactor(0.6)
+            if links > 0 { pips }
         }
-        .padding(large ? 22 : 14)
+        .padding(8)
         .background { face }
-        .overlay(alignment: .topTrailing) { if isNew { NewBadge().padding(6) } }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .neoSurface(radius: Theme.Radius.md, fill: .clear,
-                    shadow: large ? Theme.Shadow.large : Theme.Shadow.small)
-        .aspectRatio(Self.aspect, contentMode: .fit)
+        .overlay(alignment: .topTrailing) { if isNew { NewBadge().padding(4) } }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+        .neoSurface(radius: Theme.Radius.sm, fill: .clear, shadow: Theme.Shadow.small)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(entity.name), \(links) \(links == 1 ? "film" : "films") linked, \(finish.label)")
     }
@@ -168,28 +141,22 @@ struct ReelActorCard: View {
         case .inked:
             // A printed frame in the actor blue, inset like a card's border art.
             Theme.Color.tile.overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                    .strokeBorder(Theme.Color.actor, lineWidth: large ? 5 : 4)
-                    .padding(large ? 6 : 4)
+                RoundedRectangle(cornerRadius: 5)
+                    .strokeBorder(Theme.Color.actor, lineWidth: 3)
+                    .padding(3)
             }
         case .holo:
             HoloFoil(tilt: tilt)
         }
     }
 
-    /// Rank and Plain: one pip per linked film, up to ten. Share fills ten
-    /// segments toward holo instead, so the pips read "how close", not "how many".
+    /// One pip per linked film, up to ten.
     private var pips: some View {
-        let total = 10
-        let holo = ReelTier.thresholds(wellKnown: entity.wellKnownFilms, model: model)?.holo ?? total
-        let filled = model == .share
-            ? min(total, Int((Double(links) / Double(holo) * Double(total)).rounded()))
-            : min(total, links)
-        return HStack(spacing: 2) {
-            ForEach(0..<total, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(i < filled ? ink : ink.opacity(0.12))
-                    .frame(height: large ? 6 : 4)
+        HStack(spacing: 1.5) {
+            ForEach(0..<10, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 0.75)
+                    .fill(i < links ? ink : ink.opacity(0.12))
+                    .frame(height: 3)
             }
         }
     }
@@ -201,37 +168,37 @@ struct ReelActorCard: View {
 /// behind it. The caption sits under the frame in the grid, like a wall label.
 struct ReelFrame: View {
     let entity: CollectedEntity
-    var large = false
     var isNew = false
+    /// Lifted: swap the poster for a sharper image once it has loaded.
+    var sharpArt = false
+
+    private static let mat: CGFloat = 7
+    private static let moulding: CGFloat = 4
+
+    /// Width ÷ height: a 2:3 poster inside a fixed border of mat and moulding,
+    /// at the design width.
+    static let aspect: CGFloat = {
+        let border = (mat + moulding) * 2
+        let width = ReelLayout.designWidth
+        return width / ((width - border) * 1.5 + border)
+    }()
 
     var body: some View {
-        ReelArt(path: entity.imagePath, kind: .movie, name: entity.name, size: "w500")
+        ReelArt(path: entity.imagePath, kind: .movie, name: entity.name,
+                sharpSize: sharpArt ? ReelLayout.liftedArtSize : nil)
             .aspectRatio(2.0 / 3.0, contentMode: .fit)
-            .clipped()
-            .overlay(Rectangle().strokeBorder(Theme.Color.border, lineWidth: 1))
-            // The mat.
-            .padding(Self.mat(large))
+            .overlay(Rectangle().strokeBorder(Theme.Color.border, lineWidth: 0.75))
+            .padding(Self.mat)
             .background(Theme.Color.tile)
             // The moulding, with a hairline inner edge where it meets the mat.
-            .overlay(Rectangle().strokeBorder(Theme.Color.hairline, lineWidth: 1).padding(1))
-            .padding(Self.moulding(large))
+            .overlay(Rectangle().strokeBorder(Theme.Color.hairline, lineWidth: 0.75).padding(0.75))
+            .padding(Self.moulding)
             .background(Theme.Color.ink)
             .background(Rectangle().fill(Theme.Color.shadow)
-                .offset(x: large ? Theme.Shadow.large : Theme.Shadow.small,
-                        y: large ? Theme.Shadow.large : Theme.Shadow.small))
-            .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 4, y: -6) } }
+                .offset(x: Theme.Shadow.small, y: Theme.Shadow.small))
+            .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 3, y: -5) } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(entity.displayName)
-    }
-
-    private static func mat(_ large: Bool) -> CGFloat { large ? 18 : 10 }
-    private static func moulding(_ large: Bool) -> CGFloat { large ? 10 : 6 }
-
-    /// Width ÷ height at `width`: a 2:3 poster inside a fixed border of mat
-    /// and moulding.
-    static func aspect(width: CGFloat, large: Bool) -> CGFloat {
-        let border = (mat(large) + moulding(large)) * 2
-        return width / ((width - border) * 1.5 + border)
     }
 }
 
@@ -242,13 +209,13 @@ struct ReelFrameCaption: View {
     var body: some View {
         VStack(spacing: 0) {
             Text(entity.name)
-                .font(Theme.Font.heading(.subheadline))
+                .font(Theme.Font.heading(.footnote))
                 .foregroundStyle(Theme.Color.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             if let year = entity.year {
                 Text(String(year))
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.flourish(.caption))
                     .foregroundStyle(Theme.Color.muted)
             }
         }
@@ -259,77 +226,127 @@ struct ReelFrameCaption: View {
 
 // MARK: - Expanded card (flips to what's behind it)
 
-/// An actor card or framed poster lifted out of the grid. It flies out of its
-/// slot and back into it (`matchedGeometryEffect` in `namespace`), and turns
-/// over on a tap: an actor's back lists the films linked through them, a
-/// movie's the actors. Holo cards catch the light here, and only here.
+/// An actor card or framed poster lifted out of the grid, with its dimmed
+/// backdrop and Flip/Close controls. It turns over on a tap: an actor's back
+/// lists the films linked through them, a movie's the actors. Holo cards catch
+/// the light here, and only here.
 ///
-/// The dimmed backdrop and the lift itself belong to `CollectionView`, so a tap
-/// anywhere puts the card back.
+/// The card makes the whole journey itself, drawn above everything: it starts
+/// exactly over its grid slot (`slot`), scaled down to it, grows to the centre,
+/// and on close shrinks back onto the slot — turning to its front on the way if
+/// it was flipped. Only once it has landed does `CollectionView` remove it and
+/// show the grid card again, identical and in place. (Matched geometry flew the
+/// *grid's* card instead, which travelled under the backdrop and under its
+/// neighbours, and was rebuilt at every hand-off.)
 struct ReelCardDetail: View {
     let entity: CollectedEntity
     let linked: [CollectedEntity]
-    let model: ReelTierModel
-    /// The grid's lift namespace; `nil` under Reduce Motion, where the card
-    /// fades in place instead of travelling.
-    let namespace: Namespace.ID?
+    /// The grid slot this card came from, in global coordinates. `nil` (never
+    /// measured) or Reduce Motion: the card fades in place instead of travelling.
+    let slot: CGRect?
+    /// Set by `CollectionView` (inside the flight-home animation) when the card
+    /// should go back.
+    let closing: Bool
     @Binding var flipped: Bool
     let close: () -> Void
 
-    /// The buttons fade in once the card is on its way; the card never fades.
+    /// Where the card sits when it's out, measured once laid out — the far end
+    /// of the flight.
+    @State private var rest: CGRect?
+    /// The card is out (the open animation drives this to true).
+    @State private var arrived = false
     @State private var settled = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Turning over: quick enough to flip back and forth, a touch of settle.
     static let flip: Animation = .spring(duration: 0.42, bounce: 0.1)
+    /// Coming out: the deliberate moment, with the faintest settle.
+    static let open: Animation = .spring(duration: 0.4, bounce: 0.08)
 
     private var links: Int { entity.links.count }
     private var isActor: Bool { entity.kind == .actor }
-    private var width: CGFloat { isActor ? 270 : 250 }
-    private var aspect: CGFloat {
-        isActor ? ReelActorCard.aspect : ReelFrame.aspect(width: width, large: true)
-    }
+    private var aspect: CGFloat { isActor ? ReelActorCard.aspect : ReelFrame.aspect }
     private var live: Bool {
         isActor && !reduceMotion && TiltMotion.shared.isAvailable
-            && ReelTier.finish(links: links, wellKnown: entity.wellKnownFilms, model: model) == .holo
+            && ReelTier.finish(links: links) == .holo
     }
+    /// Travel needs a slot to travel from; otherwise the card fades.
+    private var travels: Bool { !reduceMotion && slot != nil }
+    private var out: Bool { arrived && !closing }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            card
-            HStack(spacing: Theme.Spacing.sm) {
-                Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
-                Button("Close", action: close).buttonStyle(.ghost)
-            }
-            .frame(width: 270)
-            .opacity(settled ? 1 : 0)
-        }
-        .onAppear {
-            withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard.delay(0.12)) {
-                settled = true
+        ZStack {
+            Theme.Color.canvas.opacity(0.92)
+                .ignoresSafeArea()
+                .opacity(out ? 1 : 0)
+                // A plain fade in (a dim mustn't bounce with the card); cleared
+                // quickly on close, while the card is still on its way home.
+                .animation(.easeOut(duration: 0.2), value: arrived)
+                .animation(.easeOut(duration: 0.15), value: closing)
+                .onTapGesture(perform: close)
+                .accessibilityHidden(true)
+
+            VStack(spacing: Theme.Spacing.lg) {
+                card
+                controls
+                    .opacity(settled && !closing ? 1 : 0)
+                    .animation(.easeOut(duration: 0.1), value: closing)
             }
         }
         .accessibilityAction(.escape, close)
     }
 
-    /// Laid out once at full size and scaled to whatever frame the lift gives
-    /// it, so the card grows out of its grid slot without re-flowing its text.
-    private var card: some View {
-        GeometryReader { g in
-            faces
-                .frame(width: width, height: width / aspect)
-                .scaleEffect(g.size.width / width, anchor: .topLeading)
+    private var controls: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
+            Button("Close", action: close).buttonStyle(.ghost)
         }
-        .aspectRatio(aspect, contentMode: .fit)
-        .reelLift(id: entity.id, in: namespace)
-        .frame(width: width, height: width / aspect)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: toggle)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint(flipped ? "Shows the front"
-                           : isActor ? "Shows the films linked through them"
-                           : "Shows the actors linked through it")
+        .frame(width: 270)
+    }
+
+    /// The front is the grid's own drawing, scaled up (`ReelCanvas`); the back
+    /// is laid out at full size over it.
+    private var card: some View {
+        let width = ReelLayout.liftedWidth
+        // The resting place is measured on an empty stand-in the flight never
+        // moves: measured on the card itself, each reading included the flight
+        // transform, so "rest" chased wherever the card had just been drawn.
+        return Color.clear
+            .frame(width: width, height: width / aspect)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                let first = rest == nil
+                rest = frame
+                if first { takeOff() }
+            }
+            .overlay {
+                faces
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: toggle)
+                    .modifier(LiftFlight(progress: travels ? (out ? 1 : 0) : 1, from: slot, to: rest))
+                    // Hidden until measured, so its first frame is over the slot
+                    // rather than flashing at the centre; without travel, it fades.
+                    .opacity(rest == nil ? 0 : travels ? 1 : (out ? 1 : 0))
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(flipped ? "Shows the front"
+                               : isActor ? "Shows the films linked through them"
+                               : "Shows the actors linked through it")
+    }
+
+    /// Start the open once the card has been drawn over its slot. The wait is
+    /// one frame: started in the same pass that measured it, the card was never
+    /// drawn at the slot, so there was nothing to animate from and it appeared
+    /// at the centre at once.
+    private func takeOff() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(17))
+            guard !closing else { return }
+            withAnimation(travels ? Self.open : Theme.Motion.reducedFade) { arrived = true }
+            withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard.delay(0.12)) {
+                settled = true
+            }
+        }
     }
 
     @ViewBuilder private var faces: some View {
@@ -343,19 +360,22 @@ struct ReelCardDetail: View {
     }
 
     private func toggle() {
+        guard !closing else { return }
         Haptics.selection()
         withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.flip) {
             flipped.toggle()
         }
     }
 
-    @ViewBuilder private var front: some View {
-        if !isActor {
-            ReelFrame(entity: entity, large: true)
-        } else if live {
-            LiveHoloActorCard(entity: entity, model: model)
-        } else {
-            ReelActorCard(entity: entity, model: model, large: true)
+    private var front: some View {
+        ReelCanvas(aspect: aspect) {
+            if !isActor {
+                ReelFrame(entity: entity, sharpArt: true)
+            } else if live {
+                LiveHoloActorCard(entity: entity)
+            } else {
+                ReelActorCard(entity: entity, sharpArt: true)
+            }
         }
     }
 
@@ -398,7 +418,7 @@ struct ReelCardDetail: View {
     @ViewBuilder private func row(_ other: CollectedEntity) -> some View {
         HStack(alignment: .center, spacing: Theme.Spacing.sm) {
             if other.kind == .actor {
-                ReelArt(path: other.imagePath, kind: .actor, name: other.name, size: "w92", monogramSize: 10)
+                ReelArt(path: other.imagePath, kind: .actor, name: other.name, monogramSize: 10)
                     .frame(width: 26, height: 26)
                     .clipShape(Circle())
                     .overlay(Circle().strokeBorder(Theme.Color.border, lineWidth: 1.5))
@@ -421,23 +441,13 @@ struct ReelCardDetail: View {
         }
     }
 
-    /// The only place a denominator appears, and only in Share. Missing titles
-    /// are never listed: that would turn the Reel into a study sheet for the
-    /// next run.
+    /// Missing titles are never listed: that would turn the Reel into a study
+    /// sheet for the next run.
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Group {
-                if isActor, model == .share, let known = entity.wellKnownFilms {
-                    Text("\(links) of ~\(known) well-known films")
-                } else if isActor {
-                    Text("\(links) \(links == 1 ? "film" : "films") linked")
-                } else {
-                    Text("\(links) \(links == 1 ? "actor" : "actors") linked")
-                }
-            }
-            .font(Theme.Font.numeral(.subheadline))
-            .foregroundStyle(Theme.Color.ink)
-
+            Text("\(links) \(isActor ? (links == 1 ? "film" : "films") : (links == 1 ? "actor" : "actors")) linked")
+                .font(Theme.Font.numeral(.subheadline))
+                .foregroundStyle(Theme.Color.ink)
             Text("In \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
                 .font(Theme.Font.flourish(.footnote))
                 .foregroundStyle(Theme.Color.muted)
@@ -449,24 +459,11 @@ struct ReelCardDetail: View {
 /// the 30Hz tilt redraws only the card, not the detail around it.
 private struct LiveHoloActorCard: View {
     let entity: CollectedEntity
-    let model: ReelTierModel
 
     var body: some View {
-        ReelActorCard(entity: entity, model: model, tilt: TiltMotion.shared.tilt, large: true)
+        ReelActorCard(entity: entity, tilt: TiltMotion.shared.tilt, sharpArt: true)
             .onAppear { TiltMotion.shared.start() }
             .onDisappear { TiltMotion.shared.stop() }
-    }
-}
-
-extension View {
-    /// Ties a Reel card to its slot in the grid so lifting it flies it out and
-    /// back. No namespace (Reduce Motion) means no travel.
-    @ViewBuilder func reelLift(id: CollectedEntity.ID, in namespace: Namespace.ID?) -> some View {
-        if let namespace {
-            matchedGeometryEffect(id: id, in: namespace)
-        } else {
-            self
-        }
     }
 }
 
@@ -495,48 +492,154 @@ private struct FlipView<Front: View, Back: View>: View, Animatable {
     }
 }
 
+/// Carries the lifted card between its grid slot and its resting place:
+/// scaled to the slot's size and moved onto it at `progress` 0, untouched at 1.
+/// The card is the grid's own drawing at a larger scale (`ReelCanvas`), so the
+/// shrink lands it pixel-for-pixel on the slot.
+nonisolated private struct LiftFlight: GeometryEffect {
+    var progress: CGFloat
+    let from: CGRect?
+    let to: CGRect?
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        guard let from, let to, to.width > 0 else { return ProjectionTransform() }
+        let away = 1 - progress
+        let scale = 1 + (from.width / to.width - 1) * away
+        let centre = CGAffineTransform(translationX: size.width / 2, y: size.height / 2)
+        let transform = centre.inverted()
+            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+            .concatenating(centre)
+            .concatenating(CGAffineTransform(translationX: (from.midX - to.midX) * away,
+                                             y: (from.midY - to.midY) * away))
+        return ProjectionTransform(transform)
+    }
+}
+
 // MARK: - Pieces
+
+/// Press feedback for a Reel card or frame: the card sinks a touch (0.97), and
+/// that's all. The app's `.pressScale` also dims to 85%, which on a photo card
+/// read as a pop when the lift then started from the undimmed card. Under
+/// Reduce Motion the scale is motion, so the dim stands in for it instead.
+struct ReelPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PressBody(configuration: configuration)
+    }
+
+    private struct PressBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+                .opacity(configuration.isPressed && reduceMotion ? 0.85 : 1)
+                .animation(Theme.Motion.press, value: configuration.isPressed)
+        }
+    }
+}
+
+extension ButtonStyle where Self == ReelPressStyle {
+    /// Usage: `.buttonStyle(.reelPress)`
+    static var reelPress: ReelPressStyle { .init() }
+}
 
 private struct NewBadge: View {
     var body: some View {
         Text("New")
-            .metaLabel(Theme.Color.onAccent, size: .small)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+            .font(.system(size: 7, weight: .heavy))
+            .textCase(.uppercase)
+            .tracking(Theme.Font.labelSmallTracking)
+            .foregroundStyle(Theme.Color.onAccent)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1.5)
             .background(Capsule().fill(Theme.Color.good))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: 1))
     }
 }
 
-/// A headshot or poster, streamed through `AsyncImage` (system-cached, never
-/// stored), over the kind's accent with a monogram until it arrives — or for
-/// good, when TMDB has no art.
+/// A headshot or poster, read through `ArtCache`: drawn at once when it's in
+/// memory, otherwise faded in over the kind's accent when it lands. A monogram
+/// stands in only when there's no art at all — never as a loading state, so a
+/// card goes straight from colour to photo, one step.
+///
+/// The regular image and the sharper one (a lifted card) are separate layers,
+/// and only their opacity animates — no views swapped in and out. Swapping one
+/// image view for another left a frame or two where neither was fully drawn and
+/// the accent flashed through; layered, the base photo is always underneath.
 private struct ReelArt: View {
     let path: String?
     let kind: NodeKind
     let name: String
-    let size: String
+    /// A sharper size to fade in over the base image once it lands (a lifted card).
+    var sharpSize: String? = nil
     var monogramSize: CGFloat = 28
 
+    @State private var base: Image?
+    @State private var sharp: Image?
+    /// Art already in memory when this view is made starts shown — no fade.
+    @State private var baseShown: Bool
+    @State private var sharpShown: Bool
+    @State private var failed = false
+
+    init(path: String?, kind: NodeKind, name: String, sharpSize: String? = nil, monogramSize: CGFloat = 28) {
+        self.path = path
+        self.kind = kind
+        self.name = name
+        self.sharpSize = sharpSize
+        self.monogramSize = monogramSize
+        let cache = ArtCache.shared
+        let base = Config.imageURL(path: path, size: ReelLayout.artSize).flatMap(cache.image(for:))
+        let sharp = sharpSize.flatMap { Config.imageURL(path: path, size: $0) }.flatMap(cache.image(for:))
+        _base = State(initialValue: base)
+        _sharp = State(initialValue: sharp)
+        _baseShown = State(initialValue: base != nil)
+        _sharpShown = State(initialValue: sharp != nil)
+    }
+
     var body: some View {
-        // The art is an overlay so only the accent sizes this view. A filling
-        // image inside a ZStack would size it instead — larger than the space
-        // offered — and push the card past its 5:7.
         kind.accent
             .overlay {
-                if let url = Config.imageURL(path: path, size: size) {
-                    AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
-                        if case .success(let image) = phase {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            monogram
-                        }
-                    }
-                } else {
-                    monogram
-                }
+                if base == nil, sharp == nil, path == nil || failed { monogram }
+            }
+            .overlay {
+                if let base { fill(base).opacity(baseShown ? 1 : 0) }
+            }
+            .overlay {
+                if let sharp { fill(sharp).opacity(sharpShown ? 1 : 0) }
             }
             .clipped()
+            .task(id: path) { await load() }
+    }
+
+    private func fill(_ image: Image) -> some View {
+        image.resizable().aspectRatio(contentMode: .fill)
+    }
+
+    private func load() async {
+        if base == nil, sharp == nil {
+            guard let url = Config.imageURL(path: path, size: ReelLayout.artSize) else { return }
+            guard let loaded = await ArtCache.shared.load(url) else {
+                if !Task.isCancelled { failed = true }
+                return
+            }
+            guard !Task.isCancelled else { return }
+            base = loaded                       // in place, transparent…
+            withAnimation(.easeOut(duration: 0.2)) { baseShown = true }   // …then faded up
+        }
+        // The same picture, sharper, faded in on top — or the moment it sharpens
+        // shows as a pop on a large lifted card.
+        guard sharp == nil, let sharpSize,
+              let url = Config.imageURL(path: path, size: sharpSize),
+              let loaded = await ArtCache.shared.load(url), !Task.isCancelled
+        else { return }
+        sharp = loaded
+        withAnimation(.easeOut(duration: 0.15)) { sharpShown = true }
     }
 
     private var monogram: some View {
@@ -552,16 +655,16 @@ private struct ReelArt: View {
 extension CollectionStore {
     /// An in-memory Reel of real actors and films, for previews and the
     /// `-uiDemoReel` launch argument. Never touches the player's saved Reel.
-    /// The well-known counts and genres are real (TMDB, 2026-10-22).
+    /// The genres are real (TMDB, 2026-10-22).
     static func demo() -> CollectionStore {
-        func actor(_ id: Int, _ name: String, _ path: String?, wellKnown: Int) -> (Person, Int) {
-            (Person(id: id, name: name, imagePath: path), wellKnown)
+        func actor(_ id: Int, _ name: String, _ path: String?) -> Person {
+            Person(id: id, name: name, imagePath: path)
         }
         func film(_ id: Int, _ title: String, _ year: Int, _ path: String?, _ genres: [Int]) -> Movie {
             Movie(id: id, title: title, year: year, imagePath: path, genreIDs: genres)
         }
-        let deck: [((Person, Int), [Movie])] = [
-        (actor(6384, "Keanu Reeves", "/8RZLOyYGsoRe9p44q3xin9QkMHv.jpg", wellKnown: 48), [
+        let deck: [(Person, [Movie])] = [
+        (actor(6384, "Keanu Reeves", "/8RZLOyYGsoRe9p44q3xin9QkMHv.jpg"), [
                     film(603, "The Matrix", 1999, "/dXNAPwY7VrqMAo51EKhhCJfaGb5.jpg", [28, 878]),
                     film(245891, "John Wick", 2014, "/wXqWR7dHncNRbxoEGybEy7QTe9h.jpg", [28, 53]),
                     film(1637, "Speed", 1994, "/82PkCE4R95KhHICUDF7G4Ly2z3l.jpg", [28, 53]),
@@ -573,48 +676,48 @@ extension CollectionStore {
                     film(324552, "John Wick: Chapter 2", 2017, "/hXWBc0ioZP3cN4zCu6SN3YHXZVO.jpg", [28, 53, 80]),
                     film(301528, "Toy Story 4", 2019, "/w9kR8qbmQ01HwnvK4alvnQ2ca0L.jpg", [10751, 35, 16, 12]),
                     film(513576, "Always Be My Maybe", 2019, "/3BO6pPa7qDcpPYct061Luh9fvst.jpg", [10749, 35])]),
-        (actor(31, "Tom Hanks", "/oFvZoKI6lvU03n4YoNGAll9rkas.jpg", wellKnown: 52), [
+        (actor(31, "Tom Hanks", "/oFvZoKI6lvU03n4YoNGAll9rkas.jpg"), [
                     film(13, "Forrest Gump", 1994, "/saHP97rTPS5eLmrLQEcANmKrsFl.jpg", [35, 18, 10749]),
                     film(8358, "Cast Away", 2000, "/7lLJgKnAicAcR5UEuo8xhSMj18w.jpg", [12, 18]),
                     film(862, "Toy Story", 1995, "/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg", [10751, 35, 16, 12]),
                     film(857, "Saving Private Ryan", 1998, "/uqx37cS8cpHg8U35f9U5IBlrCV3.jpg", [10752, 18, 36]),
                     film(2280, "Big", 1988, "/eWhCDJiwxvx3YXkAFRiHjimnF0j.jpg", [14, 18, 35]),
                     film(640, "Catch Me If You Can", 2002, "/ctjEj2xM32OvBXCq8zAdK3ZrsAj.jpg", [18, 80])]),
-        (actor(1373737, "Florence Pugh", "/1QfiLnofJFlOJOLCWaxyDpIN03v.jpg", wellKnown: 14), [
+        (actor(1373737, "Florence Pugh", "/1QfiLnofJFlOJOLCWaxyDpIN03v.jpg"), [
                     film(872585, "Oppenheimer", 2023, "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg", [18, 36, 10752]),
                     film(331482, "Little Women", 2019, "/yn5ihODtZ7ofn8pDYfxCmxh8AXI.jpg", [18, 10749]),
                     film(530385, "Midsommar", 2019, "/7LEI8ulZzO5gy9Ww2NVCrKmHeDZ.jpg", [27, 18, 9648]),
                     film(693134, "Dune: Part Two", 2024, "/6izwz7rsy95ARzTR3poZ8H6c5pp.jpg", [878, 12])]),
-        (actor(234352, "Margot Robbie", "/euDPyqLnuwaWMHajcU3oZ9uZezR.jpg", wellKnown: 20), [
+        (actor(234352, "Margot Robbie", "/euDPyqLnuwaWMHajcU3oZ9uZezR.jpg"), [
                     film(346698, "Barbie", 2023, "/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg", [35, 12, 14]),
                     film(106646, "The Wolf of Wall Street", 2013, "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg", [80, 18, 35]),
                     film(615777, "Babylon", 2022, "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", [18, 35]),
                     film(466272, "Once Upon a Time in Hollywood", 2019, "/8j58iEBw9pOXFD2L0nt0ZXeHviB.jpg", [35, 18, 53])]),
-        (actor(139, "Uma Thurman", "/sBgAZWi3o4FsnaTvnTNtK6jpQcF.jpg", wellKnown: 20), [
+        (actor(139, "Uma Thurman", "/sBgAZWi3o4FsnaTvnTNtK6jpQcF.jpg"), [
                     film(680, "Pulp Fiction", 1994, "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg", [53, 80, 35]),
                     film(24, "Kill Bill: Vol. 1", 2003, "/v7TaX8kXMXs5yFFGR41guUDNcnB.jpg", [28, 80]),
                     film(782, "Gattaca", 1997, "/eSKr5Fl1MEC7zpAXaLWBWSBjgJq.jpg", [878, 18])]),
-        (actor(884, "Steve Buscemi", "/n0pZumkrcZrAPMoPq684RhYnjPV.jpg", wellKnown: 48), [
+        (actor(884, "Steve Buscemi", "/n0pZumkrcZrAPMoPq684RhYnjPV.jpg"), [
                     film(275, "Fargo", 1996, "/rt7cpEr1uP6RTZykBFhBTcRaKvG.jpg", [80, 18, 53])]),
-        (actor(2231, "Samuel L. Jackson", "/AiAYAqwpM5xmiFrAIeQvUXDCVvo.jpg", wellKnown: 77), [
+        (actor(2231, "Samuel L. Jackson", "/AiAYAqwpM5xmiFrAIeQvUXDCVvo.jpg"), [
                     film(680, "Pulp Fiction", 1994, "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg", [53, 80, 35])]),
-        (actor(8891, "John Travolta", "/ap8eEYfBKTLixmVVpRlq4NslDD5.jpg", wellKnown: 26), [
+        (actor(8891, "John Travolta", "/ap8eEYfBKTLixmVVpRlq4NslDD5.jpg"), [
                     film(680, "Pulp Fiction", 1994, "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg", [53, 80, 35])]),
-        (actor(2975, "Laurence Fishburne", "/2GbXERENPpl5MmlqOLlPVaVtifD.jpg", wellKnown: 36), [
+        (actor(2975, "Laurence Fishburne", "/2GbXERENPpl5MmlqOLlPVaVtifD.jpg"), [
                     film(603, "The Matrix", 1999, "/dXNAPwY7VrqMAo51EKhhCJfaGb5.jpg", [28, 878])]),
-        (actor(530, "Carrie-Anne Moss", "/9zya72vRZYBQILfetACsnmCBgdj.jpg", wellKnown: 14), [
+        (actor(530, "Carrie-Anne Moss", "/9zya72vRZYBQILfetACsnmCBgdj.jpg"), [
                     film(603, "The Matrix", 1999, "/dXNAPwY7VrqMAo51EKhhCJfaGb5.jpg", [28, 878])]),
-        (actor(2037, "Cillian Murphy", "/2lKs67r7FI4bPu0AXxMUJZxmUXn.jpg", wellKnown: 22), [
+        (actor(2037, "Cillian Murphy", "/2lKs67r7FI4bPu0AXxMUJZxmUXn.jpg"), [
                     film(872585, "Oppenheimer", 2023, "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg", [18, 36, 10752])]),
-        (actor(32, "Robin Wright", "/d3rIv0y2p0jMsQ7ViR7O1606NZa.jpg", wellKnown: 19), [
+        (actor(32, "Robin Wright", "/d3rIv0y2p0jMsQ7ViR7O1606NZa.jpg"), [
                     film(13, "Forrest Gump", 1994, "/saHP97rTPS5eLmrLQEcANmKrsFl.jpg", [35, 18, 10749])]),
-        (actor(30614, "Ryan Gosling", "/lyUyVARQKhGxaxy0FbPJCQRpiaW.jpg", wellKnown: 24), [
+        (actor(30614, "Ryan Gosling", "/lyUyVARQKhGxaxy0FbPJCQRpiaW.jpg"), [
                     film(346698, "Barbie", 2023, "/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg", [35, 12, 14])]),
         ]
         let store = CollectionStore(fileURL: nil)
-        for ((person, wellKnown), films) in deck {
+        for (person, films) in deck {
             for film in films {
-                store.record(chain: [.actor(person), .movie(film)], wellKnownFilms: [person.id: wellKnown])
+                store.record(chain: [.actor(person), .movie(film)])
             }
         }
         return store
@@ -627,11 +730,13 @@ extension CollectionStore {
 
 #Preview("Card and frame") {
     let store = CollectionStore.demo()
-    HStack(alignment: .top, spacing: Theme.Spacing.md) {
-        if let actor = store.sortedActors.first { ReelActorCard(entity: actor, model: .rank) }
+    HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+        ForEach(store.sortedActors.prefix(2)) { actor in
+            ReelCanvas(aspect: ReelActorCard.aspect) { ReelActorCard(entity: actor) }
+        }
         if let movie = store.sortedMovies.first {
-            VStack(spacing: Theme.Spacing.sm) {
-                ReelFrame(entity: movie)
+            VStack(spacing: Theme.Spacing.xs) {
+                ReelCanvas(aspect: ReelFrame.aspect) { ReelFrame(entity: movie) }
                 ReelFrameCaption(entity: movie)
             }
         }

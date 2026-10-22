@@ -2,128 +2,16 @@
 //  ChainCards.swift
 //  movie-quiz
 //
-//  0.5.0 design overhaul — the chain drawn as a stack of
-//  neobrutalist cards, the roadmap's leading candidate. It keeps `ChainStack`'s
-//  information architecture (stack, collapse older, emphasise newest) and spends
-//  the vertical room differently:
+//  The chain's card pieces, shared by the play screen's `ChainDeck` and the
+//  game-over recap: the compact card (a small art thumb and the name, one line
+//  each), the actor/movie kind chip, and `ChainArt`, the poster or headshot that
+//  develops in as it streams.
 //
-//    • The newest link is a full **hero card**: poster or headshot art, a kind
-//      chip, and the name set in display type. It is the thing you're building
-//      from, so it gets the room.
-//    • The few links before it are **compact cards**: a small art thumb and the
-//      name, one line each.
-//    • Anything older collapses into "+N earlier".
-//
-//  Newest sits at the bottom, nearest the docked input, so the eye travels from
-//  "what I'm linking from" straight to "where I type". One of the three chain
-//  styles a player can pick in Settings → Chain style (see `ChainStyle`).
+//  The chain used to come in three styles (Cards, Deck, Tiles) behind a
+//  setting; the Deck won and the other two were removed.
 //
 
 import SwiftUI
-
-struct ChainCardStack: View {
-    let chain: [ChainNode]
-    /// How many compact cards to show above the hero before collapsing. Two is
-    /// what fits on an iPhone 16 with the keyboard docked while keeping the
-    /// "+N earlier" marker on screen; a third gets clipped off the top.
-    var maxEarlier = 2
-
-    /// Shared by the hero and compact cards, keyed by node id: when a link lands,
-    /// the old hero and the compact card that replaces it are the same link, so
-    /// the card is seen to shrink up into its slot instead of cross-fading.
-    @Namespace private var cardSpace
-
-    private var earlier: [ChainNode] {
-        Array(chain.dropLast().suffix(maxEarlier))
-    }
-
-    private var hiddenCount: Int {
-        max(0, chain.count - 1 - maxEarlier)
-    }
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.xs + 2) {
-            if hiddenCount > 0 {
-                Text("+\(hiddenCount) earlier")
-                    .metaLabel(size: .small)
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
-            }
-            ForEach(earlier) { node in
-                CompactChainCard(node: node)
-                    // Inserted where the old hero was: the matched frame carries
-                    // it from hero size/position into this slot while the two
-                    // faces cross-fade.
-                    .matchedGeometryEffect(id: node.id, in: cardSpace)
-                    .transition(.asymmetric(
-                        insertion: .opacity,
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
-            }
-            if let newest = chain.last {
-                HeroChainCard(node: newest, isStart: chain.count == 1)
-                    // Re-identify per node so each new link drops in as a new card
-                    // rather than the old hero morphing its text.
-                    .id(newest.id)
-                    .matchedGeometryEffect(id: newest.id, in: cardSpace)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .opacity
-                    ))
-            }
-        }
-        // Leave room for the hard shadow, which draws outside the card's frame.
-        .padding(.trailing, Theme.Shadow.large)
-        .padding(.bottom, Theme.Shadow.large)
-        .animation(Theme.Motion.drop, value: chain.count)
-    }
-}
-
-// MARK: - Hero card (the newest link)
-
-struct HeroChainCard: View {
-    let node: ChainNode
-    /// The dealt start (not a link): wears the holographic start flag. Links carry
-    /// no number — the score already counts them.
-    var isStart = false
-
-    var body: some View {
-        HStack(alignment: .center, spacing: Theme.Spacing.md) {
-            ChainArt(node: node, width: 48, height: 72)
-
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs + 2) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    KindChip(kind: node.kind)
-                    Spacer(minLength: 0)
-                }
-                Text(node.matchText)
-                    .font(Theme.Font.heading(.title2))
-                    .foregroundStyle(Theme.Color.ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .fixedSize(horizontal: false, vertical: true)
-                if case .movie(let m) = node, let year = m.year {
-                    Text(String(year))
-                        .font(Theme.Font.flourish(.subheadline))
-                        .foregroundStyle(Theme.Color.muted)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(Theme.Spacing.md - 4)
-        .neoSurface(radius: Theme.Radius.card)
-        // Stuck flat on the card's face, inside its edges — a sticker hanging off
-        // the border read as floating.
-        .overlay(alignment: .topTrailing) {
-            if isStart {
-                StartSticker()
-                    .padding(.top, Theme.Spacing.sm)
-                    .padding(.trailing, Theme.Spacing.sm + 2)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
 
 // MARK: - Compact card (earlier links)
 
@@ -247,38 +135,12 @@ private struct DevelopingImage: View {
     }
 }
 
-// MARK: - Chain style
-
-/// Which chain treatment the play screen draws — a player preference in
-/// Settings, persisted under the `chainStyle` key. Deck is the default.
-enum ChainStyle: String, CaseIterable, Identifiable {
-    case cards
-    /// Same cards, but earlier links are pushed back into a physical pile
-    /// (`ChainDeck`) instead of collapsing into compact rows.
-    case deck
-    case tiles
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .cards: "Cards"
-        case .deck: "Deck"
-        case .tiles: "Tiles"
-        }
+#Preview("Recap cards") {
+    VStack(spacing: Theme.Spacing.xs + 2) {
+        CompactChainCard(node: .actor(Person(id: 1, name: "Brad Pitt")), position: nil, isStart: true)
+        CompactChainCard(node: .movie(Movie(id: 1001, title: "Ocean's Eleven", year: 2001)), position: 1)
+        CompactChainCard(node: .actor(Person(id: 2, name: "Matt Damon")), position: 2)
     }
-}
-
-#Preview("Card stack") {
-    ChainCardStack(chain: [
-        .actor(Person(id: 1, name: "Brad Pitt")),
-        .movie(Movie(id: 1001, title: "Ocean's Eleven", year: 2001)),
-        .actor(Person(id: 2, name: "Matt Damon")),
-        .movie(Movie(id: 1002, title: "The Departed", year: 2006)),
-        .actor(Person(id: 3, name: "Leonardo DiCaprio")),
-        .movie(Movie(id: 1003, title: "Inception", year: 2010)),
-    ])
     .padding()
-    .frame(maxHeight: .infinity, alignment: .bottom)
     .background(Theme.Color.canvas)
 }

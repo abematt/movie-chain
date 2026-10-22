@@ -35,6 +35,20 @@ final class GameEngine {
         /// How many brand-new actors/movies this run added to the collection ("Your
         /// Reel") — the "+N to your Reel" figure.
         var reelAdditions = 0
+        /// The finished run itself, frozen here rather than read live off the
+        /// engine: "Play again" resets the live run as the game-over screen
+        /// starts sliding away, and that screen must keep showing *this* run
+        /// until it's gone.
+        var chain: [ChainNode] = []
+        var links = 0
+        var points = 0
+
+        /// Spoiler-free share card: each link as a coloured square, never a name.
+        var shareText: String {
+            let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
+            let linkWord = links == 1 ? "link" : "links"
+            return "Movie Chain 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+        }
     }
 
     // MARK: State
@@ -136,10 +150,6 @@ final class GameEngine {
     /// Valid next nodes for the current turn (cast or filmography), pre-wrapped.
     private var candidates: [ChainNode] = []
     private var usedIds: Set<String> = []
-    /// Each actor's well-known film count (TMDB id → count), taken from the
-    /// filmography loaded for their turn this run and handed to the Reel at
-    /// game over. Costs no request: the filmography was fetched anyway.
-    private var wellKnownFilms: [Int: Int] = [:]
     private var countdownTask: Task<Void, Never>?
     /// Monotonic token identifying the current run/turn's async work. Every
     /// lifecycle transition (start, end, reset) bumps it; an async candidate load
@@ -174,12 +184,6 @@ final class GameEngine {
     /// A spoiler-free, shareable recap of the finished run: the score line plus a
     /// blue/purple square rendering of the chain (🟦 actor, 🟪 movie) — the
     /// Connections-style share card. Pure text, so the engine stays UIKit-free.
-    var shareSummary: String {
-        let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
-        let linkWord = score == 1 ? "link" : "links"
-        return "Movie Chain 🎬\n\(score) \(linkWord) · \(points) pts\n\(squares)"
-    }
-
     // MARK: Seed selection
 
     /// Global search for the starting node.
@@ -404,7 +408,6 @@ final class GameEngine {
         stopCountdown()
         chain = []
         usedIds = []
-        wellKnownFilms = [:]
         candidates = []
         score = 0
         points = 0
@@ -433,20 +436,16 @@ final class GameEngine {
         for attempt in 0..<max(1, Config.candidateLoadAttempts) {
             do {
                 let loaded: [ChainNode]
-                var wellKnown: (actor: Int, count: Int)?
                 switch node {
                 case .movie(let movie):
                     loaded = try await provider.cast(of: movie).map(ChainNode.actor)
                 case .actor(let actor):
-                    let films = try await provider.filmography(of: actor)
-                    wellKnown = (actor.id, films.count { ($0.voteCount ?? 0) >= Config.wellKnownVoteCount })
-                    loaded = films.map(ChainNode.movie)
+                    loaded = try await provider.filmography(of: actor).map(ChainNode.movie)
                 }
                 // Drop a superseded result: a reset/quit/new game moved the token on
                 // while this fetch was in flight, so installing its candidates would
                 // corrupt the current round.
                 guard generation == token else { return }
-                if let wellKnown { wellKnownFilms[wellKnown.actor] = wellKnown.count }
                 candidates = loaded
                 feedback = nil
                 isChecking = false
@@ -526,7 +525,7 @@ final class GameEngine {
         guard phase == .playing else { return }
         generation += 1                            // drop any in-flight candidate load
         stopCountdown()
-        var summary = Summary()
+        var summary = Summary(chain: chain, links: score, points: points)
 
         // "You were one away": surface a valid answer the player didn't give on
         // the turn that ran out — the sting that drives the next run. Skip it on a
@@ -551,7 +550,7 @@ final class GameEngine {
         // a seed-then-quit (length 1) logs nothing. `record` dedups by id, so
         // each entity is counted once per chain.
         if chain.count >= 2 {
-            summary.reelAdditions = collection?.record(chain: chain, wellKnownFilms: wellKnownFilms) ?? 0
+            summary.reelAdditions = collection?.record(chain: chain) ?? 0
         }
 
         phase = .gameOver(summary)
@@ -590,7 +589,8 @@ final class GameEngine {
     /// Same sample chain, but jump straight to the game-over summary.
     func loadDemoGameOver() {
         loadDemoChain()
-        phase = .gameOver(Summary(isNewBest: true, previousBest: 2, missedAnswer: candidates.first))
+        phase = .gameOver(Summary(isNewBest: true, previousBest: 2, missedAnswer: candidates.first,
+                                  chain: chain, links: score, points: points))
     }
     #endif
 }

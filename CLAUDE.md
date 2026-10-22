@@ -74,11 +74,9 @@ changelog table before choosing a bump**. Each is documented in
 the relevant section before starting one.
 
 > Note: the visual design is **Cream Neobrutalist** as of 0.5.0 — no longer
-> placeholder. How the chain is drawn is a **player setting** (Settings → Chain style):
-> **Deck** (`ChainDeck.swift`, the default — a physical pile that fills the space above
-> the keyboard), **Cards** (`ChainCards.swift`) and **Tiles** (`ChainStack.swift`). All
-> three are kept on purpose; keep them working when touching the chain. The motion
-> re-tune landed as 0.5.1. The recurring
+> placeholder. The chain is drawn as the **Deck** (`ChainDeck.swift` — a physical pile
+> that fills the space above the keyboard); the Cards and Tiles styles that sat behind
+> a setting were removed once the Deck won. The motion re-tune landed as 0.5.1. The recurring
 > constraint is still vertical room against the docked keyboard. Vocabulary is fixed:
 > a *chain* is a whole run, a *link* is one correct answer (the score counts links),
 > the dealt start is not a link, and the best run is the most links with points
@@ -237,13 +235,16 @@ posters**; either flips over to the other side of its links (no progress for mov
 — a cast is never completable). No numbers on the fronts; the finish is the reward.
 `ReelCards.swift` draws both. The Reel narrows by decade and genre (`ReelFilter`:
 films match directly, actors through a linked film; genre ids ride along on every
-TMDB movie response, names are a fixed table). An actor card's finish (paper / inked / holo) comes
-from the pure, tested `ReelTier`, under a model set in Settings → Reel cards (Rank
-default, Share, Plain) while they're compared. Share scales to a well-known-films
-snapshot the engine takes from the filmography it already loads — **no extra TMDB
-request; never add a fetch on Reel open**. Art streams via `AsyncImage` from
-`Config.imageURL(path:)` (system-cached, never stored on disk; nil path →
-monogram). The store is owned at the app root and injected into the engine.
+TMDB movie response, names are a fixed table). An actor card's finish comes from the
+pure, tested `ReelTier`: paper, inked at 5 films linked, holo at 11 — **no TMDB data,
+no extra request; never add a fetch on Reel open**. Cards and frames are drawn once
+at their grid size and scaled (`ReelCanvas`), so a lift is a pure zoom: the lifted
+card flies itself out of its measured grid slot and back onto it, drawn above
+everything (`ReelCardDetail` + `LiftFlight`) — **not** `matchedGeometryEffect`, which
+flew the grid's own card under the dim layer and its neighbours. Art is read
+through **`ArtCache`** (memory `NSCache` + a 150MB disk-cached session, off-main
+decode), not `AsyncImage`, which has no memory cache; the Reel's first screen is
+warmed at launch. The store is owned at the app root and injected into the engine.
 `-uiDemoReel -uiOpenReel` (DEBUG) opens a demo Reel without touching the saved one.
 
 **UI (NYT-Games / Connections treatment)** — `ContentView.swift` routes on
@@ -271,21 +272,18 @@ per-node category identity — **blue = actor, yellow = movie**) and
 (`.appear(i)`)), all built on the
 Cream Neobrutalist palette (0.5.0) defined in `Assets.xcassets`
 (Canvas/Ink/Tile/Shadow/Hairline/Coral/ActorBlue/MovieYellow/Good/OnAccent, each
-light+dark). The chain has three player-selectable styles (Settings → Chain style,
-`ChainStyle`): **Deck** by default (`ChainDeck.swift`: every link is one card for its
-whole life — a new one is dealt in from below and pushes the last back into a pile
-that peeks out above it, sized to the room above the keyboard), **Cards**
-(`ChainCards.swift`: a hero card for the newest link, compact cards for the two before
-it) and **Tiles** (`ChainStack.swift`: a **rising Tetris-style stack of category
-tiles** — a new link drops in and older ones collapse into "+N earlier"). The dealt
+light+dark). The chain is the **Deck** (`ChainDeck.swift`: every link is one card for
+its whole life — a new one is dealt in from below and pushes the last back into a pile
+that peeks out above it, sized to the room above the keyboard); `ChainCards.swift`
+holds the pieces it shares with the game-over recap (`CompactChainCard`, `KindChip`,
+`ChainArt`). The dealt
 start wears a holographic sticker (`HoloSticker.swift`, gyro-lit foil) instead of a
 number, as does a new best on game over. The play
 screen docks the text input via `.safeAreaInset(.bottom)` above the
 **always-present keyboard** (with `TimerBar.swift` as a slim linear countdown), and
 swaps it for a **Retry** button if a candidate load failed
-(`engine.awaitingRetry`); the full chain is revealed as a numbered recap at game over, its tiles
-staggering in (`ChainStack(staggered:)`) and the score popping when the run set a
-new best. App-wide
+(`engine.awaitingRetry`); the full chain is revealed as a numbered recap of compact
+cards at game over, cascading in, and the score pops when the run set a new best. App-wide
 tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the
 system serif wordmark with the default sans). Prefer reusing these over hardcoded
 values.

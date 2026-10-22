@@ -23,8 +23,6 @@ struct GameOverView: View {
     /// (fast), `stickerPressed` smooths it down from a big peel to a slight one.
     @State private var stickerPlaced = false
     @State private var stickerPressed = false
-    /// The player's chain style: the recap follows the play screen's treatment.
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -46,6 +44,10 @@ struct GameOverView: View {
         .padding(.vertical, Theme.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
+        // The play screen lowers its keyboard before handing over; should one
+        // still be on its way down, it slides off over this screen instead of
+        // re-laying it out as it goes.
+        .ignoresSafeArea(.keyboard)
         .task {
             guard summary.isNewBest else { return }
             // Reduce Motion: the celebratory haptic still fires, but no visual pop.
@@ -148,14 +150,14 @@ struct GameOverView: View {
     private var showsBest: Bool { !summary.isNewBest && engine.bestChain > 0 }
     private var showsReel: Bool { collection.total > 0 }
 
-    private var linkWord: String { engine.score == 1 ? "link" : "links" }
+    private var linkWord: String { summary.links == 1 ? "link" : "links" }
 
     private var runHero: some View {
         VStack(spacing: Theme.Spacing.xs) {
             // The unit sits on the numeral's baseline so "2 links" reads as one
             // figure; points get their own line beneath it.
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                Text("\(engine.score)")
+                Text("\(summary.links)")
                     .font(Theme.Font.display(72))
                     .foregroundStyle(Theme.Color.ink)
                     .contentTransition(.numericText())
@@ -174,12 +176,12 @@ struct GameOverView: View {
                 }
             }
 
-            Text("\(engine.points) pts")
+            Text("\(summary.points) pts")
                 .font(Theme.Font.numeral(.title3))
                 .foregroundStyle(Theme.Color.ink)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(engine.score) \(linkWord), \(engine.points) points\(summary.isNewBest ? ", a new best" : "")")
+        .accessibilityLabel("\(summary.links) \(linkWord), \(summary.points) points\(summary.isNewBest ? ", a new best" : "")")
     }
 
     // The personal best, deliberately quiet: small label, small muted figures.
@@ -256,29 +258,22 @@ struct GameOverView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("Your chain").metaLabel()
             ScrollView {
-                switch chainStyle {
-                // The deck is a play-screen treatment; its recap is the card list.
-                case .cards, .deck:
-                    VStack(spacing: Theme.Spacing.xs + 2) {
-                        ForEach(Array(engine.chain.enumerated()), id: \.element.id) { i, node in
-                            // The start isn't a link: it gets a flag, and the
-                            // links count from 1, so the last number matches
-                            // the score above.
-                            CompactChainCard(node: node, position: i == 0 ? nil : i,
-                                             isStart: i == 0)
-                                // Starts as the push settles, so the cascade
-                                // isn't spent underneath the slide.
-                                .appear(i + recapStaggerStart, animation: Theme.Motion.cascade,
-                                        offset: 14, after: Theme.Motion.screenSettle)
-                        }
+                VStack(spacing: Theme.Spacing.xs + 2) {
+                    ForEach(Array(summary.chain.enumerated()), id: \.element.id) { i, node in
+                        // The start isn't a link: it gets a flag, and the
+                        // links count from 1, so the last number matches
+                        // the score above.
+                        CompactChainCard(node: node, position: i == 0 ? nil : i,
+                                         isStart: i == 0)
+                            // Starts as the push settles, so the cascade
+                            // isn't spent underneath the slide.
+                            .appear(i + recapStaggerStart, animation: Theme.Motion.cascade,
+                                    offset: 14, after: Theme.Motion.screenSettle)
                     }
-                    // Room for the hard shadows, which draw outside each card.
-                    .padding(.trailing, Theme.Shadow.small)
-                    .padding(.bottom, Theme.Spacing.sm)
-                case .tiles:
-                    ChainStack(chain: engine.chain, numbered: true, showKind: false, staggered: true)
-                        .padding(.bottom, Theme.Spacing.sm)
                 }
+                // Room for the hard shadows, which draw outside each card.
+                .padding(.trailing, Theme.Shadow.small)
+                .padding(.bottom, Theme.Spacing.sm)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -295,7 +290,7 @@ struct GameOverView: View {
             }
             .buttonStyle(.primary)
 
-            ShareLink(item: engine.shareSummary) {
+            ShareLink(item: summary.shareText) {
                 Text("Share").frame(maxWidth: .infinity)
             }
             .buttonStyle(.ghost)

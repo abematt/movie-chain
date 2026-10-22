@@ -205,19 +205,6 @@ struct CollectionStoreTests {
         #expect(store.linked(to: actor1).map(\.name) == ["New", "Old"])
     }
 
-    @Test func wellKnownSnapshotIsStoredAndRefreshed() {
-        let store = makeStore()
-        store.record(chain: [actor(1), movie(10)], wellKnownFilms: [1: 40])
-        #expect(store.entities["p1"]?.wellKnownFilms == 40)
-
-        store.record(chain: [actor(1), movie(20)], wellKnownFilms: [1: 42])
-        #expect(store.entities["p1"]?.wellKnownFilms == 42)
-
-        // A run where their filmography didn't load keeps the last snapshot.
-        store.record(chain: [actor(1), movie(30)])
-        #expect(store.entities["p1"]?.wellKnownFilms == 42)
-    }
-
     @Test func deckLeadsWithTheMostLinks() {
         let store = makeStore()
         for _ in 0..<3 { store.record(chain: [actor(1), movie(10)]) }  // logged most, one film
@@ -239,18 +226,17 @@ struct CollectionStoreTests {
 
         #expect(disk.entities.first?.name == "Uma Thurman")
         #expect(disk.entities.first?.links == [])
-        #expect(disk.entities.first?.wellKnownFilms == nil)
+        #expect(disk.entities.first?.genres == [])
     }
 
     @Test func linksSurviveACodableRoundTrip() throws {
         let store = makeStore()
-        store.record(chain: [actor(1), movie(10), actor(2)], wellKnownFilms: [1: 12])
+        store.record(chain: [actor(1), movie(10), actor(2)])
         let original = try #require(store.entities["p1"])
 
         let decoded = try JSONDecoder().decode(CollectedEntity.self,
                                                from: JSONEncoder().encode(original))
         #expect(decoded.links == [10])
-        #expect(decoded.wellKnownFilms == 12)
     }
 
     // MARK: Genres and the decade/genre filter
