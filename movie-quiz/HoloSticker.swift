@@ -141,7 +141,7 @@ nonisolated struct SeededRandom: RandomNumberGenerator {
 
 /// The iridescent face: a pastel sweep whose hue rotates with tilt, under a
 /// bright sheen band that slides across as the light "moves".
-private struct HoloFoil: View {
+struct HoloFoil: View {
     let tilt: CGSize
 
     var body: some View {
