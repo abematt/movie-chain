@@ -27,8 +27,11 @@ enum FuzzyMatch {
     /// Folding both sides to a digit makes the right sequel an exact match, and
     /// because it is applied consistently, single-letter cases that are not
     /// sequels ("Malcolm X", "X-Men", "I Am Legend") still match themselves.
+    ///
+    /// Folded with no locale: under the user's locale a Turkish device would fold
+    /// "III" to dotless "ııı", which is no longer a Roman numeral.
     static func normalize(_ s: String) -> String {
-        let folded = s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        let folded = s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
         let elided = folded
             .replacingOccurrences(of: "'", with: "")
             .replacingOccurrences(of: "\u{2019}", with: "")   // ’ right single quote
@@ -107,7 +110,11 @@ enum FuzzyMatch {
 
     /// Similarity in [0, 1] where 1 is identical.
     static func similarity(_ a: String, _ b: String) -> Double {
-        let na = normalize(a), nb = normalize(b)
+        normalizedSimilarity(normalize(a), normalize(b))
+    }
+
+    /// `similarity` for strings that are already normalized.
+    private static func normalizedSimilarity(_ na: String, _ nb: String) -> Double {
         if na == nb { return 1 }
         let maxLen = max(na.count, nb.count)
         guard maxLen > 0 else { return 0 }
@@ -116,7 +123,7 @@ enum FuzzyMatch {
     }
 
     /// Result of matching input against a candidate set.
-    struct Result<T> {
+    struct Match<T> {
         let item: T
         let score: Double
     }
@@ -133,7 +140,7 @@ enum FuzzyMatch {
         in candidates: [T],
         nameOf: (T) -> String,
         threshold: Double = 0.72
-    ) -> Result<T>? {
+    ) -> Match<T>? {
         let query = normalize(input)
         guard !query.isEmpty else { return nil }
 
@@ -149,7 +156,7 @@ enum FuzzyMatch {
             let name = normalize(nameOf(candidate))
             guard !name.isEmpty else { continue }
 
-            let base = similarity(name, query)
+            let base = normalizedSimilarity(name, query)
             var score = base
 
             let nameWords = name.split(separator: " ").map(String.init)
@@ -185,14 +192,14 @@ enum FuzzyMatch {
             // Prefer a strictly higher boosted score; on an exact tie (both hit
             // the same boost floor) prefer the higher raw similarity — the title
             // with fewer extra words is the one the player meant.
-            if best == nil || score > best!.score
-                || (score == best!.score && base > best!.base) {
+            let isBetter = best.map { score > $0.score || (score == $0.score && base > $0.base) } ?? true
+            if isBetter {
                 best = (candidate, score, base)
             }
         }
 
         if let best, best.score >= threshold {
-            return Result(item: best.item, score: best.score)
+            return Match(item: best.item, score: best.score)
         }
         return nil
     }

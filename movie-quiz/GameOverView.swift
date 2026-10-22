@@ -12,6 +12,7 @@ import SwiftUI
 struct GameOverView: View {
     @Bindable var engine: GameEngine
     var collection: CollectionStore
+    let summary: GameEngine.Summary
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showReel = false
@@ -25,7 +26,7 @@ struct GameOverView: View {
         VStack(spacing: Theme.Spacing.md) {
             summaryCard
 
-            if let missed = engine.missedAnswer {
+            if let missed = summary.missedAnswer {
                 oneAway(missed)
             }
 
@@ -37,18 +38,19 @@ struct GameOverView: View {
         .padding(.vertical, Theme.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
-        .onAppear {
-            guard engine.isNewBest else { return }
+        .task {
+            guard summary.isNewBest else { return }
             // Reduce Motion: the celebratory haptic still fires, but no visual pop.
             if reduceMotion { Haptics.celebrate(); return }
-            Task {
-                // Wait out the screen-push carousel (Theme.Motion.screen, ~0.45s)
-                // so the bounce reads as a landing beat rather than overlapping the
-                // horizontal push. Haptic + pop fire together, after the settle.
-                try? await Task.sleep(for: .milliseconds(450))
-                Haptics.celebrate()
-                scorePop += 1
-            }
+            // Wait out the screen-push carousel (Theme.Motion.screen, ~0.45s)
+            // so the bounce reads as a landing beat rather than overlapping the
+            // horizontal push. Haptic + pop fire together, after the settle.
+            // `.task` is cancelled if the screen leaves first (a fast "Play
+            // again"); `try?` swallows that, so check before firing.
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            Haptics.celebrate()
+            scorePop += 1
         }
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain)
@@ -86,14 +88,14 @@ struct GameOverView: View {
         .neoSurface(radius: Theme.Radius.card)
     }
 
-    private var showsBest: Bool { !engine.isNewBest && engine.bestChain > 0 }
+    private var showsBest: Bool { !summary.isNewBest && engine.bestChain > 0 }
     private var showsReel: Bool { collection.total > 0 }
 
     private var linkWord: String { engine.score == 1 ? "link" : "links" }
 
     private var runHero: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            if engine.isNewBest {
+            if summary.isNewBest {
                 Text("a new best")
                     .font(Theme.Font.flourish(.subheadline))
                     .foregroundStyle(Theme.Color.onAccent)
@@ -131,7 +133,7 @@ struct GameOverView: View {
                 .foregroundStyle(Theme.Color.ink)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(engine.score) \(linkWord), \(engine.points) points\(engine.isNewBest ? ", a new best" : "")")
+        .accessibilityLabel("\(engine.score) \(linkWord), \(engine.points) points\(summary.isNewBest ? ", a new best" : "")")
     }
 
     // The personal best, deliberately quiet: small label, small muted figures.
@@ -176,8 +178,8 @@ struct GameOverView: View {
     }
 
     private var reelMessage: String {
-        if engine.reelAdditions > 0 {
-            return "+\(engine.reelAdditions) new · \(collection.total) total"
+        if summary.reelAdditions > 0 {
+            return "+\(summary.reelAdditions) new · \(collection.total) total"
         }
         return "\(collection.total) logged"
     }
@@ -254,5 +256,6 @@ struct GameOverView: View {
 #Preview {
     let engine = GameEngine()
     engine.loadDemoGameOver()
-    return GameOverView(engine: engine, collection: CollectionStore(fileURL: nil))
+    return GameOverView(engine: engine, collection: CollectionStore(fileURL: nil),
+                        summary: engine.summary ?? .init())
 }

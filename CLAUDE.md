@@ -16,7 +16,9 @@ that alternates actor → movie → actor → movie …, where each link must be
 (the actor appeared in the movie). Score = chain length; each turn is timed.
 
 - Bundle ID: `abe.movie-quiz`
-- Language: Swift 5.0, SwiftUI + Observation (`@Observable`), iOS 17+ APIs
+- Language: **Swift 6** language mode (full data-race checking), SwiftUI + Observation
+  (`@Observable`), iOS 17+ APIs. Approachable Concurrency is on, so a `nonisolated
+  async` function runs on its *caller's* actor — use `@concurrent` to really leave main
 - Builds with **MainActor-default isolation** (`SWIFT_DEFAULT_ACTOR_ISOLATION =
   MainActor`) — off-main-actor code must opt out explicitly (e.g. the
   `nonisolated` `Codable` values in `Collection.swift`; resolve `@MainActor`
@@ -49,10 +51,10 @@ xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
 xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
   -destination 'platform=iOS Simulator,name=iPhone 16' test
 
-# Run a single test (XCTest)
+# Run a single test (Swift Testing — suites are structs, tests have no `test` prefix)
 xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
-  test -only-testing:movie-quizTests/FuzzyMatchTests/testArabicSequelMatchesRomanTitle
+  test -only-testing:movie-quizTests/FuzzyMatchTests/rejectsOffListAnswer()
 ```
 
 Day-to-day development is normally done in Xcode (⌘B build, ⌘R run, ⌘U test). `#Preview` blocks

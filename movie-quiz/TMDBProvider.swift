@@ -45,13 +45,15 @@ struct TMDBProvider: MovieDataProvider {
         // default), so decoding here would parse every response on the main
         // thread — including the ~18 concurrent cast fetches that build the deal
         // pool and a popular actor's 100+ credit filmography — stuttering the
-        // seed→play transition. This nonisolated async helper runs the decode on
-        // the cooperative pool instead.
+        // seed→play transition. This `@concurrent` helper runs the decode on the
+        // cooperative pool instead.
         return try await Self.decode(T.self, from: data)
     }
 
-    /// Off-main JSON decode. `nonisolated async` so it runs on the concurrency
-    /// thread pool, not the caller's (Main) actor.
+    /// Off-main JSON decode. Must be `@concurrent`, not just `nonisolated`: under
+    /// Approachable Concurrency (`NonisolatedNonsendingByDefault`) a plain
+    /// `nonisolated async` function runs on the *caller's* actor — here, Main.
+    @concurrent
     nonisolated private static func decode<T: Decodable & Sendable>(_ type: T.Type, from data: Data) async throws -> T {
         do { return try JSONDecoder().decode(type, from: data) }
         catch { throw DataProviderError.decoding }
@@ -134,21 +136,27 @@ struct TMDBProvider: MovieDataProvider {
 
     /// The most-rated films (a proxy for most-watched), `pages` of ~20 each, in
     /// vote-count order. Shared by the movie pool and the derived-actor pool.
+    /// Pages are fetched in parallel, then reassembled in page order.
     private func mostWatchedMovies(pages: Int) async throws -> [Movie] {
-        var out: [Movie] = []
-        for page in 1...max(1, pages) {
-            let resp: MovieSearchResponse = try await fetch(
-                MovieSearchResponse.self,
-                path: "discover/movie",
-                query: [
-                    URLQueryItem(name: "include_adult", value: "false"),
-                    URLQueryItem(name: "sort_by", value: "vote_count.desc"),
-                    URLQueryItem(name: "page", value: "\(page)"),
-                ]
-            )
-            out.append(contentsOf: resp.results.map { $0.toMovie() })
+        try await withThrowingTaskGroup(of: (page: Int, movies: [Movie]).self) { group in
+            for page in 1...max(1, pages) {
+                group.addTask {
+                    let resp = try await self.fetch(
+                        MovieSearchResponse.self,
+                        path: "discover/movie",
+                        query: [
+                            URLQueryItem(name: "include_adult", value: "false"),
+                            URLQueryItem(name: "sort_by", value: "vote_count.desc"),
+                            URLQueryItem(name: "page", value: "\(page)"),
+                        ]
+                    )
+                    return (page, resp.results.map { $0.toMovie() })
+                }
+            }
+            var byPage: [(page: Int, movies: [Movie])] = []
+            for try await result in group { byPage.append(result) }
+            return byPage.sorted { $0.page < $1.page }.flatMap(\.movies)
         }
-        return out
     }
 
     func cast(of movie: Movie) async throws -> [Person] {

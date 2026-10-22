@@ -38,7 +38,7 @@ and each turn is on a countdown — run out of time and the game ends.
 
 | | |
 |---|---|
-| Language | Swift 5.0 |
+| Language | Swift 6 language mode; tests use Swift Testing |
 | UI | SwiftUI |
 | State | Observation framework (`@Observable`, `@State`) |
 | Concurrency | Swift structured concurrency (`async`/`await`, `Task`, `@MainActor`); builds with **MainActor-default isolation** (`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`) |
@@ -131,8 +131,10 @@ hand-picked graph.
 > That was invisible for one-at-a-time fetches but became a real hitch once the
 > deal fired ~18 concurrent cast decodes and popular seeds carried 100+ credit
 > filmographies — the decode stuttered the seed→play transition. `fetch` now routes
-> decoding through a `nonisolated static func decode(...) async` helper (runs on the
-> cooperative pool, off main), and the private DTOs are `nonisolated` so their
+> decoding through a `@concurrent static func decode(...) async` helper (runs on the
+> cooperative pool, off main — a plain `nonisolated async` would *not*: under
+> Approachable Concurrency it runs on the caller's actor), and the private DTOs are
+> `nonisolated` so their
 > `Decodable` conformance isn't MainActor-bound (same pattern as `Collection.swift`).
 
 The TMDB implementation of `filmography(of:)` drops **self-appearance credits**
@@ -242,13 +244,16 @@ function of it.
 - **State:** `phase` (`.seed`/`.playing`/`.gameOver`), `chain: [ChainNode]`,
   `score` (chain length), `points`, `lastGain`/`lastAnswerFast` (for the "+N"
   flourish), `secondsRemaining`, `expectedKind`, transient `feedback`, `isChecking`.
-- **Records & recap:** `bestChain`/`bestPoints` (persisted via `UserDefaults`),
+- **Records & recap:** `bestChain`/`bestPoints` (persisted via an injectable
+  `UserDefaults`, `.standard` in the app). The finished run's facts ride on the
+  phase itself — `.gameOver(Summary)` — so they can't exist outside a game-over:
   `isNewBest` (celebration trigger), `missedAnswer` (a valid answer left ungiven on
   the turn that timed out — the "you were one away" near-miss, captured in
-  `endGame()` from the still-loaded `candidates`; `nil` on a manual quit),
-  `endedByQuit` (so the summary shows "Chain ended" rather than "Time's up"), and
+  `endGame()` from the still-loaded `candidates`; `nil` on a manual quit), and
   `reelAdditions` (how many brand-new entities this run added to the collection —
-  the "+N to your Reel" figure).
+  the "+N to your Reel" figure). `ContentView` hands the summary to `GameOverView`.
+- **Run reset:** `startGame` and `reset` both go through one `resetRun()`, so the
+  per-run fields can't drift apart between the two.
 - **Collection recording:** in `endGame()`, when `chain.count >= 2`, the run is
   logged into the injected `CollectionStore` (see below). The `>= 2` guard is the
   whole logging rule: it means at least one link validated, so the seed (chain[0])

@@ -32,6 +32,35 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+### Changed
+
+- **Network responses are now really decoded off the main thread.** The decode
+  helper was `nonisolated async`, which under Approachable Concurrency runs on the
+  caller's actor — so every TMDB response, including the ~24 that build the first deal
+  and big filmographies mid-run, was being parsed on main. It's `@concurrent` now,
+  which should take the edge off the hitch when a link lands and on cold launch.
+- **The first deal arrives sooner and costs fewer requests.** A Shuffle tap (or a
+  resume) during the first pool load used to start a second, identical load; callers
+  now join the one in flight. The five most-watched pages also load in parallel
+  rather than one after another.
+- **The project builds in the Swift 6 language mode**, so data races are compile
+  errors rather than unchecked. It surfaced one real issue (a main-actor value read
+  inside a `@Sendable` animation closure), now fixed.
+- **Tests moved to Swift Testing** — parameterized where they were tables, and the
+  engine tests use their own `UserDefaults` suite instead of writing a best into the
+  simulator app's real records.
+- The turn clock ticks against fixed deadlines, so scheduling slack no longer
+  stretches a 30-second turn.
+
+### Fixed
+
+- **Sequel matching on Turkish-locale devices.** Answers were case-folded in the
+  device locale, which turns "III" into dotless "ııı" — no longer a Roman numeral — so
+  "mission impossible 3" stopped matching. Folding is now locale-independent.
+- **A stray celebration after a fast "Play again".** The new-best haptic waited out
+  the screen push in a task nothing cancelled, so leaving within half a second still
+  fired it on the next screen.
+
 ## [0.5.0] — 2026-10-22
 
 The visual design overhaul. The placeholder NYT-Games look is replaced by a real
