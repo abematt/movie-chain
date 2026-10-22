@@ -24,7 +24,10 @@ struct ContentView: View {
     init() {
         let store = CollectionStore()
         _collection = State(initialValue: store)
-        _engine = State(initialValue: GameEngine(collection: store))
+        let engine = GameEngine(collection: store)
+        // The play screen releases the first turn's clock once the keyboard is up.
+        engine.holdsFirstTurnClock = true
+        _engine = State(initialValue: engine)
     }
 
     var body: some View {

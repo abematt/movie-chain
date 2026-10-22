@@ -32,7 +32,38 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+### Added
+
+- **Chain style → Deck, now the default.** The chain as a physical pile: each new link is
+  dealt in from below and pushes the previous card back (smaller, higher, shadow
+  sinking), earlier cards peek out with their names, and the oldest tucks under the
+  pile. Nothing cross-fades. Cards and Tiles stay available in Settings → Chain style
+  as a player preference (the setting is no longer labelled a prototype). The pile fills whatever
+  height the screen can spare above the keyboard — named peeks while they fit, then
+  card edges for the pile's thickness.
+- **Holographic stickers.** The dealt start wears a foil "START" flag instead of a
+  label, and a new best is a foil sticker slapped onto the score card ("New best! —
+  was 7") instead of a green pill. It lands lifted, smooths down to a slightly peeled
+  corner, and its foil shifts colour and catches the light as you tilt the phone.
+
 ### Changed
+
+- **Running out of time now has a moment.** When the clock hits 0 the play screen
+  holds for half a second — the input greys out, the pile sags and settles, and the
+  miss buzz fires — before game over slides in. It used to slide away the instant
+  the clock ran out, so a run never visibly *ended*. Quitting still leaves at once.
+- **Your Reel's growth is visible.** Back on the home screen after a run, the Reel
+  pill's count rolls up from the number you last saw to the new total, with a small
+  bump, instead of already showing it.
+- The "you were one away" card now deals in with the chain on game over rather than
+  sitting still while everything around it arrives, and the Retry button cross-fades
+  in and out of the input's place after a failed load instead of swapping instantly.
+- **Chain cards no longer say "Link N".** The score already counts links; the number
+  read like a form field. Only the start is marked, with its sticker.
+- **The first card's art is already there when a game starts.** The home screen
+  pre-fetches each dealt start's poster or headshot, so it no longer loads in (and
+  slid against the screen push) as the play screen arrived. Art that does stream in
+  later now "develops" — a quick blur-to-sharp fade scoped to the image itself.
 
 - **Network responses are now really decoded off the main thread.** The decode
   helper was `nonisolated async`, which under Approachable Concurrency runs on the
@@ -51,8 +82,32 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
   simulator app's real records.
 - The turn clock ticks against fixed deadlines, so scheduling slack no longer
   stretches a 30-second turn.
+- **A landing link now hands off visibly.** When you add a link, the previous hero card
+  shrinks up into its compact slot rather than fading out while a copy fades in, so the
+  chain reads as one object growing. The landing spring is calmer (less wobble across
+  the whole stack on every link), and poster art fades in instead of popping.
+- **The timer bar drains continuously.** It used to step once a second (move for a
+  quarter-second, then sit still); it now flows, and snaps full at the start of a turn
+  instead of sliding back. The header's seconds now actually roll.
+- **A miss no longer squeezes the chain.** The error message takes over the next-up
+  hint's line instead of adding a row above the input, and hands it back as soon as you
+  start typing again. The shake settles instead of stopping dead.
+- **The first turn's 30 seconds start when the keyboard is up**, not when the screen
+  starts sliding in — the push and the keyboard used to cost about a second.
+- **Game over plays as one sequence**: the screen lands, then the score and "a new
+  best" pill pop together, then the chain deals in, rather than the recap staggering
+  in underneath the slide.
+- Presses share one fast timing (and gentler scale) across every button; the "+N"
+  gain pops in before it drifts away; Reel art fades in on an ease-out.
 
 ### Fixed
+
+- **A second identical miss didn't shake or buzz.** The reaction keyed off the error
+  text, which doesn't change when two misses in a row produce the same message.
+- **Reduce Motion gaps.** The wrong-answer shake and the floating "+N" ignored the
+  setting; the shake is now a red flash of the field's border and the "+N" fades in
+  place. The Shuffle deal and Reel art kept no transition at all under it; they now
+  cross-fade.
 
 - **Sequel matching on Turkish-locale devices.** Answers were case-folded in the
   device locale, which turns "III" into dotless "ııı" — no longer a Roman numeral — so

@@ -18,7 +18,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("soundEnabled") private var soundEnabled = true
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     var body: some View {
         NavigationStack {
@@ -65,14 +65,14 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Chain style (prototype switch, kept until motion work confirms cards)
+    // MARK: Chain style
     //
-    // Flips the play screen between chain treatments so they can be judged on a
-    // device. Remove once the overhaul picks one.
+    // A player preference: how the play screen draws the chain — Deck (the
+    // default), Cards or Tiles. The game-over recap follows it.
 
     private var chainStyleSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            sectionTitle("Chain style · prototype")
+            sectionTitle("Chain style")
             NeoSegmented(selection: $chainStyle,
                          options: ChainStyle.allCases.map { (value: $0, label: $0.label) })
         }

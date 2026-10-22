@@ -28,9 +28,10 @@ struct CollectionView: View {
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
 
-    /// Fade art in as it streams from the network, unless motion is reduced.
+    /// Fade art in as it streams from the network. A fade isn't movement, so it
+    /// stays under Reduce Motion — it hides *when* the image happened to arrive.
     private var imageTransaction: Transaction {
-        Transaction(animation: reduceMotion ? nil : .easeIn(duration: 0.25))
+        Transaction(animation: .easeOut(duration: 0.2))
     }
 
     enum Filter: String, CaseIterable, Identifiable {
@@ -319,7 +320,6 @@ struct TMDBAttribution: View {
 private struct ReelTile: View {
     let entity: CollectedEntity
     let isNew: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -343,7 +343,7 @@ private struct ReelTile: View {
 
     @ViewBuilder private var artContent: some View {
         if let url = Config.imageURL(path: entity.imagePath, size: "w185") {
-            AsyncImage(url: url, transaction: Transaction(animation: reduceMotion ? nil : .easeIn(duration: 0.25))) { phase in
+            AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)

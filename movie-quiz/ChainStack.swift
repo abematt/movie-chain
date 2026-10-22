@@ -59,7 +59,8 @@ struct ChainStack: View {
                     insertion: .move(edge: .top).combined(with: .opacity),
                     removal: .opacity
                 ))
-                .appear(pos, animation: Theme.Motion.cascade, offset: 14, enabled: staggered)
+                .appear(pos, animation: Theme.Motion.cascade, offset: 14, enabled: staggered,
+                        after: Theme.Motion.screenSettle)
             }
         }
         .animation(Theme.Motion.drop, value: chain.count)

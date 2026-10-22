@@ -25,6 +25,9 @@ final class GameEngine {
     struct Summary: Equatable {
         /// This run beat the previous best — the trigger for the celebration.
         var isNewBest = false
+        /// The best this run beat, in links ("was 7" on the sticker). 0 when there
+        /// was no previous best (the first run that logged one).
+        var previousBest = 0
         /// A valid answer the player *didn't* give on the turn that timed out — the
         /// "you were one away" near-miss. `nil` on a manual quit (there was no
         /// missed turn — the player chose to stop).
@@ -54,7 +57,22 @@ final class GameEngine {
 
     /// Transient feedback for a rejected / off-list answer.
     private(set) var feedback: String?
+    /// Bumped on every rejected answer. Views react to this rather than to
+    /// `feedback`, which doesn't change when two misses in a row produce the
+    /// same message — so the second miss would otherwise get no shake or buzz.
+    private(set) var rejections = 0
     private(set) var isChecking = false
+    /// The clock has hit 0 and the run is in its brief "time's up" hold before
+    /// game over (`Config.timeUpPause`). Answers are no longer accepted.
+    private(set) var timeUp = false
+
+    /// When true, a new game's first turn doesn't start its clock until the play
+    /// screen calls `playerReady()` — i.e. once the keyboard is up — so the
+    /// screen push and keyboard rise don't eat into the first 30 seconds. Off by
+    /// default so headless callers (tests) keep the immediate clock.
+    var holdsFirstTurnClock = false
+    private var playerIsReady = false
+    private var clockPending = false
 
     // MARK: Records & recap
 
@@ -289,14 +307,29 @@ final class GameEngine {
         await loadCandidates(for: seed, token: token)
         // Bail if a reset/quit/new game happened during the await.
         guard phase == .playing, generation == token else { return }
-        startCountdown()
+        if holdsFirstTurnClock && !playerIsReady {
+            clockPending = true
+        } else {
+            startCountdown()
+        }
+    }
+
+    /// The play screen is ready for input (keyboard up). Starts the first turn's
+    /// clock if `startGame` is holding it; harmless to call more than once.
+    func playerReady() {
+        guard phase == .playing, !playerIsReady else { return }
+        playerIsReady = true
+        if clockPending {
+            clockPending = false
+            startCountdown()
+        }
     }
 
     // MARK: Play
 
     /// Validate the player's free-text answer against the bounded candidate set.
     func submit(_ text: String) async {
-        guard phase == .playing, !isChecking else { return }
+        guard phase == .playing, !isChecking, !timeUp else { return }
         let token = generation
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -309,12 +342,14 @@ final class GameEngine {
 
         guard let match else {
             feedback = "Not in the \(expectedKind == .actor ? "cast" : "filmography") — try again."
+            rejections += 1
             return
         }
         let node = match.item
 
         guard !usedIds.contains(node.id) else {
             feedback = "\(node.displayName) is already in your chain."
+            rejections += 1
             return
         }
         await accept(node, token: token)
@@ -373,6 +408,9 @@ final class GameEngine {
         feedback = nil
         isChecking = false
         secondsRemaining = Config.secondsPerTurn
+        playerIsReady = false
+        clockPending = false
+        timeUp = false
     }
 
     // MARK: Candidates
@@ -436,6 +474,7 @@ final class GameEngine {
         let token = generation
         await loadCandidates(for: node, token: token)
         guard phase == .playing, generation == token else { return }
+        clockPending = false   // a manual retry starts the clock itself
         startCountdown()
     }
 
@@ -461,7 +500,13 @@ final class GameEngine {
                 if Task.isCancelled { return }
                 self.secondsRemaining -= 1
             }
-            self?.endGame()
+            // Time's up: hold on the play screen for a beat so the run visibly
+            // ends, then go to game over. `stopCountdown` (quit/reset) cancels it.
+            guard let self else { return }
+            self.timeUp = true
+            try? await Task.sleep(for: Config.timeUpPause)
+            if Task.isCancelled { return }
+            self.endGame()
         }
     }
 
@@ -483,6 +528,7 @@ final class GameEngine {
         // numbers are written together so they always describe one run.
         if Scoring.isNewRecord(links: score, points: points,
                                bestLinks: bestChain, bestPoints: bestPoints) {
+            summary.previousBest = bestChain
             bestChain = score
             bestPoints = points
             summary.isNewBest = true
@@ -535,7 +581,7 @@ final class GameEngine {
     /// Same sample chain, but jump straight to the game-over summary.
     func loadDemoGameOver() {
         loadDemoChain()
-        phase = .gameOver(Summary(isNewBest: true, missedAnswer: candidates.first))
+        phase = .gameOver(Summary(isNewBest: true, previousBest: 2, missedAnswer: candidates.first))
     }
     #endif
 }

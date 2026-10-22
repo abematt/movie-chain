@@ -15,8 +15,8 @@
 //    • Anything older collapses into "+N earlier".
 //
 //  Newest sits at the bottom, nearest the docked input, so the eye travels from
-//  "what I'm linking from" straight to "where I type". Settings → Chain style
-//  switches between this and the tile stack for side-by-side judging on device.
+//  "what I'm linking from" straight to "where I type". One of the three chain
+//  styles a player can pick in Settings → Chain style (see `ChainStyle`).
 //
 
 import SwiftUI
@@ -27,6 +27,11 @@ struct ChainCardStack: View {
     /// what fits on an iPhone 16 with the keyboard docked while keeping the
     /// "+N earlier" marker on screen; a third gets clipped off the top.
     var maxEarlier = 2
+
+    /// Shared by the hero and compact cards, keyed by node id: when a link lands,
+    /// the old hero and the compact card that replaces it are the same link, so
+    /// the card is seen to shrink up into its slot instead of cross-fading.
+    @Namespace private var cardSpace
 
     private var earlier: [ChainNode] {
         Array(chain.dropLast().suffix(maxEarlier))
@@ -46,16 +51,21 @@ struct ChainCardStack: View {
             }
             ForEach(earlier) { node in
                 CompactChainCard(node: node)
+                    // Inserted where the old hero was: the matched frame carries
+                    // it from hero size/position into this slot while the two
+                    // faces cross-fade.
+                    .matchedGeometryEffect(id: node.id, in: cardSpace)
                     .transition(.asymmetric(
                         insertion: .opacity,
                         removal: .move(edge: .top).combined(with: .opacity)
                     ))
             }
             if let newest = chain.last {
-                HeroChainCard(node: newest, position: chain.count - 1)
+                HeroChainCard(node: newest, isStart: chain.count == 1)
                     // Re-identify per node so each new link drops in as a new card
                     // rather than the old hero morphing its text.
                     .id(newest.id)
+                    .matchedGeometryEffect(id: newest.id, in: cardSpace)
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
                         removal: .opacity
@@ -73,8 +83,9 @@ struct ChainCardStack: View {
 
 struct HeroChainCard: View {
     let node: ChainNode
-    /// Link number (0 = the dealt start), stamped quietly in the corner.
-    var position: Int? = nil
+    /// The dealt start (not a link): wears the holographic start flag. Links carry
+    /// no number — the score already counts them.
+    var isStart = false
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.Spacing.md) {
@@ -84,17 +95,6 @@ struct HeroChainCard: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     KindChip(kind: node.kind)
                     Spacer(minLength: 0)
-                    if let position {
-                        // The start isn't a link; links count from 1, matching
-                        // the score.
-                        if position == 0 {
-                            Text("Start").metaLabel(size: .small)
-                        } else {
-                            Text("Link \(position)")
-                                .font(Theme.Font.numeral(.footnote))
-                                .foregroundStyle(Theme.Color.muted)
-                        }
-                    }
                 }
                 Text(node.matchText)
                     .font(Theme.Font.heading(.title2))
@@ -112,6 +112,15 @@ struct HeroChainCard: View {
         }
         .padding(Theme.Spacing.md - 4)
         .neoSurface(radius: Theme.Radius.card)
+        // Stuck flat on the card's face, inside its edges — a sticker hanging off
+        // the border read as floating.
+        .overlay(alignment: .topTrailing) {
+            if isStart {
+                StartSticker()
+                    .padding(.top, Theme.Spacing.sm)
+                    .padding(.trailing, Theme.Spacing.sm + 2)
+            }
+        }
         .accessibilityElement(children: .combine)
     }
 }
@@ -186,11 +195,20 @@ struct ChainArt: View {
         ZStack {
             node.accent
             if let url = Config.imageURL(path: node.imagePath, size: "w185") {
-                AsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        glyph
+                if let warmed = ArtCache.shared.image(for: url) {
+                    // The dealt start, pre-fetched on the home screen: drawn at
+                    // once, so it is already in place as the play screen arrives.
+                    warmed.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    // No transaction here: an animated phase change also re-ran
+                    // the card's matched geometry mid screen-push, sliding the
+                    // card against the push. The develop is scoped to the image.
+                    AsyncImage(url: url) { phase in
+                        if case .success(let image) = phase {
+                            DevelopingImage(image: image)
+                        } else {
+                            glyph
+                        }
                     }
                 }
             } else {
@@ -210,12 +228,34 @@ struct ChainArt: View {
     }
 }
 
-// MARK: - Chain style switch (prototype)
+/// Streamed art "develops" in: a quick blur-to-sharp fade, like a print coming up,
+/// hiding the moment the download happened to land. The animation is scoped to
+/// this view (`.animation(_:value:)`), so it can never drive the card's geometry.
+/// Not movement, so it stays under Reduce Motion.
+private struct DevelopingImage: View {
+    let image: Image
+    @State private var developed = false
 
-/// Which chain treatment the play screen draws. A prototype switch so the
-/// candidates can be judged running on a device; delete it once one wins.
+    var body: some View {
+        image
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .opacity(developed ? 1 : 0)
+            .blur(radius: developed ? 0 : 6)
+            .animation(.easeOut(duration: 0.22), value: developed)
+            .onAppear { developed = true }
+    }
+}
+
+// MARK: - Chain style
+
+/// Which chain treatment the play screen draws — a player preference in
+/// Settings, persisted under the `chainStyle` key. Deck is the default.
 enum ChainStyle: String, CaseIterable, Identifiable {
     case cards
+    /// Same cards, but earlier links are pushed back into a physical pile
+    /// (`ChainDeck`) instead of collapsing into compact rows.
+    case deck
     case tiles
 
     var id: String { rawValue }
@@ -223,6 +263,7 @@ enum ChainStyle: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .cards: "Cards"
+        case .deck: "Deck"
         case .tiles: "Tiles"
         }
     }

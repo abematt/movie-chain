@@ -50,6 +50,15 @@ struct SeedView: View {
 
     @State private var showSettings = false
 
+    /// The Reel total the player last *saw* on the pill, so growth since then can
+    /// be shown rolling up rather than already there.
+    @AppStorage(Self.reelShownKey) private var reelTotalShown = 0
+    private static let reelShownKey = "reelTotalShown"
+    /// What the pill displays while a roll-up is pending; `nil` = the live total.
+    @State private var reelDisplayed: Int?
+    /// Bumped to give the pill one small bump as its number rolls.
+    @State private var reelBump = 0
+
     @AppStorage("soundEnabled") private var soundEnabled = true
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -67,6 +76,10 @@ struct SeedView: View {
         _chainBuilt = State(initialValue: done)
         _revealed = State(initialValue: done)
         _revealedControls = State(initialValue: done ? Self.controlSlotCount : 0)
+        // Start the pill at the last-seen total (read here, not in `.task`, so
+        // the first frame doesn't flash the new number before rolling back).
+        let lastShown = UserDefaults.standard.integer(forKey: Self.reelShownKey)
+        _reelDisplayed = State(initialValue: lastShown < collection.total ? lastShown : nil)
     }
 
     var body: some View {
@@ -114,6 +127,11 @@ struct SeedView: View {
         }
         // Deal a fresh start on every appearance (cold launch and "Play again").
         .task { await engine.prepareSeeds() }
+        // Pre-fetch each dealt start's art, so the first chain card arrives with
+        // its poster already drawn instead of loading in mid screen-push.
+        .task(id: engine.dealtSeed?.id) {
+            if let seed = engine.dealtSeed { await ArtCache.shared.warm(seed) }
+        }
         // Warm the haptic/audio engines HERE, on the seed screen, rather than in
         // GameView. `AVAudioEngine.start()` briefly blocks the main actor, and
         // doing it in GameView.task landed that block right on the seed->play
@@ -121,6 +139,7 @@ struct SeedView: View {
         // carousel push on a Play-again re-entry) has settled so the warm never
         // lands on an animation.
         .task(id: introRunning) { await warmFeedbackWhenIdle() }
+        .task(id: introRunning) { await revealReelGrowth() }
         .onAppear {
             // swift-check:ignore on the next line — kept as a stored Task so `skipIntro`
             // can cancel it; the screen can't leave mid-intro (controls are inert).
@@ -275,7 +294,7 @@ struct SeedView: View {
             }
         }
         .frame(height: 40)                                // fixed one-line height
-        .animation(reduceMotion ? nil : Theme.Motion.drop, value: engine.dealtSeed)
+        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.dealtSeed)
     }
 
     private var hintLine: some View {
@@ -287,7 +306,7 @@ struct SeedView: View {
         .font(Theme.Font.body)
         .foregroundStyle(Theme.Color.muted)
         .contentTransition(.opacity)
-        .animation(reduceMotion ? nil : Theme.Motion.standard, value: engine.dealtSeed)
+        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard, value: engine.dealtSeed)
     }
 
     private var shuffleButton: some View {
@@ -351,15 +370,18 @@ struct SeedView: View {
         }
     }
 
+    private var reelCount: Int { reelDisplayed ?? collection.total }
+
     @ViewBuilder private var reelButton: some View {
         if !searching, !introRunning {
             Button { showReel = true } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "film.stack")
-                    if collection.total > 0 {
-                        Text("\(collection.total)")
+                    if reelCount > 0 {
+                        Text("\(reelCount)")
                             .font(Theme.Font.numeral(.subheadline))
                             .monospacedDigit()
+                            .contentTransition(.numericText(value: Double(reelCount)))
                     }
                 }
                 .font(Theme.Font.bodyStrong)
@@ -367,6 +389,16 @@ struct SeedView: View {
                 .padding(.horizontal, Theme.Spacing.sm + 2)
                 .padding(.vertical, Theme.Spacing.xs + 2)
                 .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
+                // One small bump as the number rolls up. Reduce Motion: the
+                // number still rolls, the pill holds still.
+                .keyframeAnimator(initialValue: 1.0, trigger: reelBump) { [reduceMotion] view, scale in
+                    view.scaleEffect(reduceMotion ? 1 : scale)
+                } keyframes: { _ in
+                    KeyframeTrack {
+                        CubicKeyframe(1.06, duration: 0.12)
+                        SpringKeyframe(1.0, duration: 0.3, spring: .snappy)
+                    }
+                }
             }
             .buttonStyle(.plain)
             .padding(.trailing, Theme.Spacing.gutter)
@@ -572,6 +604,23 @@ struct SeedView: View {
         if soundEnabled { SoundPlayer.shared.warm() }
     }
 
+    /// After a run that grew the Reel, roll the pill's number up from what the
+    /// player last saw to the new total, once the screen has landed — so the
+    /// growth (the "look how many you know" hook) is seen, not just there.
+    private func revealReelGrowth() async {
+        guard !introRunning else { return }
+        let total = collection.total
+        guard let from = reelDisplayed, from < total else {
+            reelTotalShown = total
+            return
+        }
+        try? await Task.sleep(for: .seconds(Theme.Motion.screenSettle))
+        guard !Task.isCancelled else { return }
+        withAnimation(.snappy(duration: 0.4)) { reelDisplayed = nil }
+        reelBump += 1
+        reelTotalShown = total
+    }
+
     private func skipIntro() {
         guard playsIntro, !introDone else { return }
         introTask?.cancel()
@@ -602,7 +651,7 @@ private struct StartButtonStyle: ButtonStyle {
             .neoSurface(radius: Theme.Radius.card + 4,
                         fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
                         pressed: configuration.isPressed)
-            .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+            .animation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
 
@@ -651,8 +700,8 @@ private struct SegmentButtonStyle: ButtonStyle {
                         .strokeBorder(selected ? Theme.Color.border : .clear, lineWidth: Theme.Border.width))
             }
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .animation(Theme.Motion.standard, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(Theme.Motion.press, value: configuration.isPressed)
             .animation(Theme.Motion.emphasized, value: selected)
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
