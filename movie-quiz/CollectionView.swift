@@ -344,11 +344,10 @@ struct CollectionView: View {
                             card.hidden()   // holds the slot while the card is out
                                 .transition(.identity)
                         } else {
-                            // No fade either way: the card hands over to its
-                            // lifted copy (and back) at full opacity, at the same
-                            // spot, so the swap can't be seen.
+                            // Hands over to its lifted copy (and back) at the same
+                            // spot. Its exit needs a duration — see `handOff`.
                             card.reelLift(id: entity.id, in: liftNamespace)
-                                .transition(.identity)
+                                .transition(Self.handOff)
                         }
                     }
                     .buttonStyle(.pressScale)
@@ -375,7 +374,7 @@ struct CollectionView: View {
                                     .transition(.identity)
                             } else {
                                 frame.reelLift(id: entity.id, in: liftNamespace)
-                                    .transition(.identity)
+                                    .transition(Self.handOff)
                             }
                             ReelFrameCaption(entity: entity)
                         }
@@ -430,11 +429,12 @@ struct CollectionView: View {
     /// Flying home: quick and unbouncy — the system putting the card back.
     private static let homeFlight: Animation = .spring(duration: 0.38, bounce: 0)
 
-    /// The lifted card's exit. It needs *some* duration: with a zero-length
-    /// removal (`.identity`) SwiftUI has nothing to animate the matched hand-off
-    /// against, and the grid card snaps home in a frame. But only a blink — held
-    /// for the whole flight, a flipped card's back travelled home beside the
-    /// grid's front. What you see travelling is the grid's own card.
+    /// How a card leaves when it hands over to its twin — the grid card as it
+    /// lifts, the lifted copy as it goes home. It needs *some* duration: with a
+    /// zero-length removal (`.identity`) SwiftUI has nothing to animate the
+    /// matched hand-off against, and the card appears lifted (or lands home) in a
+    /// single frame. But only a blink — held for the whole flight, a flipped
+    /// card's back travelled home beside the grid's front.
     private static let handOff: AnyTransition = .asymmetric(
         insertion: .identity,
         removal: .opacity.animation(.easeOut(duration: 0.08))
