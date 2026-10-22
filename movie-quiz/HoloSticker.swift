@@ -86,28 +86,55 @@ struct HoloSticker<Label: View>: View {
 /// Hairline scratches and a few specks of grime, so the sticker looks handled
 /// rather than freshly printed. The scratches are bright — they catch the light —
 /// and catch it more as the phone tilts. Deterministic per `seed`.
+///
+/// Each layer is drawn once: tilt only changes the scratch layer's opacity, so
+/// a tilt frame never redraws a canvas (the start sticker sits on the deck while
+/// you type).
 private struct StickerWear: View {
     let seed: UInt64
     let tilt: CGSize
 
     var body: some View {
+        let glint = min(1, abs(tilt.width) + abs(tilt.height))
+        ZStack {
+            StickerWearLayer(seed: seed, layer: .scratches)
+                .opacity(0.35 + 0.4 * glint)
+            StickerWearLayer(seed: seed, layer: .specks)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// One layer of a sticker's wear. Its inputs never change with tilt, so SwiftUI
+/// keeps the drawn canvas instead of re-running it.
+private struct StickerWearLayer: View {
+    enum Layer { case scratches, specks }
+
+    let seed: UInt64
+    let layer: Layer
+
+    var body: some View {
         // Theme colours are main-actor values; read them here, not in the canvas.
         let grime = Theme.Color.shadow
-        let glint = min(1, abs(tilt.width) + abs(tilt.height))
-        Canvas { context, size in
+        Canvas { [layer] context, size in
+            // Both layers walk the same random stream in the same order, so the
+            // specks land where they always have.
             var rng = SeededRandom(seed: seed)
-            // Scratches: short, mostly-diagonal hairlines.
+            // Scratches: short, mostly-diagonal hairlines, full white — the
+            // layer's opacity sets how much light they catch.
             for _ in 0..<7 {
                 let start = CGPoint(x: rng.next(in: 0...size.width), y: rng.next(in: 0...size.height))
                 let length = rng.next(in: 5...(size.width * 0.45))
                 let angle = rng.next(in: -0.9...(-0.3))
+                let width = rng.next(in: 0.4...0.8)
+                guard layer == .scratches else { continue }
                 var path = Path()
                 path.move(to: start)
                 path.addLine(to: CGPoint(x: start.x + cos(angle) * length,
                                          y: start.y + sin(angle) * length))
-                context.stroke(path, with: .color(.white.opacity(0.35 + 0.4 * glint)),
-                               lineWidth: rng.next(in: 0.4...0.8))
+                context.stroke(path, with: .color(.white), lineWidth: width)
             }
+            guard layer == .specks else { return }
             // Specks: tiny flecks of dirt, darker.
             for _ in 0..<12 {
                 let r = rng.next(in: 0.3...0.8)
@@ -116,7 +143,6 @@ private struct StickerWear: View {
                 context.fill(Path(ellipseIn: rect), with: .color(grime.opacity(0.25)))
             }
         }
-        .allowsHitTesting(false)
     }
 }
 
@@ -301,6 +327,8 @@ final class TiltMotion {
     private static let drift = 1.65
     /// How far the phone turns for a full tilt: 1 / gain of gravity, ~15°.
     private static let gain: CGFloat = 4
+    /// The smallest change worth publishing (about 0.016° of card lean).
+    private static let deadBand: CGFloat = 0.002
 
     var isAvailable: Bool { manager.isDeviceMotionAvailable }
 
@@ -339,8 +367,14 @@ final class TiltMotion {
         let target = CGSize(width: clamp((raw.width - base.width) * Self.gain),
                             height: clamp((raw.height - base.height) * Self.gain))
         let s = CGFloat(1 - exp(-dt / Self.smoothing))
-        tilt = CGSize(width: tilt.width + (target.width - tilt.width) * s,
-                      height: tilt.height + (target.height - tilt.height) * s)
+        let next = CGSize(width: tilt.width + (target.width - tilt.width) * s,
+                          height: tilt.height + (target.height - tilt.height) * s)
+        // Under ~0.02° of card lean nothing visibly moves:
+        // skip the write, so a phone held still doesn't re-render every reader
+        // of the tilt every frame.
+        guard abs(next.width - tilt.width) >= Self.deadBand
+                || abs(next.height - tilt.height) >= Self.deadBand else { return }
+        tilt = next
     }
 
     private func clamp(_ v: CGFloat) -> CGFloat { min(1, max(-1, v)) }

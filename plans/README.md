@@ -51,3 +51,9 @@ build on it.
   gain 3 → 4; lifted width 240 → 300pt. The table shadow looked off in both forms
   (flat slab, then tipped silhouette) and was removed: the lifted actor card has no
   shadow. Flick and mid-tilt landing felt right as built.
+- **Review pass (`/review-animations` + `animation-performance`)**: the parallax's
+  overscan zoom now scales with tilt intensity (it had cropped every grid card 8%);
+  the lifted card's hard shadow slides under it as it rises and back out as it lands
+  instead of blinking; the sticker wear is drawn once and only its opacity follows the
+  tilt; `TiltMotion` skips writes under a 0.002 dead band; the glare dropped its blend
+  mode so it can't push the card offscreen.

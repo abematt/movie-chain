@@ -97,11 +97,15 @@ struct ReelActorCard: View {
     var isNew = false
     /// Lifted: swap the art for a sharper image once it has loaded.
     var sharpArt = false
-    /// Lifted: the laminate glare that catches the light, and no hard shadow —
-    /// a shadow under a card tipping in 3D never looked attached to it. Grid
-    /// cards are matte and keep theirs. Tilt itself arrives through `\.cardTilt`, read only by
-    /// the leaf views below, so a tilt frame never re-runs this body.
+    /// Lifted: the laminate glare that catches the light. Grid cards are matte.
+    /// Tilt itself arrives through `\.cardTilt`, read only by the leaf views
+    /// below, so a tilt frame never re-runs this body.
     var lifted = false
+    /// Sitting on the table, with its hard shadow. A lifted card is off the
+    /// table while it's out — a shadow under a card tipping in 3D never looked
+    /// attached — so the shadow slides in under it as it rises and back out as it
+    /// lands, riding the flight's own animation instead of blinking.
+    var grounded = true
 
     /// A poker card's proportions.
     static let aspect: CGFloat = 5.0 / 7.0
@@ -136,7 +140,7 @@ struct ReelActorCard: View {
         .overlay {
             if lifted { ReelGlare().clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm)) }
         }
-        .neoSurface(radius: Theme.Radius.sm, fill: .clear, shadow: lifted ? 0 : Theme.Shadow.small)
+        .neoSurface(radius: Theme.Radius.sm, fill: .clear, shadow: grounded ? Theme.Shadow.small : 0)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(entity.name), \(links) \(links == 1 ? "film" : "films") linked, \(finish.label)")
     }
@@ -178,9 +182,10 @@ struct ReelFrame: View {
     var isNew = false
     /// Lifted: swap the poster for a sharper image once it has loaded.
     var sharpArt = false
-    /// Lifted: glass over the poster that catches the light, the poster sitting
-    /// a little behind it, and no hard shadow (as `ReelActorCard.lifted`).
+    /// Lifted: glass over the poster that catches the light.
     var lifted = false
+    /// Sitting on the wall, with its hard shadow (see `ReelActorCard.grounded`).
+    var grounded = true
 
     private static let mat: CGFloat = 7
     private static let moulding: CGFloat = 4
@@ -210,10 +215,8 @@ struct ReelFrame: View {
             .padding(Self.moulding)
             .background(Theme.Color.ink)
             .background {
-                if !lifted {
-                    Rectangle().fill(Theme.Color.shadow)
-                        .offset(x: Theme.Shadow.small, y: Theme.Shadow.small)
-                }
+                let depth = grounded ? Theme.Shadow.small : 0
+                Rectangle().fill(Theme.Color.shadow).offset(x: depth, y: depth)
             }
             .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 3, y: -5) } }
             .accessibilityElement(children: .ignore)
@@ -408,9 +411,9 @@ struct ReelCardDetail: View {
     private var front: some View {
         ReelCanvas(aspect: aspect) {
             if isActor {
-                ReelActorCard(entity: entity, sharpArt: true, lifted: true)
+                ReelActorCard(entity: entity, sharpArt: true, lifted: true, grounded: !out)
             } else {
-                ReelFrame(entity: entity, sharpArt: true, lifted: true)
+                ReelFrame(entity: entity, sharpArt: true, lifted: true, grounded: !out)
             }
         }
     }
@@ -448,7 +451,7 @@ struct ReelCardDetail: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Theme.Color.tile)
         .clipShape(RoundedRectangle(cornerRadius: isActor ? Theme.Radius.md : 0))
-        // No shadow on a lifted card, either face (see `ReelActorCard.lifted`).
+        // Only shown while out, when the card is off the table (`ReelActorCard.grounded`).
         .neoSurface(radius: isActor ? Theme.Radius.md : 0, fill: .clear, shadow: 0)
     }
 
@@ -583,16 +586,24 @@ private struct ReelFoil: View {
 }
 
 /// The photo sitting a little behind the card's face: it slides against the
-/// tilt inside its window. Scaled up a touch so the slide never shows an edge.
+/// tilt inside its window, scaled up just enough that the slide never shows an
+/// edge. The overscan grows with the tilt's intensity, so a grid card — and a
+/// lifted one while it flies — is the photo exactly as cropped, never zoomed.
 private struct ReelParallax<Content: View>: View {
     @Environment(\.cardTilt) private var tilt
     @ViewBuilder let content: Content
 
+    /// Design points the photo slides at full tilt.
+    private static var travel: CGFloat { 2.5 }
+    /// Overscan at full tilt: covers `travel` each side of the smallest window
+    /// (a poster, ~88pt), with a little to spare.
+    private static var overscan: CGFloat { 0.07 }
+
     var body: some View {
         let t = tilt?.value ?? .zero
         content
-            .scaleEffect(1.08)
-            .offset(x: -t.width * 2.5, y: -t.height * 2.5)
+            .scaleEffect(1 + Self.overscan * (tilt?.intensity ?? 0))
+            .offset(x: -t.width * Self.travel, y: -t.height * Self.travel)
     }
 }
 
@@ -617,8 +628,9 @@ private struct ReelGlare: View {
                 .offset(x: t.width * w * 0.8, y: t.height * h * 0.8)
                 .frame(width: w, height: h)
         }
+        // Plain white over the face, no blend mode: a compositing filter here
+        // could push the whole card offscreen on every tilt frame.
         .opacity(0.10 + 0.25 * magnitude)
-        .blendMode(.plusLighter)
         .allowsHitTesting(false)
     }
 }
