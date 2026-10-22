@@ -71,6 +71,11 @@ enum Config {
     /// clock is paused, so they don't cost the player time.
     static let candidateLoadAttempts = 3
 
+    /// How long a timed-out run holds on the play screen ("time's up") before
+    /// game over. Without it the screen slid away the instant the clock hit 0,
+    /// so the run never visibly *ended*. A Quit skips it.
+    static let timeUpPause: Duration = .milliseconds(450)
+
     // MARK: Seed deal
 
     /// Probability (0…1) that a dealt home-screen start is an *actor* rather than

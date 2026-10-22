@@ -177,6 +177,23 @@ enum Theme {
         static let pill: CGFloat = 999
     }
 
+    // MARK: Holographic foil
+    //
+    // The iridescent stops a `HoloSticker` sweeps through as the phone tilts.
+    // Deliberately the same in light and dark: foil is a material, not a surface
+    // colour, so it doesn't invert — text on it uses `Color.onAccent`, which is
+    // legible on pastels in both themes.
+    enum Holo {
+        static let colors: [SwiftUI.Color] = [
+            SwiftUI.Color(red: 1.00, green: 0.71, blue: 0.90),  // pink
+            SwiftUI.Color(red: 0.79, green: 0.72, blue: 1.00),  // lilac
+            SwiftUI.Color(red: 0.66, green: 0.91, blue: 1.00),  // cyan
+            SwiftUI.Color(red: 0.73, green: 0.96, blue: 0.82),  // mint
+            SwiftUI.Color(red: 1.00, green: 0.95, blue: 0.66),  // lemon
+            SwiftUI.Color(red: 1.00, green: 0.71, blue: 0.90),  // pink again, so the sweep wraps
+        ]
+    }
+
     // MARK: Motion
     //
     // Centralizing animation curves keeps transitions feeling like one system.
@@ -185,7 +202,19 @@ enum Theme {
     enum Motion {
         static let standard: Animation = .snappy
         static let emphasized: Animation = .bouncy(duration: 0.4)
-        static let drop: Animation = .spring(response: 0.34, dampingFraction: 0.62)
+        /// Seen on every correct link, so the overshoot stays small: enough to
+        /// read as a landing, not so much that the whole stack wobbles each turn.
+        static let drop: Animation = .spring(duration: 0.35, bounce: 0.2)
+        /// Press feedback on every tappable surface — fast enough to feel like the
+        /// control heard the finger (100–160ms), one value so presses all agree.
+        static let press: Animation = .snappy(duration: 0.14)
+        /// What a movement animation becomes under Reduce Motion: a short
+        /// cross-fade, so state changes still read without anything travelling.
+        static let reducedFade: Animation = .easeOut(duration: 0.2)
+        /// How long the screen push takes to visually settle; content that
+        /// cascades in on a new screen waits this long so it isn't lost under the
+        /// push.
+        static let screenSettle: Double = 0.3
         /// The screen-to-screen carousel curve — a soft spring, damped high so a
         /// full-width directional push carries continuity without overshooting
         /// into a visible edge gap.

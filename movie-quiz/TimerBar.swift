@@ -18,6 +18,10 @@ struct TimerBar: View {
     private var clamped: Double { max(0, min(1, fraction)) }
     private var lowTime: Bool { clamped <= 0.25 }
 
+    /// What the bar is drawing. Follows `clamped` with a direction-aware animation
+    /// (see `onChange`), so it can't simply be an implicit animation on `clamped`.
+    @State private var shown: Double = 1
+
     var body: some View {
         GeometryReader { geo in
             // The spec's progress bar: 6pt, muted track, full radius, no border
@@ -26,13 +30,22 @@ struct TimerBar: View {
                 Capsule().fill(Theme.Color.hairline)
                 Capsule()
                     .fill(lowTime ? Theme.Color.danger : Theme.Color.ink)
-                    .frame(width: clamped * geo.size.width)
+                    .frame(width: shown * geo.size.width)
             }
             .clipShape(Capsule())
         }
         .frame(height: 6)
-        .animation(.linear(duration: 0.25), value: clamped)
         .animation(Theme.Motion.standard, value: lowTime)
+        .onAppear { shown = clamped }
+        .onChange(of: clamped) { old, new in
+            // The engine ticks once a second. Draining linearly over the whole
+            // second makes consecutive ticks join into one continuous drain (it
+            // trails the clock by under a second); a new turn's refill is a quick
+            // snap rather than a slow slide backwards.
+            withAnimation(new < old ? .linear(duration: 1) : Theme.Motion.standard) {
+                shown = new
+            }
+        }
     }
 }
 

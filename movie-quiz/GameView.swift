@@ -18,12 +18,17 @@ struct GameView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Prototype switch between chain treatments (Settings → Chain style).
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     @State private var answer = ""
     @FocusState private var fieldFocused: Bool
     @State private var gainToken = 0     // bumps to replay the "+N" pop
     @State private var shakeToken = 0    // bumps to shake the field on reject
+    /// Set once the player starts typing again after a reject, so the error
+    /// hands its line back to the next-up hint.
+    @State private var feedbackDismissed = false
+    /// Height of the band between the score and the hint, for the deck's pile.
+    @State private var chainBandHeight: CGFloat = 0
     /// Bumps to fire the one-shot score bounce when a run passes the record.
     @State private var recordPop = 0
     /// DEBUG screenshot hook: act as if this run had passed the record.
@@ -65,9 +70,24 @@ struct GameView: View {
                     case .cards:
                         ChainCardStack(chain: engine.chain)
                             .fixedSize(horizontal: false, vertical: true)
+                    case .deck:
+                        ChainDeck(chain: engine.chain, availableHeight: chainBandHeight)
+                            .fixedSize(horizontal: false, vertical: true)
                     case .tiles:
                         ChainStack(chain: engine.chain, maxVisible: visibleLinks)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                // The deck sizes its pile to this (it shrinks as the keyboard rises).
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { chainBandHeight = $0 }
+                // Time's up: the pile sags 4pt and settles — the chain dropped,
+                // not just the screen changing. Reduce Motion: no sag.
+                .keyframeAnimator(initialValue: 0.0, trigger: engine.timeUp) { [reduceMotion] view, sag in
+                    view.offset(y: reduceMotion ? 0 : sag)
+                } keyframes: { _ in
+                    KeyframeTrack {
+                        CubicKeyframe(4, duration: 0.12)
+                        SpringKeyframe(0, duration: 0.3, spring: .snappy)
                     }
                 }
                 .clipped()
@@ -93,6 +113,8 @@ struct GameView: View {
             // set would fire on whatever screen replaced us and jump the keyboard.
             guard !Task.isCancelled else { return }
             fieldFocused = true
+            // The first turn's clock starts now, not when the push began.
+            engine.playerReady()
         }
         #if DEBUG
         .onAppear {
@@ -106,8 +128,20 @@ struct GameView: View {
         .onChange(of: engine.score) { old, new in
             if new > old { onCorrect() }
         }
-        .onChange(of: engine.feedback) { _, new in
-            if new != nil { onReject() }
+        // `rejections`, not `feedback`: two identical misses in a row leave
+        // `feedback` unchanged, and the second must still shake and buzz.
+        .onChange(of: engine.rejections) {
+            feedbackDismissed = false
+            onReject()
+        }
+        .onChange(of: engine.feedback) { feedbackDismissed = false }
+        .onChange(of: engine.timeUp) { _, up in
+            if up { onTimeUp() }
+        }
+        .onChange(of: answer) { _, new in
+            if !new.isEmpty, !feedbackDismissed {
+                withAnimation(Theme.Motion.reducedFade) { feedbackDismissed = true }
+            }
         }
     }
 
@@ -134,7 +168,9 @@ struct GameView: View {
                 .font(Theme.Font.numeral(.subheadline))
                 .monospacedDigit()
                 .foregroundStyle(lowTime ? Theme.Color.danger : Theme.Color.muted)
-                .contentTransition(.numericText())
+                .contentTransition(.numericText(countsDown: true))
+                // A content transition only plays inside an animation.
+                .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: engine.secondsRemaining)
 
             Spacer()
 
@@ -206,19 +242,45 @@ struct GameView: View {
         }
     }
 
-    // MARK: Next-up hint
+    // MARK: Next-up hint (and, after a miss, the error)
 
+    /// The error to show, if any: a reject's message until the player starts
+    /// typing the next try. A load failure stays until Retry clears it.
+    private var visibleFeedback: String? {
+        guard let feedback = engine.feedback else { return nil }
+        return feedbackDismissed && !engine.awaitingRetry ? nil : feedback
+    }
+
+    // One fixed line that carries either the next-up hint or the error, cross-
+    // fading between them. The error used to be an extra row in the answer dock,
+    // which grew the bottom inset on every miss and squeezed the chain band.
     private var nextHint: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            NodeDot(kind: engine.expectedKind)
-            Text(hintText)
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+        ZStack(alignment: .leading) {
+            HStack(spacing: Theme.Spacing.sm) {
+                NodeDot(kind: engine.expectedKind)
+                Text(hintText)
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .contentTransition(.opacity)
+            }
+            .opacity(visibleFeedback == nil ? 1 : 0)
+
+            if let feedback = visibleFeedback {
+                Text(feedback)
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.danger)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .transition(.opacity)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Theme.Spacing.xs)
+        // The hint changes as the new link lands, so it arrives on the same beat.
+        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.chain.count)
+        .animation(Theme.Motion.reducedFade, value: visibleFeedback)
     }
 
     private var hintText: String {
@@ -233,16 +295,9 @@ struct GameView: View {
 
     private var answerDock: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            if let feedback = engine.feedback {
-                Text(feedback)
-                    .font(Theme.Font.small)
-                    .foregroundStyle(Theme.Color.danger)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity)
-            }
-
             if engine.awaitingRetry {
                 retryButton
+                    .transition(dockSwap)
             } else {
                 HStack(spacing: Theme.Spacing.sm) {
                     TextField(engine.expectedKind.placeholder, text: $answer)
@@ -254,6 +309,27 @@ struct GameView: View {
                         .padding(.horizontal, Theme.Spacing.md)
                         .frame(minHeight: 44)
                         .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+                        // Reduce Motion's stand-in for the shake: the field's
+                        // border flashes red and fades — a rejection you can see
+                        // without anything moving.
+                        // (The content closure is `@Sendable`, so the theme
+                        // values are captured here rather than read inside.)
+                        .keyframeAnimator(initialValue: 0.0, trigger: shakeToken) { [reduceMotion,
+                                                                                     radius = Theme.Radius.md,
+                                                                                     danger = Theme.Color.danger,
+                                                                                     width = Theme.Border.width] view, flash in
+                            view.overlay {
+                                RoundedRectangle(cornerRadius: radius)
+                                    .strokeBorder(danger, lineWidth: width)
+                                    .opacity(reduceMotion ? flash : 0)
+                            }
+                        } keyframes: { _ in
+                            KeyframeTrack {
+                                LinearKeyframe(1.0, duration: 0.05)
+                                CubicKeyframe(1.0, duration: 0.25)
+                                CubicKeyframe(0.0, duration: 0.4)
+                            }
+                        }
 
                     Button("Go", action: submit)
                         .buttonStyle(.primary)
@@ -261,13 +337,25 @@ struct GameView: View {
                         .disabled(!canSubmit)
                 }
                 .shake(shakeToken)
+                .transition(dockSwap)
             }
         }
+        // Time's up: the input greys out for the beat before game over. Not
+        // `.disabled` — that would drop the keyboard mid-beat and jump the
+        // layout; the engine already ignores answers once `timeUp` is set.
+        .opacity(engine.timeUp ? 0.5 : 1)
+        .animation(.easeOut(duration: 0.2), value: engine.timeUp)
+        .animation(.easeOut(duration: 0.2), value: engine.awaitingRetry)
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.sm)
         .padding(.bottom, Theme.Spacing.sm)
         .background(Theme.Color.canvas)
-        .animation(.snappy, value: engine.feedback)
+    }
+
+    /// The input row ⇄ Retry swap after a failed load: a quick cross-fade with a
+    /// slight scale, instead of one teleporting into the other's place.
+    private var dockSwap: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97))
     }
 
     // Shown in place of the input when a candidate load failed — typing would be
@@ -299,6 +387,14 @@ struct GameView: View {
         if soundEnabled { SoundPlayer.shared.record() }
         recordPop += 1
         AccessibilityNotification.Announcement("A new best").post()
+    }
+
+    /// The clock ran out: the "time's up" beat. The wrong-answer buzz marks the
+    /// moment the run ends; the dock dims and the pile sags (above) on the same
+    /// beat, then the engine moves on to game over.
+    private func onTimeUp() {
+        Haptics.wrong()
+        if soundEnabled { SoundPlayer.shared.wrong() }
     }
 
     private func onReject() {

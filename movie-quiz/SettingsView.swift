@@ -18,7 +18,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("soundEnabled") private var soundEnabled = true
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     var body: some View {
         NavigationStack {

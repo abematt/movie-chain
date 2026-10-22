@@ -19,8 +19,12 @@ struct GameOverView: View {
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
     @State private var scorePop = 0
+    /// The new-best sticker, in two beats: `stickerPlaced` lands it on the card
+    /// (fast), `stickerPressed` smooths it down from a big peel to a slight one.
+    @State private var stickerPlaced = false
+    @State private var stickerPressed = false
     /// Prototype switch: the recap follows the play screen's chain treatment.
-    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
+    @AppStorage("chainStyle") private var chainStyle: ChainStyle = .deck
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -28,6 +32,10 @@ struct GameOverView: View {
 
             if let missed = summary.missedAnswer {
                 oneAway(missed)
+                    // First beat of the deal-in, ahead of the chain cards, so
+                    // nothing on this screen arrives unannounced.
+                    .appear(0, animation: Theme.Motion.cascade, offset: 14,
+                            after: Theme.Motion.screenSettle)
             }
 
             recapSection
@@ -41,7 +49,12 @@ struct GameOverView: View {
         .task {
             guard summary.isNewBest else { return }
             // Reduce Motion: the celebratory haptic still fires, but no visual pop.
-            if reduceMotion { Haptics.celebrate(); return }
+            if reduceMotion {
+                stickerPlaced = true
+                stickerPressed = true
+                Haptics.celebrate()
+                return
+            }
             // Wait out the screen-push carousel (Theme.Motion.screen, ~0.45s)
             // so the bounce reads as a landing beat rather than overlapping the
             // horizontal push. Haptic + pop fire together, after the settle.
@@ -51,6 +64,10 @@ struct GameOverView: View {
             guard !Task.isCancelled else { return }
             Haptics.celebrate()
             scorePop += 1
+            // Slapped on, then pressed flat from the stuck edge outward — the
+            // big peel springs down to a slight lift at the corner.
+            withAnimation(.easeOut(duration: 0.16)) { stickerPlaced = true }
+            withAnimation(.spring(duration: 0.55, bounce: 0.3).delay(0.06)) { stickerPressed = true }
         }
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain)
@@ -71,6 +88,8 @@ struct GameOverView: View {
             runHero
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Theme.Spacing.md)
+                // A little headroom so the sticker in the corner clears the score.
+                .padding(.top, summary.isNewBest ? Theme.Spacing.sm : 0)
                 .padding(.horizontal, Theme.Spacing.md)
 
             if showsBest || showsReel {
@@ -86,6 +105,44 @@ struct GameOverView: View {
             }
         }
         .neoSurface(radius: Theme.Radius.card)
+        // Stuck flat in the card's top-trailing corner, inside its edges (hanging
+        // off the border read as floating). It sits in the empty corner above
+        // "links", clear of the centred score.
+        .overlay(alignment: .topTrailing) {
+            if summary.isNewBest {
+                newBestSticker
+                    .padding(.top, Theme.Spacing.sm + 2)
+                    .padding(.trailing, Theme.Spacing.sm + 2)
+            }
+        }
+    }
+
+    /// The chain cards deal in after the "one away" card when there is one.
+    private var recapStaggerStart: Int { summary.missedAnswer == nil ? 0 : 1 }
+
+    // MARK: New-best sticker
+
+    private var newBestSticker: some View {
+        HoloSticker(rotation: .degrees(-8),
+                    peel: stickerPressed ? 0.22 : 0.7,
+                    // Casts a shadow only while it's still in the air; pressed
+                    // flat, the shadow is gone and it's part of the card.
+                    shadow: stickerPressed ? 0 : Theme.Shadow.large * 2,
+                    wearSeed: 21) {
+            VStack(spacing: 0) {
+                Text("New best!")
+                    .font(Theme.Font.heading(.title3))
+                // The record it beat means more than the label alone.
+                if summary.previousBest > 0 {
+                    Text("was \(summary.previousBest)")
+                        .font(Theme.Font.flourish(.footnote))
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.xs)
+        }
+        .scaleEffect(stickerPlaced ? 1 : 1.25)
+        .opacity(stickerPlaced ? 1 : 0)
+        .accessibilityHidden(true)   // the hero's label already says "a new best"
     }
 
     private var showsBest: Bool { !summary.isNewBest && engine.bestChain > 0 }
@@ -95,17 +152,6 @@ struct GameOverView: View {
 
     private var runHero: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            if summary.isNewBest {
-                Text("a new best")
-                    .font(Theme.Font.flourish(.subheadline))
-                    .foregroundStyle(Theme.Color.onAccent)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.xs + 1)
-                    .neoSurface(radius: Theme.Radius.pill, fill: Theme.Color.good,
-                                shadow: Theme.Shadow.small)
-                    .transition(.scale.combined(with: .opacity))
-            }
-
             // The unit sits on the numeral's baseline so "2 links" reads as one
             // figure; points get their own line beneath it.
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
@@ -211,7 +257,8 @@ struct GameOverView: View {
             Text("Your chain").metaLabel()
             ScrollView {
                 switch chainStyle {
-                case .cards:
+                // The deck is a play-screen treatment; its recap is the card list.
+                case .cards, .deck:
                     VStack(spacing: Theme.Spacing.xs + 2) {
                         ForEach(Array(engine.chain.enumerated()), id: \.element.id) { i, node in
                             // The start isn't a link: it gets a flag, and the
@@ -219,7 +266,10 @@ struct GameOverView: View {
                             // the score above.
                             CompactChainCard(node: node, position: i == 0 ? nil : i,
                                              isStart: i == 0)
-                                .appear(i, animation: Theme.Motion.cascade, offset: 14)
+                                // Starts as the push settles, so the cascade
+                                // isn't spent underneath the slide.
+                                .appear(i + recapStaggerStart, animation: Theme.Motion.cascade,
+                                        offset: 14, after: Theme.Motion.screenSettle)
                         }
                     }
                     // Room for the hard shadows, which draw outside each card.

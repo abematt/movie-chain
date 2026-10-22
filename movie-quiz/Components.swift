@@ -100,7 +100,7 @@ private struct NeoButtonBody: View {
                                  fill: isEnabled ? fill : Theme.Color.hairline,
                                  shadow: isEnabled ? shadow : 0,
                                  pressed: configuration.isPressed && !reduceMotion))
-            .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+            .animation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
 
@@ -235,9 +235,9 @@ struct PressScaleStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
                 .opacity(configuration.isPressed ? 0.85 : 1)
-                .animation(Theme.Motion.standard, value: configuration.isPressed)
+                .animation(Theme.Motion.press, value: configuration.isPressed)
         }
     }
 }
@@ -344,10 +344,14 @@ struct NodeTile: View {
 struct Shake: GeometryEffect {
     var animatableData: CGFloat
     var amplitude: CGFloat = 8
-    var shakes: CGFloat = 3
+    /// Half-swings across the shake; an even count ends back at rest.
+    var shakes: CGFloat = 4
 
     func effectValue(size: CGSize) -> ProjectionTransform {
-        let translation = amplitude * sin(animatableData * .pi * shakes)
+        // The swing decays to nothing, so the shake settles instead of stopping
+        // dead mid-swing like a constant-amplitude wobble does.
+        let t = animatableData
+        let translation = amplitude * (1 - t) * sin(t * .pi * shakes)
         return ProjectionTransform(CGAffineTransform(translationX: translation, y: 0))
     }
 }
@@ -362,13 +366,18 @@ extension View {
 private struct ShakeOnChange: ViewModifier {
     let trigger: Int
     @State private var amount: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .modifier(Shake(animatableData: amount))
             .onChange(of: trigger) {
+                // Reduce Motion: no shake. The caller carries the rejection with a
+                // non-moving cue instead (GameView flashes the field's border).
+                guard !reduceMotion else { return }
                 amount = 0
-                withAnimation(.linear(duration: 0.4)) { amount = 1 }
+                // Linear on purpose: the decay lives in `Shake`, so time must be even.
+                withAnimation(.linear(duration: 0.35)) { amount = 1 }
             }
     }
 }
@@ -380,17 +389,25 @@ private struct ShakeOnChange: ViewModifier {
 
 struct FloatingGain: View {
     let value: Int
+    @State private var shown = false
     @State private var rise = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Text("+\(value)")
             .font(Theme.Font.numeral(.subheadline))
             .monospacedDigit()
             .foregroundStyle(Theme.Color.good)
-            .opacity(rise ? 0 : 1)
-            .offset(y: rise ? -34 : 0)
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.8)) { rise = true }
+            .opacity(shown && !rise ? 1 : 0)
+            .scaleEffect(shown || reduceMotion ? 1 : 0.85, anchor: .bottom)
+            .offset(y: rise && !reduceMotion ? -34 : 0)
+            // Two beats: pop in fast, hold long enough to be read, then drift off.
+            // Under Reduce Motion it only fades in and out, in place.
+            .task {
+                withAnimation(.easeOut(duration: 0.12)) { shown = true }
+                try? await Task.sleep(for: .milliseconds(280))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.55)) { rise = true }
             }
     }
 }
@@ -420,6 +437,10 @@ struct StaggeredAppear: ViewModifier {
     /// e.g. the seed controls stagger during the cold-launch intro, but arrive
     /// solid on a "Play again" re-entry so they don't fight the carousel push.
     var enabled: Bool = true
+    /// Extra delay before the whole group starts, in seconds — e.g.
+    /// `Theme.Motion.screenSettle`, so a recap on a screen that is still pushing
+    /// in starts as the push lands rather than underneath it.
+    var after: Double = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
@@ -433,7 +454,7 @@ struct StaggeredAppear: ViewModifier {
             .onAppear {
                 guard enabled, !shown else { return }
                 if reduceMotion { shown = true; return }
-                withAnimation(animation.delay(Double(min(index, cap)) * step)) {
+                withAnimation(animation.delay(after + Double(min(index, cap)) * step)) {
                     shown = true
                 }
             }
@@ -449,8 +470,9 @@ extension View {
                 step: Double = 0.03,
                 offset: CGFloat = 10,
                 scaleFrom: CGFloat = 1,
-                enabled: Bool = true) -> some View {
-        modifier(StaggeredAppear(index: index, step: step, animation: animation, offset: offset, scaleFrom: scaleFrom, enabled: enabled))
+                enabled: Bool = true,
+                after: Double = 0) -> some View {
+        modifier(StaggeredAppear(index: index, step: step, animation: animation, offset: offset, scaleFrom: scaleFrom, enabled: enabled, after: after))
     }
 }
 
