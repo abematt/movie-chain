@@ -181,7 +181,8 @@ struct ReelActorCard: View {
     private var header: some View {
         HStack(spacing: 4) {
             if let number {
-                Text(ReelNumber.label(number) + (finish == .holo ? " · Holo" : ""))
+                // Just the number: a holo card shows it's holo, never says so.
+                Text(ReelNumber.label(number))
                     .font(Theme.Font.cardStamp)
                     .textCase(.uppercase)
                     .tracking(Theme.Font.labelSmallTracking)
