@@ -54,6 +54,15 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
   or straight away on Quit, with the run ending once it's down — and the game-over
   screen no longer reacts to a keyboard at all.
 
+- **Play again leaves the last run alone.** The game-over screen read the score,
+  points and chain live from the game, and Play again resets them as that screen
+  starts sliding away — so the points cross-faded to zero and lingered while it
+  left. The finished run is now frozen into its game-over summary.
+- **Putting a Reel card back is clean.** Closing faded the lifted card and its
+  buttons out in place while the grid's own card faded in on its way home — two
+  half-see-through cards and buttons hanging mid-screen. Now the buttons go at once,
+  the dim clears fast, and one card flies home at full opacity, flipped or not.
+
 ### Changed
 
 - **Smaller cards, three across.** The Reel fits half as many again on a screen.

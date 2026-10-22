@@ -233,9 +233,18 @@ struct ReelFrameCaption: View {
 ///
 /// The dimmed backdrop and the lift itself belong to `CollectionView`, so a tap
 /// anywhere puts the card back.
+///
+/// It's drawn as two layers from one layout — the card, and the Flip/Close
+/// controls — so each leaves on its own terms: the controls fade out in 100ms
+/// the moment Close is tapped, instead of lingering over the card flying home.
 struct ReelCardDetail: View {
+    enum Part { case card, controls }
+
     let entity: CollectedEntity
     let linked: [CollectedEntity]
+    /// Which layer this instance draws; the other is held as an empty slot so
+    /// both lay out identically.
+    let part: Part
     /// The grid's lift namespace; `nil` under Reduce Motion, where the card
     /// fades in place instead of travelling.
     let namespace: Namespace.ID?
@@ -259,20 +268,32 @@ struct ReelCardDetail: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
-            card
-            HStack(spacing: Theme.Spacing.sm) {
-                Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
-                Button("Close", action: close).buttonStyle(.ghost)
+            switch part {
+            case .card:
+                card
+                controls.hidden()
+            case .controls:
+                // The card's slot, empty: never a second card, which would
+                // double the lift's matched geometry.
+                Color.clear.frame(width: ReelLayout.liftedWidth, height: ReelLayout.liftedWidth / aspect)
+                controls.opacity(settled ? 1 : 0)
             }
-            .frame(width: 270)
-            .opacity(settled ? 1 : 0)
         }
         .onAppear {
+            guard part == .controls else { return }
             withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard.delay(0.12)) {
                 settled = true
             }
         }
         .accessibilityAction(.escape, close)
+    }
+
+    private var controls: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
+            Button("Close", action: close).buttonStyle(.ghost)
+        }
+        .frame(width: 270)
     }
 
     /// The front is the grid's own drawing, scaled up (`ReelCanvas`); the back

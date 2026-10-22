@@ -150,14 +150,14 @@ struct GameOverView: View {
     private var showsBest: Bool { !summary.isNewBest && engine.bestChain > 0 }
     private var showsReel: Bool { collection.total > 0 }
 
-    private var linkWord: String { engine.score == 1 ? "link" : "links" }
+    private var linkWord: String { summary.links == 1 ? "link" : "links" }
 
     private var runHero: some View {
         VStack(spacing: Theme.Spacing.xs) {
             // The unit sits on the numeral's baseline so "2 links" reads as one
             // figure; points get their own line beneath it.
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                Text("\(engine.score)")
+                Text("\(summary.links)")
                     .font(Theme.Font.display(72))
                     .foregroundStyle(Theme.Color.ink)
                     .contentTransition(.numericText())
@@ -176,12 +176,12 @@ struct GameOverView: View {
                 }
             }
 
-            Text("\(engine.points) pts")
+            Text("\(summary.points) pts")
                 .font(Theme.Font.numeral(.title3))
                 .foregroundStyle(Theme.Color.ink)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(engine.score) \(linkWord), \(engine.points) points\(summary.isNewBest ? ", a new best" : "")")
+        .accessibilityLabel("\(summary.links) \(linkWord), \(summary.points) points\(summary.isNewBest ? ", a new best" : "")")
     }
 
     // The personal best, deliberately quiet: small label, small muted figures.
@@ -259,7 +259,7 @@ struct GameOverView: View {
             Text("Your chain").metaLabel()
             ScrollView {
                 VStack(spacing: Theme.Spacing.xs + 2) {
-                    ForEach(Array(engine.chain.enumerated()), id: \.element.id) { i, node in
+                    ForEach(Array(summary.chain.enumerated()), id: \.element.id) { i, node in
                         // The start isn't a link: it gets a flag, and the
                         // links count from 1, so the last number matches
                         // the score above.
@@ -290,7 +290,7 @@ struct GameOverView: View {
             }
             .buttonStyle(.primary)
 
-            ShareLink(item: engine.shareSummary) {
+            ShareLink(item: summary.shareText) {
                 Text("Share").frame(maxWidth: .infinity)
             }
             .buttonStyle(.ghost)

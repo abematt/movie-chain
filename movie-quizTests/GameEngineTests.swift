@@ -163,6 +163,26 @@ struct GameEngineTests {
         #expect(engine.summary?.missedAnswer == nil, "a quit has no missed turn")
     }
 
+    /// The game-over screen reads the run from its summary, so "Play again" —
+    /// which resets the live run while that screen is still sliding away —
+    /// can't change what it shows on the way out.
+    @Test func summaryKeepsTheRunAfterPlayAgain() async throws {
+        let engine = makeEngine(SimpleGraphProvider())
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+        await engine.submit("Film 100")
+        let points = engine.points
+        engine.quit()
+        let summary = try #require(engine.summary)
+
+        engine.reset()
+
+        #expect(engine.score == 0 && engine.points == 0 && engine.chain.isEmpty)
+        #expect(summary.links == 1)
+        #expect(summary.points == points && points > 0)
+        #expect(summary.chain.map(\.id) == ["p1", "m100"])
+        #expect(summary.shareText.hasSuffix("🟦🟪"))
+    }
+
     // MARK: Candidate-load resilience (the "stuck turn" fix)
 
     /// Fails the first N candidate fetches (a transient rate limit / timeout), then

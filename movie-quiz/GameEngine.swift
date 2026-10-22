@@ -35,6 +35,20 @@ final class GameEngine {
         /// How many brand-new actors/movies this run added to the collection ("Your
         /// Reel") — the "+N to your Reel" figure.
         var reelAdditions = 0
+        /// The finished run itself, frozen here rather than read live off the
+        /// engine: "Play again" resets the live run as the game-over screen
+        /// starts sliding away, and that screen must keep showing *this* run
+        /// until it's gone.
+        var chain: [ChainNode] = []
+        var links = 0
+        var points = 0
+
+        /// Spoiler-free share card: each link as a coloured square, never a name.
+        var shareText: String {
+            let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
+            let linkWord = links == 1 ? "link" : "links"
+            return "Movie Chain 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+        }
     }
 
     // MARK: State
@@ -170,12 +184,6 @@ final class GameEngine {
     /// A spoiler-free, shareable recap of the finished run: the score line plus a
     /// blue/purple square rendering of the chain (🟦 actor, 🟪 movie) — the
     /// Connections-style share card. Pure text, so the engine stays UIKit-free.
-    var shareSummary: String {
-        let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
-        let linkWord = score == 1 ? "link" : "links"
-        return "Movie Chain 🎬\n\(score) \(linkWord) · \(points) pts\n\(squares)"
-    }
-
     // MARK: Seed selection
 
     /// Global search for the starting node.
@@ -517,7 +525,7 @@ final class GameEngine {
         guard phase == .playing else { return }
         generation += 1                            // drop any in-flight candidate load
         stopCountdown()
-        var summary = Summary()
+        var summary = Summary(chain: chain, links: score, points: points)
 
         // "You were one away": surface a valid answer the player didn't give on
         // the turn that ran out — the sting that drives the next run. Skip it on a
@@ -581,7 +589,8 @@ final class GameEngine {
     /// Same sample chain, but jump straight to the game-over summary.
     func loadDemoGameOver() {
         loadDemoChain()
-        phase = .gameOver(Summary(isNewBest: true, previousBest: 2, missedAnswer: candidates.first))
+        phase = .gameOver(Summary(isNewBest: true, previousBest: 2, missedAnswer: candidates.first,
+                                  chain: chain, links: score, points: points))
     }
     #endif
 }

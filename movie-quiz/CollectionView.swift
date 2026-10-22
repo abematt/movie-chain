@@ -342,8 +342,13 @@ struct CollectionView: View {
                         }
                         if expanded == entity.id {
                             card.hidden()   // holds the slot while the card is out
+                                .transition(.identity)
                         } else {
+                            // No fade either way: the card hands over to its
+                            // lifted copy (and back) at full opacity, at the same
+                            // spot, so the swap can't be seen.
                             card.reelLift(id: entity.id, in: liftNamespace)
+                                .transition(.identity)
                         }
                     }
                     .buttonStyle(.pressScale)
@@ -367,8 +372,10 @@ struct CollectionView: View {
                             // The label stays on the wall while its frame is out.
                             if expanded == entity.id {
                                 frame.hidden()
+                                    .transition(.identity)
                             } else {
                                 frame.reelLift(id: entity.id, in: liftNamespace)
+                                    .transition(.identity)
                             }
                             ReelFrameCaption(entity: entity)
                         }
@@ -393,8 +400,11 @@ struct CollectionView: View {
     /// No travel under Reduce Motion: the card fades in place instead.
     private var liftNamespace: Namespace.ID? { reduceMotion ? nil : lift }
 
-    /// The backdrop fades on its own; the card flies from its slot (identity
-    /// insertion, so it never fades in) and fades out over the card flying home.
+    /// Three layers, each leaving on its own terms. On close the controls go at
+    /// once and the lifted card hands over to the grid's own card, which flies
+    /// home from its exact frame at full opacity. The grid card makes that trip
+    /// under the backdrop, so the backdrop clears fast — 150ms — or the card
+    /// would start home washed out. Nothing fades mid-flight.
     @ViewBuilder private var detail: some View {
         ZStack {
             if expanded != nil {
@@ -402,24 +412,40 @@ struct CollectionView: View {
                     .ignoresSafeArea()
                     .onTapGesture { expand(nil) }
                     .accessibilityHidden(true)
-                    .transition(.opacity)
+                    .transition(.asymmetric(insertion: .opacity,
+                                            removal: .opacity.animation(.easeOut(duration: 0.15))))
             }
             if let id = expanded, let entity = store.entities[id] {
-                ReelCardDetail(entity: entity, linked: store.linked(to: entity),
-                               namespace: liftNamespace, flipped: $flipped) {
-                    expand(nil)
-                }
-                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .identity, removal: .opacity))
+                ReelCardDetail(entity: entity, linked: store.linked(to: entity), part: .card,
+                               namespace: liftNamespace, flipped: $flipped) { expand(nil) }
+                    .transition(reduceMotion ? .opacity : Self.handOff)
+                ReelCardDetail(entity: entity, linked: store.linked(to: entity), part: .controls,
+                               namespace: liftNamespace, flipped: $flipped) { expand(nil) }
+                    .transition(.asymmetric(insertion: .identity,
+                                            removal: .opacity.animation(.easeOut(duration: 0.1))))
             }
         }
     }
+
+    /// Flying home: quick and unbouncy — the system putting the card back.
+    private static let homeFlight: Animation = .spring(duration: 0.38, bounce: 0)
+
+    /// The lifted card's exit. It needs *some* duration: with a zero-length
+    /// removal (`.identity`) SwiftUI has nothing to animate the matched hand-off
+    /// against, and the grid card snaps home in a frame. But only a blink — held
+    /// for the whole flight, a flipped card's back travelled home beside the
+    /// grid's front. What you see travelling is the grid's own card.
+    private static let handOff: AnyTransition = .asymmetric(
+        insertion: .identity,
+        removal: .opacity.animation(.easeOut(duration: 0.08))
+    )
 
     /// Picking a card up is the deliberate moment, with a little settle;
     /// putting it back is the system answering, so it snaps home.
     private func expand(_ id: CollectedEntity.ID?) {
         if id != nil { Haptics.lift() }
         let animation: Animation = reduceMotion ? Theme.Motion.reducedFade
-            : id != nil ? .spring(duration: 0.4, bounce: 0.15) : Theme.Motion.standard
+            : id != nil ? .spring(duration: 0.4, bounce: 0.15) : Self.homeFlight
         withAnimation(animation) {
             expanded = id
             flipped = false
