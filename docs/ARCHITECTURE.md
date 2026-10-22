@@ -552,8 +552,8 @@ small, bold, uppercase and tracked.
   with a selection haptic; `GameView` then releases the first turn's clock
   (`playerReady`). The name's and the blank's crossfades carry a 2pt blur at their
   midpoint (`bridge`), so the two copies read as one shape changing. Underneath, the
-  home's chrome fades out fast (`handoffExit`, 150ms) and play's fades in a beat later
-  (`handoffEnter`), so they never sit half-faded over each other. The blank presses
+  home's chrome fades out fast (`layoutOut`, 150ms) and play's fades in a beat later
+  (`layoutIn`), so they never sit half-faded over each other. The blank presses
   through `\.blankPressed` (the arrow's neo press, no row scale) so the release frame
   matches the flight's first. Fallbacks: launch after 450ms without the focus, and give up (show
   play) after 1s without destinations. `ContentView` makes seed → play a cross-fade
