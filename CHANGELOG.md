@@ -54,7 +54,7 @@ Unspool rebrand was inserted as 0.6.0.)
 
 - **The home screen stopped explaining itself.** "Tap the blank to start" is gone: the
   sentence already reads as the rule, and the blank nudges once for a new player. The
-  best run now sits on its own, centred in the space between the header and the start.
+  best run now sits alone, centred at the bottom.
 
 - **The holo foil is smoother and cheaper.** Stickers and holo cards used to redraw
   their foil gradients on every tilt sample; now the gradients are drawn once and slid,
