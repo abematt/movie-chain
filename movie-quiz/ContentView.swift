@@ -52,10 +52,10 @@ struct ContentView: View {
             case .seed:
                 SeedView(engine: engine, collection: collection, introDone: $seedIntroDone)
                     .transition(.asymmetric(insertion: .screenPush(reduceMotion: reduceMotion),
-                                            removal: .opacity.animation(Theme.Motion.handoffExit)))
+                                            removal: .opacity.animation(Theme.Motion.layoutOut)))
             case .playing:
                 GameView(engine: engine)
-                    .transition(.asymmetric(insertion: .opacity.animation(Theme.Motion.handoffEnter),
+                    .transition(.asymmetric(insertion: .opacity.animation(Theme.Motion.layoutIn),
                                             removal: .screenPush(reduceMotion: reduceMotion)))
             case .gameOver(let summary):
                 GameOverView(engine: engine, collection: collection, summary: summary)

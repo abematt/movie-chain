@@ -117,7 +117,6 @@ struct SeedView: View {
             .padding(.top, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.sm)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .animation(Theme.Motion.standard, value: searching)
         }
         .background(Theme.Color.canvas.ignoresSafeArea())
         .overlay {
@@ -197,7 +196,7 @@ struct SeedView: View {
                   engine.dealtSeed != nil, !searching else { return }
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
-            withAnimation(Theme.Motion.standard) { searching = true }
+            searching = true
         }
         #endif
         .onDisappear {
@@ -237,7 +236,7 @@ struct SeedView: View {
                     settingsButton
                 }
                 // Out with the layout they belong to, not trailing after it.
-                .animation(Theme.Motion.swapOut, value: pillsVisible)
+                .animation(Theme.Motion.layoutOut, value: pillsVisible)
             }
     }
 
@@ -317,8 +316,8 @@ struct SeedView: View {
     /// in a beat later with a short rise (just the fade under Reduce Motion).
     private var modeSwap: AnyTransition {
         let arrive: AnyTransition = reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 12))
-        return .asymmetric(insertion: arrive.animation(Theme.Motion.swapIn),
-                           removal: .opacity.animation(Theme.Motion.swapOut))
+        return .asymmetric(insertion: arrive.animation(Theme.Motion.layoutIn),
+                           removal: .opacity.animation(Theme.Motion.layoutOut))
     }
 
     /// The flying pieces hide the moment the blank is tapped: the handoff's
@@ -381,9 +380,8 @@ struct SeedView: View {
 
             Spacer(minLength: Theme.Spacing.sm)
 
-            Button {
-                withAnimation(Theme.Motion.standard) { searching = true }
-            } label: {
+            // The swap animates through its transitions (`modeSwap`).
+            Button { searching = true } label: {
                 Label("Pick your own", systemImage: "magnifyingglass")
             }
         }
@@ -433,17 +431,17 @@ struct SeedView: View {
     private var searchSection: some View {
         VStack(spacing: Theme.Spacing.md) {
             HStack {
-                Button {
-                    withAnimation(Theme.Motion.standard) { searching = false }
-                } label: {
+                // The swap animates through its transitions (`modeSwap`).
+                Button { searching = false } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                         Text("Deal a start")
                     }
                     .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.muted)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.pressScale)
                 Spacer()
             }
             segment
@@ -509,12 +507,22 @@ struct SeedView: View {
 
     // MARK: Results — warm-tile rows with a category dot
 
+    // Empty state ⇄ results fades, the same way the layouts swap. Only that
+    // swap: results replacing results as you type stay instant (they change on
+    // every debounced keystroke, and fading those would read as lag).
     @ViewBuilder private var resultsSection: some View {
         if results.isEmpty {
             emptyState
+                .transition(resultsSwap)
         } else {
             resultsList
+                .transition(resultsSwap)
         }
+    }
+
+    private var resultsSwap: AnyTransition {
+        .asymmetric(insertion: .opacity.animation(Theme.Motion.layoutIn),
+                    removal: .opacity.animation(Theme.Motion.layoutOut))
     }
 
     private var resultsList: some View {
@@ -558,8 +566,10 @@ struct SeedView: View {
                 .foregroundStyle(Theme.Color.muted)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, Theme.Spacing.lg)
+        // Pinned to the top, not centred: centred, the keyboard coming up just
+        // after the search lands slid it up a second time.
+        .padding(.top, Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: Search plumbing
