@@ -130,7 +130,9 @@ struct GameOverView: View {
                     // Casts a shadow only while it's still in the air; pressed
                     // flat, the shadow is gone and it's part of the card.
                     shadow: stickerPressed ? 0 : Theme.Shadow.large * 2,
-                    wearSeed: 21) {
+                    wearSeed: 21,
+                    // The Reel sheet covers it without making it disappear.
+                    active: !showReel) {
             VStack(spacing: 0) {
                 Text("New best!")
                     .font(Theme.Font.heading(.title3))

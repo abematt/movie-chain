@@ -237,6 +237,16 @@ enum Theme {
         /// take over (and the first turn's clock starts).
         static let handoffSpring = Spring(duration: 0.45, bounce: 0)
         static let handoffDuration: Double = 0.55
+        /// A lifted Reel card's tilt coming alive once it has settled — gentle,
+        /// unbouncy. Like the handoff, sampled on its own clock (`CardTilt`), so
+        /// the gyro's per-frame writes can't cancel it.
+        static let tiltIn = Spring(duration: 0.35, bounce: 0)
+        /// The tilt flattening as the card goes home; done well inside the 0.38s
+        /// flight so the card lands flat on its slot.
+        static let tiltOut = Spring(duration: 0.18, bounce: 0)
+        /// A dragged card swinging back level when let go — carries the flick,
+        /// with a small settle (a playful object, so a touch of bounce).
+        static let tiltRelease = Spring(duration: 0.5, bounce: 0.15)
         /// One layout making way for another — home → play under the handoff,
         /// deal ⇄ search, the search's empty state ⇄ its results: the old content
         /// gone fast, the new arriving a beat later, so two full-height layouts

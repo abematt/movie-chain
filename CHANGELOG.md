@@ -34,7 +34,22 @@ Unspool rebrand was inserted as 0.6.0.)
 
 ## [Unreleased]
 
+### Added
+
+- **A lifted Reel card is a card in your hand.** Pick up an actor and it tips with the
+  phone: the photo shifts behind the face, light slides across the laminate, a holo
+  card's foil shimmers, and its shadow moves across the table underneath it rather than
+  being printed on it. No gyro, or holding still? Drag it with a finger, and it swings
+  back level carrying the flick. It flies out and home flat, so it still lands exactly
+  on its slot, and Reduce Motion keeps it still with a quiet sheen.
+
 ### Changed
+
+- **The holo foil is smoother and cheaper.** Stickers and holo cards used to redraw
+  their foil gradients on every tilt sample; now the gradients are drawn once and slid,
+  and the tilt is smoothed per display frame rather than per sensor reading, so it no
+  longer steps on a fast screen. A sticker covered by the Reel sheet also stops
+  running the gyro.
 
 - **The game is called Unspool now.** "Movie Chain" described the mechanic and nothing
   else; Unspool is film coming off a reel and a chain playing out, and it's a name the
