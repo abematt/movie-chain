@@ -232,9 +232,12 @@ conditions encode "successful combinations only, seed counts once a link lands, 
 seed logs nothing, and nothing logged for a run where the answers were shown to
 you". Pure count stats from your own play — no TMDB rarity. `record` also links
 each adjacent pair both ways (`CollectedEntity.links`), so **actors are playing
-cards numbered by the films linked through them** and **movies are stamps showing
-the actors linked through them** (no progress — a cast is never completable);
-`ReelCards.swift` draws both. An actor card's finish (paper / inked / holo) comes
+cards earned through the films linked through them** and **movies are framed
+posters**; either flips over to the other side of its links (no progress for movies
+— a cast is never completable). No numbers on the fronts; the finish is the reward.
+`ReelCards.swift` draws both. The Reel narrows by decade and genre (`ReelFilter`:
+films match directly, actors through a linked film; genre ids ride along on every
+TMDB movie response, names are a fixed table). An actor card's finish (paper / inked / holo) comes
 from the pure, tested `ReelTier`, under a model set in Settings → Reel cards (Rank
 default, Share, Plain) while they're compared. Share scales to a well-known-films
 snapshot the engine takes from the filmography it already loads — **no extra TMDB

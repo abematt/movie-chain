@@ -4,8 +4,9 @@
 //
 //  "Your Reel" — the collection screen. Every actor/movie the player has logged
 //  through play, with pure count stats on top ("look how many you know"):
-//  actors as a deck of playing cards numbered by the films linked through them,
-//  movies as stamps (`ReelCards.swift`). Presented as a sheet from the seed and
+//  actors as a deck of playing cards earned through the films linked through
+//  them, movies as framed posters (`ReelCards.swift`), narrowed by decade and
+//  genre. Presented as a sheet from the seed and
 //  game-over screens.
 //
 //  Built entirely on the `Theme` tokens and the node-category identity (blue =
@@ -27,7 +28,9 @@ struct CollectionView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var filter: Filter = .actors
     @AppStorage("reelTiers") private var tierModel: ReelTierModel = .rank
-    /// The actor card lifted out of the deck, if any.
+    /// Decade and genre narrowing, shared by both tabs.
+    @State private var narrow = ReelFilter()
+    /// The card or frame lifted out of the grid, if any.
     @State private var expanded: CollectedEntity.ID?
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
@@ -60,6 +63,7 @@ struct CollectionView: View {
                             hero
                             regulars
                             filterControl
+                            narrowControls
                             grids
                             TMDBAttribution()
                         }
@@ -226,11 +230,73 @@ struct CollectionView: View {
         .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
     }
 
+    /// Counts follow the decade and genre narrowing, so each tab says what's
+    /// under it.
     private func count(for f: Filter) -> Int {
         switch f {
-        case .actors: store.actorCount
-        case .movies: store.movieCount
+        case .actors: store.actors(matching: narrow).count
+        case .movies: store.movies(matching: narrow).count
         }
+    }
+
+    // MARK: Narrow — decade and genre
+    //
+    // Two menus under the tabs. Both describe films; on the Actors tab they keep
+    // the actors linked through a matching film. The options come from the Reel
+    // itself, so a choice never comes up empty.
+
+    @ViewBuilder private var narrowControls: some View {
+        if !store.decades.isEmpty || !store.genres.isEmpty {
+            HStack(spacing: Theme.Spacing.sm) {
+                Menu {
+                    Picker("Decade", selection: $narrow.decade) {
+                        Text("Any decade").tag(Int?.none)
+                        ForEach(store.decades, id: \.self) { Text(decadeName($0)).tag(Int?.some($0)) }
+                    }
+                } label: {
+                    pill(narrow.decade.map(decadeName) ?? "Decade", active: narrow.decade != nil)
+                }
+                Menu {
+                    Picker("Genre", selection: $narrow.genre) {
+                        Text("Any genre").tag(Int?.none)
+                        ForEach(genreOptions, id: \.id) { Text($0.name).tag(Int?.some($0.id)) }
+                    }
+                } label: {
+                    pill(narrow.genre.flatMap(ReelGenre.name) ?? "Genre", active: narrow.genre != nil)
+                }
+                Spacer(minLength: 0)
+                if narrow.isActive {
+                    Button("Clear") { narrow = ReelFilter() }
+                        .font(Theme.Font.bodyStrong)
+                        .foregroundStyle(Theme.Color.ink)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Theme.Motion.standard, value: narrow)
+        }
+    }
+
+    private var genreOptions: [(id: Int, name: String)] {
+        store.genres
+            .compactMap { id in ReelGenre.name(id).map { (id: id, name: $0) } }
+            .sorted { $0.name < $1.name }
+    }
+
+    private func decadeName(_ decade: Int) -> String { "\(String(decade))s" }
+
+    private func pill(_ title: String, active: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+        }
+        .font(Theme.Font.button)
+        .textCase(.uppercase)
+        .tracking(Theme.Font.buttonTracking)
+        .foregroundStyle(active ? Theme.Color.onInk : Theme.Color.ink)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .neoSurface(radius: Theme.Radius.pill, fill: active ? Theme.Color.ink : Theme.Color.tile,
+                    shadow: Theme.Shadow.small)
     }
 
     // MARK: Grids
@@ -245,38 +311,67 @@ struct CollectionView: View {
             case .actors:
                 deck
             case .movies:
-                stamps
+                frames
             }
         }
         // Give each filter its own identity so switching cross-fades and re-deals
         // the cards, rather than reflowing one grid's contents into the other's.
         .id(filter)
         .transition(.opacity)
+        .animation(Theme.Motion.standard, value: narrow)
     }
 
     // The tabs above already name the kind and its count, so neither grid
     // carries a header of its own.
-    private var deck: some View {
-        LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
-            ForEach(Array(store.sortedActors.enumerated()), id: \.element.id) { i, entity in
-                Button { expand(entity.id) } label: {
-                    ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+    @ViewBuilder private var deck: some View {
+        let actors = store.actors(matching: narrow)
+        if actors.isEmpty {
+            nothingMatches
+        } else {
+            LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
+                ForEach(Array(actors.enumerated()), id: \.element.id) { i, entity in
+                    Button { expand(entity.id) } label: {
+                        ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+                    }
+                    .buttonStyle(.pressScale)
+                    // The lifted card stands in for this one while it's out.
+                    .opacity(expanded == entity.id ? 0 : 1)
+                    .appear(i)
                 }
-                .buttonStyle(.pressScale)
-                // The lifted card stands in for this one while it's out.
-                .opacity(expanded == entity.id ? 0 : 1)
-                .appear(i)
             }
         }
     }
 
-    private var stamps: some View {
-        LazyVGrid(columns: columns, spacing: Theme.Spacing.lg) {
-            ForEach(Array(store.sortedMovies.enumerated()), id: \.element.id) { i, entity in
-                ReelStamp(entity: entity, actors: store.linked(to: entity), isNew: store.isNew(entity))
+    @ViewBuilder private var frames: some View {
+        let movies = store.movies(matching: narrow)
+        if movies.isEmpty {
+            nothingMatches
+        } else {
+            LazyVGrid(columns: columns, alignment: .center, spacing: Theme.Spacing.lg) {
+                ForEach(Array(movies.enumerated()), id: \.element.id) { i, entity in
+                    Button { expand(entity.id) } label: {
+                        VStack(spacing: Theme.Spacing.sm) {
+                            ReelFrame(entity: entity, isNew: store.isNew(entity))
+                                .opacity(expanded == entity.id ? 0 : 1)
+                            ReelFrameCaption(entity: entity)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    .buttonStyle(.pressScale)
                     .appear(i)
+                }
             }
         }
+    }
+
+    /// Only reachable through the narrowing — e.g. actors on the Movies-only
+    /// side of a filter that matches no linked film.
+    private var nothingMatches: some View {
+        Text("Nothing here yet. Try another decade or genre.")
+            .font(Theme.Font.flourish(.subheadline))
+            .foregroundStyle(Theme.Color.muted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.xl)
     }
 
     @ViewBuilder private var detail: some View {

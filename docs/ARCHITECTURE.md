@@ -345,11 +345,14 @@ pure-value + observable-store split as the rest of the app:
   `bestChain:` and shows **personal best** here (a trophy line under the category
   split) now that it's off the home hero — this is where "best + Reel live in one
   place." Pure count stats (no TMDB rarity/obscurity): a hero total + blue/purple
-  category split, "your regulars" (most-logged), a filter, and the **deck**: actors
-  as playing cards numbered by the films linked through them (`links`, recorded
-  from adjacent chain pairs), movies as perforated stamps showing the actors linked
-  through them. Tapping an actor card lifts it out and flips it to the films behind
-  the number. Finishes (paper / inked / holo) come from `ReelTier` under the
+  category split, "your regulars" (most-logged), the Actors/Movies tabs, decade and
+  genre menus (`ReelFilter`, options drawn from the Reel itself; an actor matches
+  through a linked film), and the **deck**: actors as playing cards earned through
+  the films linked through them (`links`, recorded from adjacent chain pairs),
+  movies as framed posters. No numbers are printed on the fronts. Tapping either
+  lifts it out and flips it to the other side of its links — an actor's films, a
+  movie's actors. Genres come from `genre_ids` on every TMDB movie response
+  (`Movie.genreIDs`), named from a fixed table (`ReelGenre`). Finishes (paper / inked / holo) come from `ReelTier` under the
   Settings → Reel cards model; Share reads `wellKnownFilms`, a count the engine
   snapshots from the filmography it already fetched for that actor's turn, so the
   Reel costs no TMDB requests. Cards, stamps and tiers live in `ReelCards.swift`. Also

@@ -54,6 +54,9 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
     /// `Config.wellKnownVoteCount`) as of the last time their filmography loaded
     /// in play. `nil` until it has; the Share tiers scale to it.
     var wellKnownFilms: Int?
+    /// Movies only: TMDB genre ids, for the Reel's genre filter. Empty for films
+    /// logged before genres were recorded, until they come up again.
+    var genres: [Int]
 
     /// Matches `ChainNode.id` ("p{id}" people, "m{id}" movies) so the store keys
     /// line up exactly with the game's no-repeat ids.
@@ -70,8 +73,10 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
         switch node {
         case .actor(let p):
             kind = .actor; tmdbID = p.id; name = p.name; year = nil; imagePath = p.imagePath
+            genres = []
         case .movie(let m):
             kind = .movie; tmdbID = m.id; name = m.title; year = m.year; imagePath = m.imagePath
+            genres = m.genreIDs
         }
         firstSeen = now
         lastSeen = now
@@ -82,7 +87,7 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case kind, tmdbID, name, year, imagePath, firstSeen, lastSeen, timesLogged
-        case links, wellKnownFilms
+        case links, wellKnownFilms, genres
     }
 
     /// Hand-written so a Reel saved before `links` existed still decodes (with
@@ -100,7 +105,29 @@ nonisolated struct CollectedEntity: Codable, Identifiable, Hashable, Sendable {
         timesLogged = try c.decode(Int.self, forKey: .timesLogged)
         links = try c.decodeIfPresent(Set<Int>.self, forKey: .links) ?? []
         wellKnownFilms = try c.decodeIfPresent(Int.self, forKey: .wellKnownFilms)
+        genres = try c.decodeIfPresent([Int].self, forKey: .genres) ?? []
     }
+}
+
+// MARK: - ReelFilter
+
+/// What the Reel is narrowed to. Both filters describe films: a movie passes
+/// on its own year and genres, an actor when a film linked through them does.
+struct ReelFilter: Equatable {
+    /// The decade's first year: 1990 means the 1990s.
+    var decade: Int?
+    /// A TMDB genre id.
+    var genre: Int?
+
+    var isActive: Bool { decade != nil || genre != nil }
+
+    func admits(movie: CollectedEntity) -> Bool {
+        if let decade, movie.year.map(Self.decade(of:)) != decade { return false }
+        if let genre, !movie.genres.contains(genre) { return false }
+        return true
+    }
+
+    static func decade(of year: Int) -> Int { year / 10 * 10 }
 }
 
 // MARK: - CollectionStore
@@ -176,6 +203,7 @@ final class CollectionStore {
             existing.lastSeen = now
             // Fill in art if a later encounter carried it.
             if existing.imagePath == nil { existing.imagePath = node.imagePath }
+            if existing.genres.isEmpty { existing.genres = node.genreIDs }
             entities[key] = existing
             return false
         } else {
@@ -196,6 +224,30 @@ final class CollectionStore {
     /// so the cards with the highest numbers lead.
     var sortedActors: [CollectedEntity] { sorted(.actor) }
     var sortedMovies: [CollectedEntity] { sorted(.movie) }
+
+    /// The deck narrowed by `filter`: movies on their own year and genres,
+    /// actors when any film linked through them passes.
+    func movies(matching filter: ReelFilter) -> [CollectedEntity] {
+        filter.isActive ? sortedMovies.filter(filter.admits) : sortedMovies
+    }
+
+    func actors(matching filter: ReelFilter) -> [CollectedEntity] {
+        guard filter.isActive else { return sortedActors }
+        let films = Set(movies(matching: filter).map(\.tmdbID))
+        return sortedActors.filter { !$0.links.isDisjoint(with: films) }
+    }
+
+    /// The decades among logged films, newest first — the filter's options, so
+    /// it never offers one that would come up empty.
+    var decades: [Int] {
+        Set(entities.values.lazy.filter { $0.kind == .movie }.compactMap(\.year).map(ReelFilter.decade(of:)))
+            .sorted(by: >)
+    }
+
+    /// The genre ids among logged films, unordered (the view sorts by name).
+    var genres: Set<Int> {
+        Set(entities.values.lazy.filter { $0.kind == .movie }.flatMap(\.genres))
+    }
 
     /// The entities linked through `entity`: an actor's films newest first, or a
     /// movie's actors most-linked first. Every id resolves, since both ends of a

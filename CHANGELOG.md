@@ -34,19 +34,26 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ### Changed
 
-- **Your Reel is now a deck of collectibles.** Actors are playing cards whose
-  number is how many of their films you've linked *through them* — the rank, from A
-  to K — and movies are stamps showing the actors you linked through them. The old
-  "×N chains" figure only said how often someone came up; the card says how well
-  you know their work, and tapping it flips the card to the films behind the number.
-  A card earns an inked frame and then holographic foil as the number climbs; how
-  it earns them is a setting for now (Settings → Reel cards: Rank, Share or Plain)
-  so the three can be compared in real play before one is kept. Films are never
-  listed as missing — the Reel isn't a study sheet for the next run.
-- Links are counted from now on: cards already in your Reel show a dot until their
-  next chain. Existing Reels load unchanged, and the cards cost no extra TMDB
-  requests — the one number Share needs comes from the filmography each turn
-  already loads.
+- **Your Reel is now a collection.** Actors are playing cards earned through the
+  films you've linked *through them*, and movies are posters hung in picture frames.
+  The old "×N chains" figure only said how often someone came up; a card now says
+  how well you know their work. Tap either to lift it out and turn it over: an
+  actor's back lists the films you linked through them, a movie's the actors. The
+  fronts carry no numbers — a card earns an inked frame and then holographic foil
+  instead. How it earns them is a setting for now (Settings → Reel cards: Rank,
+  Share or Plain) so the three can be compared in real play before one is kept.
+  Films are never listed as missing — the Reel isn't a study sheet for the next run.
+
+### Added
+
+- **Decade and genre filters in Your Reel.** They narrow the movies directly, and
+  the actors to those you linked through a matching film. The menus only offer
+  decades and genres your Reel actually has.
+- Links and genres are recorded from now on: cards already in your Reel start with
+  no links, and films logged before this have no genre until they come up again.
+  Existing Reels load unchanged, and none of this costs an extra TMDB request — the
+  number Share needs comes from the filmography each turn already loads, and genres
+  arrive on the same responses.
 
 ## [0.5.1] — 2026-10-22
 

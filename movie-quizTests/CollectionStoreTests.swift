@@ -252,4 +252,66 @@ struct CollectionStoreTests {
         #expect(decoded.links == [10])
         #expect(decoded.wellKnownFilms == 12)
     }
+
+    // MARK: Genres and the decade/genre filter
+
+    private func film(_ id: Int, _ year: Int?, _ genres: [Int]) -> ChainNode {
+        .movie(Movie(id: id, title: "Film \(id)", year: year, genreIDs: genres))
+    }
+
+    @Test func genresAreKeptAndFilledInLater() {
+        let store = makeStore()
+        store.record(chain: [actor(1), film(10, 1999, [])])
+        #expect(store.entities["m10"]?.genres == [])
+
+        store.record(chain: [actor(2), film(10, 1999, [28, 878])])
+        #expect(store.entities["m10"]?.genres == [28, 878])
+    }
+
+    /// Keanu has a 1990s sci-fi and a 2010s action film; Margot only a 2010s
+    /// comedy. Actors pass when a film linked *through them* does.
+    private func filterStore() -> CollectionStore {
+        let store = makeStore()
+        store.record(chain: [actor(1, "Keanu"), film(10, 1999, [28, 878])])
+        store.record(chain: [actor(1, "Keanu"), film(20, 2014, [28, 53])])
+        store.record(chain: [actor(2, "Margot"), film(30, 2013, [35])])
+        return store
+    }
+
+    @Test func noFilterKeepsEverything() {
+        let store = filterStore()
+        #expect(store.movies(matching: ReelFilter()).count == 3)
+        #expect(store.actors(matching: ReelFilter()).count == 2)
+    }
+
+    @Test func decadeNarrowsMoviesAndTheActorsLinkedThroughThem() {
+        let store = filterStore()
+        let nineties = ReelFilter(decade: 1990)
+        #expect(store.movies(matching: nineties).map(\.tmdbID) == [10])
+        #expect(store.actors(matching: nineties).map(\.name) == ["Keanu"])
+
+        let tens = ReelFilter(decade: 2010)
+        #expect(Set(store.movies(matching: tens).map(\.tmdbID)) == [20, 30])
+        #expect(Set(store.actors(matching: tens).map(\.name)) == ["Keanu", "Margot"])
+    }
+
+    @Test func genreAndDecadeCombine() {
+        let store = filterStore()
+        let filter = ReelFilter(decade: 2010, genre: 35)
+        #expect(store.movies(matching: filter).map(\.tmdbID) == [30])
+        #expect(store.actors(matching: filter).map(\.name) == ["Margot"])
+    }
+
+    @Test func aFilmWithNoYearOrGenresNeverMatchesAFilter() {
+        let store = makeStore()
+        store.record(chain: [actor(1), film(10, nil, [])])
+        #expect(store.movies(matching: ReelFilter(decade: 1990)).isEmpty)
+        #expect(store.movies(matching: ReelFilter(genre: 28)).isEmpty)
+    }
+
+    @Test func filterOptionsComeFromTheReel() {
+        let store = filterStore()
+        #expect(store.decades == [2010, 1990])
+        #expect(store.genres == [28, 878, 53, 35])
+    }
 }
