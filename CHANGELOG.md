@@ -84,6 +84,10 @@ not a contract — if milestones land out of order, the version follows the work
   counts links. The dealt start isn't a link, so the recap marks it with a flag and
   numbers the links from 1, matching the score instead of running one past it. The
   play screen's newest card reads "Link 4" (or "Start") on the same rule.
+- **"4 links" reads as one figure.** The unit used to sit on its own line between the
+  number and the points, so "links" read like a separate stat. It now sits on the
+  numeral's baseline, with the points on their own line beneath, on both the play
+  and game-over screens.
 
 ### Changed
 

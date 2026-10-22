@@ -104,22 +104,31 @@ struct GameOverView: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
-            Text("\(engine.score)")
-                .font(Theme.Font.display(72))
-                .foregroundStyle(Theme.Color.ink)
-                .contentTransition(.numericText())
-                // One-shot bounce (up then settle) fired by `scorePop` on a new
-                // best. Resting scale is 1, so it can never get stuck oversized.
-                .keyframeAnimator(initialValue: 1.0, trigger: scorePop) { view, scale in
-                    view.scaleEffect(scale)
-                } keyframes: { _ in
-                    KeyframeTrack {
-                        CubicKeyframe(1.12, duration: 0.18)
-                        SpringKeyframe(1.0, duration: 0.42, spring: .bouncy)
-                    }
+            // The unit sits on the numeral's baseline so "2 links" reads as one
+            // figure; points get their own line beneath it.
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                Text("\(engine.score)")
+                    .font(Theme.Font.display(72))
+                    .foregroundStyle(Theme.Color.ink)
+                    .contentTransition(.numericText())
+                Text(linkWord)
+                    .font(Theme.Font.flourish(.title2))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            // One-shot bounce (up then settle) fired by `scorePop` on a new best.
+            // Resting scale is 1, so it can never get stuck oversized.
+            .keyframeAnimator(initialValue: 1.0, trigger: scorePop) { view, scale in
+                view.scaleEffect(scale)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(1.12, duration: 0.18)
+                    SpringKeyframe(1.0, duration: 0.42, spring: .bouncy)
                 }
+            }
 
-            Text("\(Text(linkWord).font(Theme.Font.flourish(.title3)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("\(engine.points) pts").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink))")
+            Text("\(engine.points) pts")
+                .font(Theme.Font.numeral(.title3))
+                .foregroundStyle(Theme.Color.ink)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(engine.score) \(linkWord), \(engine.points) points\(engine.isNewBest ? ", a new best" : "")")

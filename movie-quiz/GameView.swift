@@ -130,22 +130,29 @@ struct GameView: View {
 
     private var scoreHero: some View {
         VStack(spacing: 2) {
-            Text("\(engine.score)")
-                .font(Theme.Font.display(60))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .foregroundStyle(Theme.Color.ink)
-                .overlay(alignment: .trailing) {
-                    if gainToken > 0 {
-                        FloatingGain(value: engine.lastGain)
-                            .id(gainToken)
-                            .offset(x: 30)
-                    }
+            // Same as the game-over card: the unit on the numeral's baseline so
+            // "4 links" reads as one figure, points on their own line. A chain is
+            // the whole run; a link is one correct answer.
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.xs + 2) {
+                Text("\(engine.score)")
+                    .font(Theme.Font.display(60))
+                    .contentTransition(.numericText())
+                    .foregroundStyle(Theme.Color.ink)
+                Text(engine.score == 1 ? "link" : "links")
+                    .font(Theme.Font.flourish(.title3))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            // The "+N" rises off the end of the whole figure, clear of the unit.
+            .overlay(alignment: .trailing) {
+                if gainToken > 0 {
+                    FloatingGain(value: engine.lastGain)
+                        .id(gainToken)
+                        .offset(x: 34)
                 }
+            }
 
-            // Same line as the game-over card: the score's unit, then points.
-            // A chain is the whole run; a link is one correct answer.
-            Text("\(Text(engine.score == 1 ? "link" : "links").font(Theme.Font.flourish(.body))) · \(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)))")
+            Text("\(engine.points) pts")
+                .font(Theme.Font.numeral(.body))
                 .foregroundStyle(Theme.Color.muted)
                 .contentTransition(.numericText())
         }
