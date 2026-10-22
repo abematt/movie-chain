@@ -40,7 +40,7 @@ struct ChainCardStack: View {
         VStack(spacing: Theme.Spacing.xs + 2) {
             if hiddenCount > 0 {
                 Text("+\(hiddenCount) earlier")
-                    .metaLabel()
+                    .metaLabel(size: .small)
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
             }
@@ -88,7 +88,7 @@ struct HeroChainCard: View {
                         Text("#\(position)")
                             .font(Theme.Font.numeral(.footnote))
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Color.muted)
                     }
                 }
                 Text(node.matchText)
@@ -100,7 +100,7 @@ struct HeroChainCard: View {
                 if case .movie(let m) = node, let year = m.year {
                     Text(String(year))
                         .font(Theme.Font.flourish(.subheadline))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Color.muted)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -124,7 +124,7 @@ struct CompactChainCard: View {
                 Text("\(position)")
                     .font(Theme.Font.heading(.subheadline))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                     .frame(minWidth: 18)
             }
             ChainArt(node: node, width: 26, height: 26, radius: 6, glyphSize: 11)
@@ -133,7 +133,7 @@ struct CompactChainCard: View {
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 0)
             Text(node.kind.tileLabel)
-                .metaLabel()
+                .metaLabel(size: .small)
         }
         .padding(.horizontal, Theme.Spacing.sm + 2)
         .padding(.vertical, Theme.Spacing.sm - 1)
@@ -150,11 +150,11 @@ struct KindChip: View {
 
     var body: some View {
         Text(kind.tileLabel)
-            .metaLabel(kind.onAccent)
+            .metaLabel(kind.onAccent, size: .small)
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, 3)
             .background(Capsule().fill(kind.accent))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: 1.5))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
     }
 }
 

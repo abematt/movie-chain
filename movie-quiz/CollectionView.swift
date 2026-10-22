@@ -58,7 +58,7 @@ struct CollectionView: View {
                             grids
                             TMDBAttribution()
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, Theme.Spacing.gutter)
                         .padding(.vertical, Theme.Spacing.md)
                         .onAppear {
                             guard !statsIn else { return }
@@ -72,9 +72,12 @@ struct CollectionView: View {
             .background(Theme.Color.canvas.ignoresSafeArea())
             .navigationTitle("Your Reel")
             .toolbarTitleDisplayMode(.inline)
+            .neoNavigationBar { SplitHeading(roman: "Your", flourish: "Reel", style: .headline) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button { dismiss() } label: {
+                        Text("Done").font(Theme.Font.bodyStrong).foregroundStyle(Theme.Color.ink)
+                    }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     if !store.isEmpty {
@@ -94,7 +97,7 @@ struct CollectionView: View {
             VStack(spacing: Theme.Spacing.xs) {
                 Text("You have logged")
                     .font(Theme.Font.flourish(.body))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                 Text("\(statsIn ? store.total : 0)")
                     .font(Theme.Font.display(64))
                     .monospacedDigit()
@@ -111,7 +114,7 @@ struct CollectionView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "trophy.fill")
                         .font(Theme.Font.label)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Color.muted)
                     Text("Best chain").metaLabel()
                     Text("\(bestChain) links")
                         .font(Theme.Font.numeral(.subheadline))
@@ -141,7 +144,7 @@ struct CollectionView: View {
     @ViewBuilder private var regulars: some View {
         if store.mostLoggedActor != nil || store.mostLoggedMovie != nil {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                sectionLabel("Your regulars", trailing: "most logged")
+                sectionLabel("Your", "regulars", trailing: "most logged")
                 HStack(spacing: Theme.Spacing.sm) {
                     if let a = store.mostLoggedActor { regularCard(a) }
                     if let m = store.mostLoggedMovie { regularCard(m) }
@@ -154,14 +157,14 @@ struct CollectionView: View {
         HStack(spacing: Theme.Spacing.sm) {
             thumb(entity)
             VStack(alignment: .leading, spacing: 2) {
-                Text(entity.kind.tileLabel).metaLabel()
+                Text(entity.kind.tileLabel).metaLabel(size: .small)
                 Text(entity.name)
                     .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.ink)
                     .lineLimit(1)
                 Text("in \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
                     .font(Theme.Font.flourish(.footnote))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
             }
             Spacer(minLength: 0)
         }
@@ -213,7 +216,7 @@ struct CollectionView: View {
                     .tracking(Theme.Font.buttonTracking)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Theme.Spacing.sm)
-                    .foregroundStyle(filter == f ? Theme.Color.onInk : .secondary)
+                    .foregroundStyle(filter == f ? Theme.Color.onInk : Theme.Color.muted)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.Radius.sm)
                             .fill(filter == f ? Theme.Color.ink : .clear)
@@ -263,7 +266,7 @@ struct CollectionView: View {
                 Text("\(n)")
                     .font(Theme.Font.numeral(.subheadline))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
             }
             LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
@@ -276,11 +279,11 @@ struct CollectionView: View {
 
     // MARK: Helpers
 
-    private func sectionLabel(_ title: String, trailing: String) -> some View {
+    private func sectionLabel(_ roman: String, _ flourish: String, trailing: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title).font(Theme.Font.heading(.title3)).foregroundStyle(Theme.Color.ink)
+            SplitHeading(roman: roman, flourish: flourish)
             Spacer()
-            Text(trailing).font(Theme.Font.flourish(.footnote)).foregroundStyle(.secondary)
+            Text(trailing).font(Theme.Font.flourish(.footnote)).foregroundStyle(Theme.Color.muted)
         }
     }
 
@@ -290,12 +293,11 @@ struct CollectionView: View {
             VStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "film.stack")
                     .font(.system(size: 40))
-                    .foregroundStyle(.tertiary)
-                Text("Your reel is empty")
-                    .font(Theme.Font.heading(.title3))
+                    .foregroundStyle(Theme.Color.muted)
+                SplitHeading(roman: "Your reel is", flourish: "empty")
                 Text("Finish a chain and every actor and movie you named lands here.")
                     .font(Theme.Font.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                     .multilineTextAlignment(.center)
             }
             Spacer()
@@ -329,7 +331,7 @@ struct TMDBAttribution: View {
                 .accessibilityLabel("The Movie Database (TMDB)")
             Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
                 .font(Theme.Font.flourish(.caption))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, Theme.Spacing.sm)
@@ -410,17 +412,17 @@ private struct ReelTile: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(Theme.Color.tile))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: 1.5))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
             .padding(6)
     }
 
     private var newBadge: some View {
         Text("New")
-            .metaLabel(Theme.Color.onAccent)
+            .metaLabel(Theme.Color.onAccent, size: .small)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(Theme.Color.good))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: 1.5))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
             .padding(6)
     }
 }

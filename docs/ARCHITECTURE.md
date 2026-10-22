@@ -372,7 +372,12 @@ branch): a cream canvas, white surfaces with a 2pt ink border and a hard unblurr
 offset shadow, one coral call-to-action, and two category accents — **blue for
 actors, yellow for movies** (the most colour-blind-safe pair). Dark mode flips the
 borders to cream on a warm charcoal canvas. A bold serif with an italic flourish
-carries display type (system New York, standing in for Fraunces); UI labels are
+carries display type in **Fraunces**, bundled in `movie-quiz/Fonts/` as four static
+cuts (bold and italic at a 72pt and a 24pt optical size) with its SIL OFL license, and
+registered at first use by `FontRegistry` in `Theme.swift`. Body, buttons and labels
+stay in SF rather than the spec's Inter, since SF is the iOS-native equivalent. Two
+other deliberate deviations: everything but the big numerals scales with Dynamic Type,
+and icons are SF Symbols rather than Phosphor. UI labels are
 small, bold, uppercase and tracked.
 - **Color** lives in `Assets.xcassets` as named sets with light+dark variants —
   `Canvas` (cream), `Ink` (text and every border), `Tile` (white surface),

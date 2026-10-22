@@ -52,6 +52,17 @@ not a contract — if milestones land out of order, the version follows the work
   object from first link to last. Thin rules, soft shadows and the Reel's gradient
   name scrim are gone. Everything except the big numerals still scales with Dynamic
   Type.
+- **Fraunces is the serif.** It's bundled as four static cuts, about 320KB with the
+  full character set, so accented and extended-Latin names render in the same face.
+  Body text, buttons and labels stay in SF, the iOS-native counterpart to the spec's
+  Inter. The license credit is in Settings.
+- **The remaining spec details.** Secondary text uses the spec's solid muted grey
+  instead of iOS's translucent one, and errors use its red. The coral button darkens
+  while held. Pressing anything moves it 1pt with the shadow collapsed. Every border
+  is 2pt. The timer is the spec's thin 6pt progress bar. Screens use the 24pt gutter.
+  Labels come in the spec's two sizes, and headings pair a roman phrase with an
+  italic word ("Your *regulars*"). The Reel and Settings sheets get a cream bar with
+  an ink rule, and Settings uses a bordered segmented control.
 
 ### Changed
 

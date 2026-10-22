@@ -39,7 +39,8 @@ struct GameOverView: View {
 
             actions
         }
-        .padding()
+        .padding(.horizontal, Theme.Spacing.gutter)
+        .padding(.vertical, Theme.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
         .onAppear {
@@ -71,7 +72,7 @@ struct GameOverView: View {
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
                             .font(Theme.Font.label)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Color.muted)
                     }
                     Text(reelMessage)
                         .font(Theme.Font.numeral())
@@ -132,7 +133,7 @@ struct GameOverView: View {
             Text("\(engine.points) pts")
                 .font(Theme.Font.flourish(.title3))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
         }
     }
 
@@ -143,7 +144,7 @@ struct GameOverView: View {
             HStack(spacing: Theme.Spacing.xs) {
                 Image(systemName: "star.fill")
                     .font(Theme.Font.label)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                 Text("Personal best").metaLabel()
             }
             Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
@@ -171,7 +172,7 @@ struct GameOverView: View {
             }
             Text(node.kind == .actor ? "was in the cast" : "was in the filmography")
                 .font(Theme.Font.flourish(.footnote))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
         }
         .frame(maxWidth: .infinity)
         .card()

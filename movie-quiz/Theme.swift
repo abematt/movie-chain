@@ -17,14 +17,15 @@
 //
 
 import SwiftUI
+import CoreText
 
 enum Theme {
 
     // MARK: Color — the warm-paper palette (defined in Assets.xcassets)
     //
-    // Surfaces and accents are custom (the warm greys and the two category
-    // hues are the identity). Muted text still uses Apple's semantic
-    // `.secondary`/`.tertiary` so it tracks accessibility contrast.
+    // Every colour is a spec token with a light and a dark value. Secondary
+    // text uses `muted` (the spec's on-surface-variant), not Apple's translucent
+    // `.secondary`, so it is the same solid grey everywhere.
     enum Color {
         static let canvas = SwiftUI.Color("Canvas")     // page background
         static let ink = SwiftUI.Color("Ink")           // primary text / filled controls
@@ -33,6 +34,11 @@ enum Theme {
         static let actor = SwiftUI.Color("ActorBlue")   // actor category accent
         static let movie = SwiftUI.Color("MovieYellow") // movie category accent
         static let primary = SwiftUI.Color("Coral")   // the coral call-to-action
+        static let primaryPressed = SwiftUI.Color("CoralPressed") // coral while held
+        /// Secondary text: metadata, hints, years (the spec's on-surface-variant).
+        static let muted = SwiftUI.Color("Muted")
+        /// Errors and the low-time warning (the spec's error red).
+        static let danger = SwiftUI.Color("Danger")
         /// The hard offset shadow behind bordered surfaces. Ink in light mode; a
         /// near-black in dark mode, where the borders flip to cream.
         static let shadow = SwiftUI.Color("Shadow")
@@ -56,6 +62,8 @@ enum Theme {
         static let lg: CGFloat = 24
         static let xl: CGFloat = 32
         static let xxl: CGFloat = 48
+        /// The spec's screen gutter: horizontal padding at every screen edge.
+        static let gutter: CGFloat = 24
     }
 
     // MARK: Borders & hard shadows (neobrutalist)
@@ -74,50 +82,87 @@ enum Theme {
 
     // MARK: Type roles
     //
-    // The whole type system. Three voices, nothing else:
-    //   • Display — a bold serif for numerals, the wordmark and node names, with
-    //     a regular italic **flourish** for the secondary word (years, "pts",
-    //     "Chain" in the wordmark). The serif is the system's New York, standing
-    //     in for the spec's Fraunces; swapping the font later is a change here.
-    //   • Numerals — every figure in the app (scores, counts, "2 links · 89
-    //     pts", the timer) is the bold serif, via `numeral`. This is the spec's
-    //     card-numeral role: numbers never fall back to the sans, whatever size.
-    //   • Body — the system sans at two sizes (`body`, `small`), medium weight,
-    //     plus `bodyStrong` for names in rows.
-    //   • Label — tiny bold uppercase tracked metadata ("ACTOR", "TIME'S UP").
-    //     Always apply it with `.metaLabel()` so case and tracking can't drift.
-    // Everything but the big fixed-size numerals rides a Dynamic Type text
-    // style, so the app still scales with the reader's text size.
+    // Three voices, nothing else:
+    //   • Serif — **Fraunces**, bundled in `Fonts/` as four static cuts: bold and
+    //     italic at a 72pt optical size (`FrauncesDisplay-*`, for the big fixed
+    //     display type) and at a 24pt optical size (`FrauncesText-*`, for
+    //     headings, names and numerals). Fraunces reshapes its letters by size,
+    //     so each size gets the cut drawn for it. Bold carries display, headings
+    //     and every figure (`numeral` — the spec's card-numeral role); the italic
+    //     is the **flourish** word (years, "pts", "Chain" in the wordmark).
+    //   • Sans — the system font (SF) for body, buttons and labels. The spec says
+    //     Inter; on iOS, SF is the native equivalent and handles Dynamic Type and
+    //     Bold Text natively, so it stands in deliberately.
+    //   • Labels — tiny bold uppercase tracked metadata, in the spec's two sizes
+    //     (`label` = label-md, `labelSmall` = label-sm). Always apply them with
+    //     `.metaLabel()` so case and tracking can't drift.
+    // Deliberate deviation from the spec: everything except the big fixed-size
+    // numerals and the wordmark rides a Dynamic Type text style (`relativeTo:`),
+    // so the app still scales with the reader's text size.
     enum Font {
         /// Big serif numerals and the wordmark (fixed size: they are the hero).
+        /// Large sizes use the display cut; smaller fixed sizes the text cut.
         static func display(_ size: CGFloat) -> SwiftUI.Font {
-            .system(size: size, weight: .bold, design: .serif)
-        }
-        /// Serif heading that scales: node names, card titles, sheet heroes.
-        static func heading(_ style: SwiftUI.Font.TextStyle = .title3) -> SwiftUI.Font {
-            .system(style, design: .serif, weight: .bold)
-        }
-        /// Bold serif figures at a text-style size: counts, stats, the timer.
-        static func numeral(_ style: SwiftUI.Font.TextStyle = .headline) -> SwiftUI.Font {
-            .system(style, design: .serif, weight: .bold)
-        }
-        /// The italic flourish paired with display/heading type.
-        static func flourish(_ style: SwiftUI.Font.TextStyle = .subheadline) -> SwiftUI.Font {
-            .system(style, design: .serif).italic()
+            serif(size >= 40 ? "FrauncesDisplay-Bold" : "FrauncesText-Bold", fixed: size)
         }
         /// Fixed-size flourish, for the italic word beside a fixed display size.
         static func flourish(size: CGFloat) -> SwiftUI.Font {
-            .system(size: size, weight: .regular, design: .serif).italic()
+            serif(size >= 40 ? "FrauncesDisplay-Italic" : "FrauncesText-Italic", fixed: size)
+        }
+        /// Serif heading that scales: node names, card titles, sheet heroes.
+        static func heading(_ style: SwiftUI.Font.TextStyle = .title3) -> SwiftUI.Font {
+            serif("FrauncesText-Bold", style: style)
+        }
+        /// Bold serif figures at a text-style size: counts, stats, the timer.
+        static func numeral(_ style: SwiftUI.Font.TextStyle = .headline) -> SwiftUI.Font {
+            serif("FrauncesText-Bold", style: style)
+        }
+        /// The italic flourish paired with display/heading type.
+        static func flourish(_ style: SwiftUI.Font.TextStyle = .subheadline) -> SwiftUI.Font {
+            serif("FrauncesText-Italic", style: style)
         }
         static let body: SwiftUI.Font = .system(.subheadline, weight: .medium)
         static let bodyStrong: SwiftUI.Font = .system(.subheadline, weight: .semibold)
         static let small: SwiftUI.Font = .system(.footnote)
-        /// Uppercase tracked micro-label. Use via `.metaLabel()`.
-        static let label: SwiftUI.Font = .system(.caption2, weight: .bold)
-        static let labelTracking: CGFloat = 0.9
+        /// label-md: section titles and metadata ("TIME'S UP", "YOUR CHAIN").
+        static let label: SwiftUI.Font = .system(.caption, weight: .bold)
+        static let labelTracking: CGFloat = 0.75      // ≈ 0.06em at 12pt
+        /// label-sm: in-card stamps ("ACTOR", "NEW", "+2 EARLIER").
+        static let labelSmall: SwiftUI.Font = .system(.caption2, weight: .bold)
+        static let labelSmallTracking: CGFloat = 0.9  // ≈ 0.08em at 11pt
         /// Button labels: uppercase and tracked like labels, at body size.
         static let button: SwiftUI.Font = .system(.subheadline, weight: .bold)
         static let buttonTracking: CGFloat = 0.8
+
+        // MARK: Fraunces plumbing
+
+        private static func serif(_ name: String, fixed size: CGFloat) -> SwiftUI.Font {
+            _ = FontRegistry.registered
+            return .custom(name, fixedSize: size)
+        }
+
+        private static func serif(_ name: String, style: SwiftUI.Font.TextStyle) -> SwiftUI.Font {
+            _ = FontRegistry.registered
+            return .custom(name, size: baseSize(style), relativeTo: style)
+        }
+
+        /// The default (Large) point size of each text style, so a custom font
+        /// starts at the same size the system font would and scales from there.
+        private static func baseSize(_ style: SwiftUI.Font.TextStyle) -> CGFloat {
+            switch style {
+            case .largeTitle: 34
+            case .title: 28
+            case .title2: 22
+            case .title3: 20
+            case .headline, .body: 17
+            case .callout: 16
+            case .subheadline: 15
+            case .footnote: 13
+            case .caption: 12
+            case .caption2: 11
+            default: 17
+            }
+        }
     }
 
     // MARK: Corner radii
@@ -228,4 +273,24 @@ extension ChainNode {
 
     var symbol: String { kind.symbol }
     var accent: Color { kind.accent }
+}
+
+// MARK: - Font registration
+//
+// Registers the bundled Fraunces cuts with Core Text once per process, the first
+// time any serif token is asked for. Done in code (not `UIAppFonts`) because the
+// target generates its Info.plist, and so SwiftUI previews get the fonts too.
+
+enum FontRegistry {
+    static let registered: Void = {
+        let names = ["FrauncesDisplay-Bold", "FrauncesDisplay-Italic",
+                     "FrauncesText-Bold", "FrauncesText-Italic"]
+        for name in names {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else {
+                assertionFailure("Missing bundled font \(name).ttf")
+                continue
+            }
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }
+    }()
 }

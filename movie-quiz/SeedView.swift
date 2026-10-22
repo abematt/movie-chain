@@ -87,7 +87,7 @@ struct SeedView: View {
                     }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, Theme.Spacing.gutter)
             .padding(.top, searching ? Theme.Spacing.sm : Theme.Spacing.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(Theme.Motion.standard, value: searching)
@@ -166,7 +166,7 @@ struct SeedView: View {
             if !searching {
                 Text("How long can you keep the chain alive?")
                     .font(Theme.Font.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
@@ -179,17 +179,17 @@ struct SeedView: View {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(kind.accent)
                     .overlay(RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(Theme.Color.border, lineWidth: 1.5))
+                        .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
                     .frame(width: 26, height: 15)
                     .modifier(TileBuild(shown: chainBuilt, index: i))
             }
             RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(Theme.Color.border.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [3]))
+                .strokeBorder(Theme.Color.border, style: StrokeStyle(lineWidth: Theme.Border.width, dash: [3, 3]))
                 .frame(width: 26, height: 15)
                 .overlay(
                     Text("?")
                         .font(Theme.Font.label)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Color.muted)
                 )
                 .modifier(TileBuild(shown: chainBuilt, index: 4))
         }
@@ -258,7 +258,7 @@ struct SeedView: View {
             Text(engine.dealtSeed?.nextKind.prompt ?? " ")
         }
         .font(Theme.Font.body)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Theme.Color.muted)
         .contentTransition(.opacity)
         .animation(reduceMotion ? nil : Theme.Motion.standard, value: engine.dealtSeed)
     }
@@ -283,7 +283,7 @@ struct SeedView: View {
         } label: {
             Text("or search for your own start")
                 .font(Theme.Font.bodyStrong)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
                 .underline(true, pattern: .solid)
         }
         .buttonStyle(.plain)
@@ -317,7 +317,7 @@ struct SeedView: View {
                     .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
             }
             .buttonStyle(.plain)
-            .padding(.leading, Theme.Spacing.md)
+            .padding(.leading, Theme.Spacing.gutter)
             .padding(.top, Theme.Spacing.xs)
             .transition(.opacity)
             .accessibilityLabel("Settings")
@@ -342,7 +342,7 @@ struct SeedView: View {
                 .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
             }
             .buttonStyle(.plain)
-            .padding(.trailing, Theme.Spacing.md)
+            .padding(.trailing, Theme.Spacing.gutter)
             .padding(.top, Theme.Spacing.xs)
             .transition(.opacity)
             .accessibilityLabel(collection.total > 0 ? "Your Reel, \(collection.total) logged" : "Your Reel")
@@ -362,7 +362,7 @@ struct SeedView: View {
                         Text("Deal a start")
                     }
                     .font(Theme.Font.bodyStrong)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                 }
                 .buttonStyle(.plain)
                 Spacer()
@@ -409,7 +409,7 @@ struct SeedView: View {
     private var searchField: some View {
         HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
             TextField(engine.seedKind == .actor ? "Search actors" : "Search movies", text: $query)
                 .font(Theme.Font.body)
                 .autocorrectionDisabled()
@@ -417,7 +417,7 @@ struct SeedView: View {
                 .submitLabel(.search)
             if !query.isEmpty {
                 Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.Color.muted)
                 }
                 .buttonStyle(.plain)
             }
@@ -460,7 +460,7 @@ struct SeedView: View {
             Spacer()
             Image(systemName: "chevron.right")
                 .font(Theme.Font.small.weight(.bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.md - 2)
@@ -470,13 +470,13 @@ struct SeedView: View {
 
     private var emptyState: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            Text(query.isEmpty ? "Pick your start" : "No matches")
-                .font(Theme.Font.heading(.title3))
+            SplitHeading(roman: query.isEmpty ? "Pick your" : "No",
+                         flourish: query.isEmpty ? "start" : "matches")
             Text(query.isEmpty
                  ? "Search an \(engine.seedKind == .actor ? "actor" : "movie") to begin your chain."
                  : "Try a different spelling.")
                 .font(Theme.Font.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -621,7 +621,7 @@ private struct SegmentButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: Theme.Radius.sm)
                     .fill(selected ? kind.accent : Color.clear)
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                        .strokeBorder(selected ? Theme.Color.border : .clear, lineWidth: 1.5))
+                        .strokeBorder(selected ? Theme.Color.border : .clear, lineWidth: Theme.Border.width))
             }
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
             .scaleEffect(configuration.isPressed ? 0.94 : 1)

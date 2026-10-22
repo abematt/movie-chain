@@ -64,7 +64,7 @@ struct GameView: View {
 
             nextHint
         }
-        .padding(.horizontal)
+        .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.xs)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
@@ -101,7 +101,7 @@ struct GameView: View {
             } label: {
                 Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
                     .contentTransition(.symbolEffect(.replace))
                     // Fixed slot: the two speaker glyphs differ in width, so let the
                     // symbol swap inside a stable box rather than nudging the header.
@@ -114,7 +114,7 @@ struct GameView: View {
             Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
                 .font(Theme.Font.numeral(.subheadline))
                 .monospacedDigit()
-                .foregroundStyle(lowTime ? Color.red : .secondary)
+                .foregroundStyle(lowTime ? Theme.Color.danger : Theme.Color.muted)
                 .contentTransition(.numericText())
 
             Spacer()
@@ -146,7 +146,7 @@ struct GameView: View {
             Text("\(engine.points) pts")
                 .font(Theme.Font.flourish(.body))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
                 .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)
@@ -161,7 +161,7 @@ struct GameView: View {
             NodeDot(kind: engine.expectedKind)
             Text(hintText)
                 .font(Theme.Font.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Color.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
@@ -184,7 +184,7 @@ struct GameView: View {
             if let feedback = engine.feedback {
                 Text(feedback)
                     .font(Theme.Font.small)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.Color.danger)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
             }
@@ -211,7 +211,7 @@ struct GameView: View {
                 .shake(shakeToken)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.sm)
         .padding(.bottom, Theme.Spacing.sm)
         .background(Theme.Color.canvas)

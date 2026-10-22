@@ -15,8 +15,8 @@ import SwiftUI
 // White (or tinted) fill, a 2pt ink border, and a solid shadow offset
 // down-right with no blur. Everything bordered in the app — cards, buttons,
 // inputs — is drawn by this one modifier, so the border weight and shadow depth
-// stay one system. `pressed` collapses the shadow: callers translate the
-// content by the same amount so the surface reads as pushed into the page.
+// stay one system. `pressed` is the spec's press: the shadow collapses and the
+// surface shifts 1pt down-right.
 
 struct NeoSurface<S: InsettableShape>: ViewModifier {
     var shape: S
@@ -26,11 +26,12 @@ struct NeoSurface<S: InsettableShape>: ViewModifier {
 
     func body(content: Content) -> some View {
         let depth = pressed ? 0 : shadow
+        let shift: CGFloat = pressed ? 1 : 0
         content
             .background(shape.fill(fill))
             .overlay(shape.strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
             .background(shape.fill(Theme.Color.shadow).offset(x: depth, y: depth))
-            .offset(x: pressed ? shadow : 0, y: pressed ? shadow : 0)
+            .offset(x: shift, y: shift)
     }
 }
 
@@ -48,14 +49,14 @@ extension View {
 // MARK: - Primary button (coral, hard shadow)
 //
 // The one prominent call-to-action per screen ("Play again", "Retry"). Coral
-// fill, ink border, 4pt hard shadow; pressing pushes it into the page (the
-// shadow collapses and the button shifts by the same amount). Under Reduce
-// Motion the shift is dropped and only the shadow collapses.
+// fill, ink border, 4pt hard shadow; pressing darkens it to the pressed coral,
+// collapses the shadow and shifts it 1pt into the page. Under Reduce Motion the
+// shift and collapse are dropped and only the colour change remains.
 
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         NeoButtonBody(configuration: configuration,
-                      fill: Theme.Color.primary,
+                      fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
                       foreground: .white,
                       shadow: Theme.Shadow.large)
     }
@@ -94,7 +95,7 @@ private struct NeoButtonBody: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             // Disabled reads as "flat and empty", not as a faded copy: muted
             // fill, secondary text, no shadow — the border stays solid.
-            .foregroundStyle(isEnabled ? foreground : Color.secondary)
+            .foregroundStyle(isEnabled ? foreground : Theme.Color.muted)
             .modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: Theme.Radius.md),
                                  fill: isEnabled ? fill : Theme.Color.hairline,
                                  shadow: isEnabled ? shadow : 0,
@@ -108,12 +109,16 @@ private struct NeoButtonBody: View {
 // The one uppercase-label recipe. Every "ACTOR", "TIME'S UP", "YOUR CHAIN" and
 // section title goes through this, so size, case and tracking stay identical.
 
+/// The spec's two label sizes: `.medium` (label-md) for section titles and
+/// metadata, `.small` (label-sm) for stamps inside cards and chips.
+enum MetaLabelSize { case medium, small }
+
 extension View {
-    /// Usage: `Text("Your chain").metaLabel()`
-    func metaLabel(_ color: Color = .secondary) -> some View {
-        self.font(Theme.Font.label)
+    /// Usage: `Text("Your chain").metaLabel()` · `Text("Actor").metaLabel(size: .small)`
+    func metaLabel(_ color: Color = Theme.Color.muted, size: MetaLabelSize = .medium) -> some View {
+        self.font(size == .medium ? Theme.Font.label : Theme.Font.labelSmall)
             .textCase(.uppercase)
-            .tracking(Theme.Font.labelTracking)
+            .tracking(size == .medium ? Theme.Font.labelTracking : Theme.Font.labelSmallTracking)
             .foregroundStyle(color)
     }
 }
@@ -131,10 +136,81 @@ struct NodeName: View {
 
     var body: some View {
         if case .movie(let m) = node, let year = m.year {
-            Text("\(Text(m.title).font(font).foregroundStyle(Theme.Color.ink)) \(Text(String(year)).font(yearFont).foregroundStyle(.secondary))")
+            Text("\(Text(m.title).font(font).foregroundStyle(Theme.Color.ink)) \(Text(String(year)).font(yearFont).foregroundStyle(Theme.Color.muted))")
         } else {
             Text(node.matchText).font(font).foregroundStyle(Theme.Color.ink)
         }
+    }
+}
+
+// MARK: - Split heading
+//
+// The spec's heading recipe: a bold roman phrase followed by an italic
+// flourish word ("Your *regulars*", "Movie *Chain*").
+
+struct SplitHeading: View {
+    let roman: String
+    let flourish: String
+    var style: Font.TextStyle = .title3
+
+    var body: some View {
+        Text("\(Text(roman).font(Theme.Font.heading(style))) \(Text(flourish).font(Theme.Font.flourish(style)))")
+            .foregroundStyle(Theme.Color.ink)
+    }
+}
+
+// MARK: - Neo segmented control
+//
+// The bordered segmented picker: a white neo surface holding the options, the
+// selected one filled ink. Replaces the stock `Picker(.segmented)`, which
+// can't take the border, shadow or label type.
+
+struct NeoSegmented<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(value: Value, label: String)]
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            ForEach(options, id: \.value) { option in
+                let selected = option.value == selection
+                Button {
+                    withAnimation(Theme.Motion.standard) { selection = option.value }
+                } label: {
+                    Text(option.label)
+                        .font(Theme.Font.button)
+                        .textCase(.uppercase)
+                        .tracking(Theme.Font.buttonTracking)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .foregroundStyle(selected ? Theme.Color.onInk : Theme.Color.muted)
+                        .background(RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .fill(selected ? Theme.Color.ink : .clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+    }
+}
+
+// MARK: - Sheet chrome (the spec's top app bar)
+//
+// Cream bar, serif title, a 2pt ink rule under it. Applied to a sheet's
+// NavigationStack content so the Reel and Settings sheets match the app
+// instead of showing the stock translucent bar.
+
+extension View {
+    func neoNavigationBar<Title: View>(@ViewBuilder title: () -> Title) -> some View {
+        self
+            .toolbarBackground(Theme.Color.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar { ToolbarItem(placement: .principal) { title() } }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+            }
     }
 }
 
@@ -211,7 +287,7 @@ struct NodeDot: View {
     var body: some View {
         Circle()
             .fill(kind.accent)
-            .overlay(Circle().strokeBorder(Theme.Color.border, lineWidth: 1.5))
+            .overlay(Circle().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
             .frame(width: size, height: size)
     }
 }
@@ -237,7 +313,7 @@ struct NodeTile: View {
         HStack(spacing: Theme.Spacing.sm) {
             if showKind {
                 Text(node.kind.tileLabel)
-                    .metaLabel(node.kind.onAccent.opacity(0.7))
+                    .metaLabel(node.kind.onAccent.opacity(0.7), size: .small)
             }
             Text(node.displayName)
                 .font(Theme.Font.bodyStrong)
@@ -248,7 +324,7 @@ struct NodeTile: View {
             if let index {
                 Text("\(index)")
                     .monospacedDigit()
-                    .metaLabel(node.kind.onAccent.opacity(0.6))
+                    .metaLabel(node.kind.onAccent.opacity(0.6), size: .small)
             }
         }
         .padding(.horizontal, 14)

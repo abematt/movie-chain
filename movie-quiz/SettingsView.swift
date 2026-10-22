@@ -28,16 +28,21 @@ struct SettingsView: View {
                     chainStyleSection
                     aboutSection
                 }
-                .padding()
+                .padding(.horizontal, Theme.Spacing.gutter)
+                .padding(.vertical, Theme.Spacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Theme.Color.canvas.ignoresSafeArea())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .neoNavigationBar {
+                Text("Settings").font(Theme.Font.heading(.headline)).foregroundStyle(Theme.Color.ink)
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
+                    Button { dismiss() } label: {
+                        Text("Done").font(Theme.Font.bodyStrong).foregroundStyle(Theme.Color.ink)
+                    }
                 }
             }
         }
@@ -68,12 +73,8 @@ struct SettingsView: View {
     private var chainStyleSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             sectionTitle("Chain style · prototype")
-            Picker("Chain style", selection: $chainStyle) {
-                ForEach(ChainStyle.allCases) { style in
-                    Text(style.label).tag(style)
-                }
-            }
-            .pickerStyle(.segmented)
+            NeoSegmented(selection: $chainStyle,
+                         options: ChainStyle.allCases.map { (value: $0, label: $0.label) })
         }
     }
 
@@ -93,13 +94,20 @@ struct SettingsView: View {
                 Text(Config.versionString)
                     .font(Theme.Font.flourish(.footnote))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Color.muted)
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Movie Chain version \(Config.appVersion), build \(Config.buildNumber)")
+
+            // The SIL Open Font License asks that the license travel with the
+            // font; the full text ships in the bundle as Fonts/Fraunces-OFL.txt.
+            Text("Set in Fraunces by Undercase Type, used under the SIL Open Font License 1.1.")
+                .font(Theme.Font.flourish(.footnote))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, Theme.Spacing.xs)
         }
     }
 
