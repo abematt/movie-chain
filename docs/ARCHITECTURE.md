@@ -355,7 +355,12 @@ pure-value + observable-store split as the rest of the app:
   (`Movie.genreIDs`), named from a fixed table (`ReelGenre`). Finishes (paper /
   inked at 5 links / holo at 11) come from `ReelTier`, so the Reel costs no TMDB
   requests. Three across: cards and frames are drawn once at a design width and
-  scaled (`ReelCanvas`), which makes the lift a pure zoom. Art reads through
+  scaled (`ReelCanvas`), which makes the lift a pure zoom. The lifted card makes
+  the whole trip itself, drawn above the grid: each grid card records its on-screen
+  frame (`SlotFrames`), and `LiftFlight` scales and moves the lifted card from that
+  slot to rest and back, the grid card staying unseen in place until it lands.
+  (`matchedGeometryEffect` was tried first; it flies the *grid's* card, which
+  travels under the dim layer and under later grid cells.) Art reads through
   `ArtCache` (memory + disk cache, off-main decode) so a reopened Reel draws at
   once; the first screen is warmed at launch. Cards, frames and tiers live in
   `ReelCards.swift`. Also

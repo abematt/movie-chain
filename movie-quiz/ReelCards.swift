@@ -226,37 +226,42 @@ struct ReelFrameCaption: View {
 
 // MARK: - Expanded card (flips to what's behind it)
 
-/// An actor card or framed poster lifted out of the grid. It flies out of its
-/// slot and back into it (`matchedGeometryEffect` in `namespace`), and turns
-/// over on a tap: an actor's back lists the films linked through them, a
-/// movie's the actors. Holo cards catch the light here, and only here.
+/// An actor card or framed poster lifted out of the grid, with its dimmed
+/// backdrop and Flip/Close controls. It turns over on a tap: an actor's back
+/// lists the films linked through them, a movie's the actors. Holo cards catch
+/// the light here, and only here.
 ///
-/// The dimmed backdrop and the lift itself belong to `CollectionView`, so a tap
-/// anywhere puts the card back.
-///
-/// It's drawn as two layers from one layout — the card, and the Flip/Close
-/// controls — so each leaves on its own terms: the controls fade out in 100ms
-/// the moment Close is tapped, instead of lingering over the card flying home.
+/// The card makes the whole journey itself, drawn above everything: it starts
+/// exactly over its grid slot (`slot`), scaled down to it, grows to the centre,
+/// and on close shrinks back onto the slot — turning to its front on the way if
+/// it was flipped. Only once it has landed does `CollectionView` remove it and
+/// show the grid card again, identical and in place. (Matched geometry flew the
+/// *grid's* card instead, which travelled under the backdrop and under its
+/// neighbours, and was rebuilt at every hand-off.)
 struct ReelCardDetail: View {
-    enum Part { case card, controls }
-
     let entity: CollectedEntity
     let linked: [CollectedEntity]
-    /// Which layer this instance draws; the other is held as an empty slot so
-    /// both lay out identically.
-    let part: Part
-    /// The grid's lift namespace; `nil` under Reduce Motion, where the card
-    /// fades in place instead of travelling.
-    let namespace: Namespace.ID?
+    /// The grid slot this card came from, in global coordinates. `nil` (never
+    /// measured) or Reduce Motion: the card fades in place instead of travelling.
+    let slot: CGRect?
+    /// Set by `CollectionView` (inside the flight-home animation) when the card
+    /// should go back.
+    let closing: Bool
     @Binding var flipped: Bool
     let close: () -> Void
 
-    /// The buttons fade in once the card is on its way; the card never fades.
+    /// Where the card sits when it's out, measured once laid out — the far end
+    /// of the flight.
+    @State private var rest: CGRect?
+    /// The card is out (the open animation drives this to true).
+    @State private var arrived = false
     @State private var settled = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Turning over: quick enough to flip back and forth, a touch of settle.
     static let flip: Animation = .spring(duration: 0.42, bounce: 0.1)
+    /// Coming out: the deliberate moment, with the faintest settle.
+    static let open: Animation = .spring(duration: 0.4, bounce: 0.08)
 
     private var links: Int { entity.links.count }
     private var isActor: Bool { entity.kind == .actor }
@@ -265,24 +270,27 @@ struct ReelCardDetail: View {
         isActor && !reduceMotion && TiltMotion.shared.isAvailable
             && ReelTier.finish(links: links) == .holo
     }
+    /// Travel needs a slot to travel from; otherwise the card fades.
+    private var travels: Bool { !reduceMotion && slot != nil }
+    private var out: Bool { arrived && !closing }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            switch part {
-            case .card:
+        ZStack {
+            Theme.Color.canvas.opacity(0.92)
+                .ignoresSafeArea()
+                .opacity(out ? 1 : 0)
+                // A plain fade in (a dim mustn't bounce with the card); cleared
+                // quickly on close, while the card is still on its way home.
+                .animation(.easeOut(duration: 0.2), value: arrived)
+                .animation(.easeOut(duration: 0.15), value: closing)
+                .onTapGesture(perform: close)
+                .accessibilityHidden(true)
+
+            VStack(spacing: Theme.Spacing.lg) {
                 card
-                controls.hidden()
-            case .controls:
-                // The card's slot, empty: never a second card, which would
-                // double the lift's matched geometry.
-                Color.clear.frame(width: ReelLayout.liftedWidth, height: ReelLayout.liftedWidth / aspect)
-                controls.opacity(settled ? 1 : 0)
-            }
-        }
-        .onAppear {
-            guard part == .controls else { return }
-            withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard.delay(0.12)) {
-                settled = true
+                controls
+                    .opacity(settled && !closing ? 1 : 0)
+                    .animation(.easeOut(duration: 0.1), value: closing)
             }
         }
         .accessibilityAction(.escape, close)
@@ -300,17 +308,45 @@ struct ReelCardDetail: View {
     /// is laid out at full size over it.
     private var card: some View {
         let width = ReelLayout.liftedWidth
-        return faces
-            .aspectRatio(aspect, contentMode: .fit)
-            .reelLift(id: entity.id, in: namespace)
+        // The resting place is measured on an empty stand-in the flight never
+        // moves: measured on the card itself, each reading included the flight
+        // transform, so "rest" chased wherever the card had just been drawn.
+        return Color.clear
             .frame(width: width, height: width / aspect)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: toggle)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                let first = rest == nil
+                rest = frame
+                if first { takeOff() }
+            }
+            .overlay {
+                faces
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: toggle)
+                    .modifier(LiftFlight(progress: travels ? (out ? 1 : 0) : 1, from: slot, to: rest))
+                    // Hidden until measured, so its first frame is over the slot
+                    // rather than flashing at the centre; without travel, it fades.
+                    .opacity(rest == nil ? 0 : travels ? 1 : (out ? 1 : 0))
+            }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
             .accessibilityHint(flipped ? "Shows the front"
                                : isActor ? "Shows the films linked through them"
                                : "Shows the actors linked through it")
+    }
+
+    /// Start the open once the card has been drawn over its slot. The wait is
+    /// one frame: started in the same pass that measured it, the card was never
+    /// drawn at the slot, so there was nothing to animate from and it appeared
+    /// at the centre at once.
+    private func takeOff() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(17))
+            guard !closing else { return }
+            withAnimation(travels ? Self.open : Theme.Motion.reducedFade) { arrived = true }
+            withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard.delay(0.12)) {
+                settled = true
+            }
+        }
     }
 
     @ViewBuilder private var faces: some View {
@@ -324,6 +360,7 @@ struct ReelCardDetail: View {
     }
 
     private func toggle() {
+        guard !closing else { return }
         Haptics.selection()
         withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.flip) {
             flipped.toggle()
@@ -455,15 +492,31 @@ private struct FlipView<Front: View, Back: View>: View, Animatable {
     }
 }
 
-extension View {
-    /// Ties a Reel card to its slot in the grid so lifting it flies it out and
-    /// back. No namespace (Reduce Motion) means no travel.
-    @ViewBuilder func reelLift(id: CollectedEntity.ID, in namespace: Namespace.ID?) -> some View {
-        if let namespace {
-            matchedGeometryEffect(id: id, in: namespace)
-        } else {
-            self
-        }
+/// Carries the lifted card between its grid slot and its resting place:
+/// scaled to the slot's size and moved onto it at `progress` 0, untouched at 1.
+/// The card is the grid's own drawing at a larger scale (`ReelCanvas`), so the
+/// shrink lands it pixel-for-pixel on the slot.
+nonisolated private struct LiftFlight: GeometryEffect {
+    var progress: CGFloat
+    let from: CGRect?
+    let to: CGRect?
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        guard let from, let to, to.width > 0 else { return ProjectionTransform() }
+        let away = 1 - progress
+        let scale = 1 + (from.width / to.width - 1) * away
+        let centre = CGAffineTransform(translationX: size.width / 2, y: size.height / 2)
+        let transform = centre.inverted()
+            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+            .concatenating(centre)
+            .concatenating(CGAffineTransform(translationX: (from.midX - to.midX) * away,
+                                             y: (from.midY - to.midY) * away))
+        return ProjectionTransform(transform)
     }
 }
 
@@ -514,22 +567,24 @@ private struct NewBadge: View {
 /// memory, otherwise faded in over the kind's accent when it lands. A monogram
 /// stands in only when there's no art at all — never as a loading state, so a
 /// card goes straight from colour to photo, one step.
+///
+/// The regular image and the sharper one (a lifted card) are separate layers,
+/// and only their opacity animates — no views swapped in and out. Swapping one
+/// image view for another left a frame or two where neither was fully drawn and
+/// the accent flashed through; layered, the base photo is always underneath.
 private struct ReelArt: View {
     let path: String?
     let kind: NodeKind
     let name: String
-    /// A sharper size to swap to once the base image is in (a lifted card).
+    /// A sharper size to fade in over the base image once it lands (a lifted card).
     var sharpSize: String? = nil
     var monogramSize: CGFloat = 28
 
-    @State private var image: Image?
-    /// Which URL `image` came from — identifies it, so a sharper swap is a
-    /// cross-fade between two views rather than a pop inside one.
-    @State private var shownURL: URL?
-    /// Off for art that was already in memory when this view was made: a
-    /// child's insertion transition also runs when its *parent* is inserted, so
-    /// without this the lifted card's photo faded in over the accent mid-lift.
-    @State private var fadesIn = false
+    @State private var base: Image?
+    @State private var sharp: Image?
+    /// Art already in memory when this view is made starts shown — no fade.
+    @State private var baseShown: Bool
+    @State private var sharpShown: Bool
     @State private var failed = false
 
     init(path: String?, kind: NodeKind, name: String, sharpSize: String? = nil, monogramSize: CGFloat = 28) {
@@ -538,66 +593,53 @@ private struct ReelArt: View {
         self.name = name
         self.sharpSize = sharpSize
         self.monogramSize = monogramSize
-        // Whatever is in memory draws on the first frame — no fade, no flash.
-        let cached = [sharpSize, ReelLayout.artSize].lazy
-            .compactMap { $0.flatMap { Config.imageURL(path: path, size: $0) } }
-            .compactMap { url in ArtCache.shared.image(for: url).map { (url, $0) } }
-            .first
-        _image = State(initialValue: cached?.1)
-        _shownURL = State(initialValue: cached?.0)
+        let cache = ArtCache.shared
+        let base = Config.imageURL(path: path, size: ReelLayout.artSize).flatMap(cache.image(for:))
+        let sharp = sharpSize.flatMap { Config.imageURL(path: path, size: $0) }.flatMap(cache.image(for:))
+        _base = State(initialValue: base)
+        _sharp = State(initialValue: sharp)
+        _baseShown = State(initialValue: base != nil)
+        _sharpShown = State(initialValue: sharp != nil)
     }
 
     var body: some View {
         kind.accent
             .overlay {
-                if let image {
-                    image.resizable().aspectRatio(contentMode: .fill)
-                        .id(shownURL)
-                        // The new image fades in over the old, which stays
-                        // fully drawn until it's covered — so a swap never dips
-                        // to the accent behind.
-                        .transition(fadesIn ? .asymmetric(
-                            insertion: .opacity,
-                            removal: .opacity.animation(.linear(duration: 0).delay(Self.sharpenFade))
-                        ) : .identity)
-                } else if path == nil || failed {
-                    monogram
-                }
+                if base == nil, sharp == nil, path == nil || failed { monogram }
+            }
+            .overlay {
+                if let base { fill(base).opacity(baseShown ? 1 : 0) }
+            }
+            .overlay {
+                if let sharp { fill(sharp).opacity(sharpShown ? 1 : 0) }
             }
             .clipped()
             .task(id: path) { await load() }
     }
 
-    /// The sharper image's cross-fade: short, since it's the same picture.
-    private static let sharpenFade = 0.15
+    private func fill(_ image: Image) -> some View {
+        image.resizable().aspectRatio(contentMode: .fill)
+    }
 
     private func load() async {
-        guard let base = Config.imageURL(path: path, size: ReelLayout.artSize) else { return }
-        if image == nil {
-            let loaded = await ArtCache.shared.load(base)
-            guard !Task.isCancelled else { return }
-            if let loaded {
-                fadesIn = true
-                withAnimation(.easeOut(duration: 0.2)) {
-                    image = loaded
-                    shownURL = base
-                }
-            } else {
-                failed = true
+        if base == nil, sharp == nil {
+            guard let url = Config.imageURL(path: path, size: ReelLayout.artSize) else { return }
+            guard let loaded = await ArtCache.shared.load(url) else {
+                if !Task.isCancelled { failed = true }
                 return
             }
+            guard !Task.isCancelled else { return }
+            base = loaded                       // in place, transparent…
+            withAnimation(.easeOut(duration: 0.2)) { baseShown = true }   // …then faded up
         }
-        // The same picture, sharper — cross-faded, or the moment it sharpens
+        // The same picture, sharper, faded in on top — or the moment it sharpens
         // shows as a pop on a large lifted card.
-        guard let sharpSize, let sharp = Config.imageURL(path: path, size: sharpSize),
-              shownURL != sharp else { return }
-        if let loaded = await ArtCache.shared.load(sharp), !Task.isCancelled {
-            fadesIn = true
-            withAnimation(.easeOut(duration: Self.sharpenFade)) {
-                image = loaded
-                shownURL = sharp
-            }
-        }
+        guard sharp == nil, let sharpSize,
+              let url = Config.imageURL(path: path, size: sharpSize),
+              let loaded = await ArtCache.shared.load(url), !Task.isCancelled
+        else { return }
+        sharp = loaded
+        withAnimation(.easeOut(duration: 0.15)) { sharpShown = true }
     }
 
     private var monogram: some View {

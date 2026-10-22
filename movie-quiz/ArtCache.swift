@@ -28,6 +28,13 @@ final class ArtCache {
     static let shared = ArtCache()
 
     private let images = NSCache<NSURL, CachedImage>()
+    /// The most recently used images, held strongly on top of the `NSCache`,
+    /// which may drop entries whenever the system likes. These are the ones on
+    /// screen now — the Reel re-creates a card as it lifts and lands, and a
+    /// copy that found its art evicted started blank, flashing its accent.
+    private var recent: [URL: Image] = [:]
+    private var recentOrder: [URL] = []
+    private let recentCapacity = 64
     /// One in-flight load per URL, so a grid card and its lifted copy — or a
     /// warm and a card appearing — share a single download.
     private var loading: [URL: Task<Image?, Never>] = [:]
@@ -43,7 +50,24 @@ final class ArtCache {
     }
 
     /// The decoded art for `url`, if it's in memory — for drawing synchronously.
-    func image(for url: URL) -> Image? { images.object(forKey: url as NSURL)?.image }
+    func image(for url: URL) -> Image? {
+        if let hit = recent[url] ?? images.object(forKey: url as NSURL)?.image {
+            remember(hit, for: url)
+            return hit
+        }
+        return nil
+    }
+
+    /// Mark `url` most recently used, dropping the oldest past capacity.
+    private func remember(_ image: Image, for url: URL) {
+        if recent.updateValue(image, forKey: url) != nil {
+            recentOrder.removeAll { $0 == url }
+        }
+        recentOrder.append(url)
+        if recentOrder.count > recentCapacity {
+            recent[recentOrder.removeFirst()] = nil
+        }
+    }
 
     /// Download (or read from disk) and decode `url`'s art, keeping it in memory.
     /// `nil` on failure; callers fall back to their placeholder.
@@ -58,6 +82,7 @@ final class ArtCache {
             let image = Image(decorative: cgImage, scale: 1)
             images.setObject(CachedImage(image), forKey: url as NSURL,
                              cost: cgImage.bytesPerRow * cgImage.height)
+            remember(image, for: url)
             return image
         }
         loading[url] = task

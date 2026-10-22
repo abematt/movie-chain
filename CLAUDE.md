@@ -238,7 +238,10 @@ films match directly, actors through a linked film; genre ids ride along on ever
 TMDB movie response, names are a fixed table). An actor card's finish comes from the
 pure, tested `ReelTier`: paper, inked at 5 films linked, holo at 11 — **no TMDB data,
 no extra request; never add a fetch on Reel open**. Cards and frames are drawn once
-at their grid size and scaled (`ReelCanvas`), so a lift is a pure zoom. Art is read
+at their grid size and scaled (`ReelCanvas`), so a lift is a pure zoom: the lifted
+card flies itself out of its measured grid slot and back onto it, drawn above
+everything (`ReelCardDetail` + `LiftFlight`) — **not** `matchedGeometryEffect`, which
+flew the grid's own card under the dim layer and its neighbours. Art is read
 through **`ArtCache`** (memory `NSCache` + a 150MB disk-cached session, off-main
 decode), not `AsyncImage`, which has no memory cache; the Reel's first screen is
 warmed at launch. The store is owned at the app root and injected into the engine.

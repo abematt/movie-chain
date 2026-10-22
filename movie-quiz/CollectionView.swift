@@ -29,12 +29,15 @@ struct CollectionView: View {
     @State private var filter: Filter = .actors
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
-    /// The card or frame lifted out of the grid, if any, and whether it's
-    /// turned over.
+    /// The card or frame lifted out of the grid — set for the whole time it's
+    /// out, including its flight home — whether it's on the way back, and
+    /// whether it's turned over.
     @State private var expanded: CollectedEntity.ID?
+    @State private var closing = false
     @State private var flipped = false
-    /// Ties each grid slot to its lifted card, so a lift flies out and back.
-    @Namespace private var lift
+    /// Where each grid card sits on screen, for the lift to start from and
+    /// land on. A plain object, so measuring never re-renders the grid.
+    @State private var slots = SlotFrames()
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
 
@@ -328,7 +331,9 @@ struct CollectionView: View {
     }
 
     // The tabs above already name the kind and its count, so neither grid
-    // carries a header of its own.
+    // carries a header of its own. A card that's out stays in its slot, unseen,
+    // until its lifted copy has landed back on it — never rebuilt, so its art is
+    // just there.
     @ViewBuilder private var deck: some View {
         let actors = store.actors(matching: narrow)
         if actors.isEmpty {
@@ -337,18 +342,10 @@ struct CollectionView: View {
             LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
                 ForEach(actors) { entity in
                     Button { expand(entity.id) } label: {
-                        let card = ReelCanvas(aspect: ReelActorCard.aspect) {
+                        ReelCanvas(aspect: ReelActorCard.aspect) {
                             ReelActorCard(entity: entity, isNew: store.isNew(entity))
                         }
-                        if expanded == entity.id {
-                            card.hidden()   // holds the slot while the card is out
-                                .transition(.identity)
-                        } else {
-                            // Hands over to its lifted copy (and back) at the same
-                            // spot. Its exit needs a duration — see `handOff`.
-                            card.reelLift(id: entity.id, in: liftNamespace)
-                                .transition(Self.handOff)
-                        }
+                        .modifier(Slot(id: entity.id, slots: slots, out: expanded == entity.id))
                     }
                     .buttonStyle(.reelPress)
                 }
@@ -365,17 +362,11 @@ struct CollectionView: View {
                 ForEach(movies) { entity in
                     Button { expand(entity.id) } label: {
                         VStack(spacing: Theme.Spacing.xs + 2) {
-                            let frame = ReelCanvas(aspect: ReelFrame.aspect) {
+                            ReelCanvas(aspect: ReelFrame.aspect) {
                                 ReelFrame(entity: entity, isNew: store.isNew(entity))
                             }
                             // The label stays on the wall while its frame is out.
-                            if expanded == entity.id {
-                                frame.hidden()
-                                    .transition(.identity)
-                            } else {
-                                frame.reelLift(id: entity.id, in: liftNamespace)
-                                    .transition(Self.handOff)
-                            }
+                            .modifier(Slot(id: entity.id, slots: slots, out: expanded == entity.id))
                             ReelFrameCaption(entity: entity)
                         }
                         .accessibilityElement(children: .combine)
@@ -396,62 +387,39 @@ struct CollectionView: View {
             .padding(.vertical, Theme.Spacing.xl)
     }
 
-    /// No travel under Reduce Motion: the card fades in place instead.
-    private var liftNamespace: Namespace.ID? { reduceMotion ? nil : lift }
-
-    /// Three layers, each leaving on its own terms. On close the controls go at
-    /// once and the lifted card hands over to the grid's own card, which flies
-    /// home from its exact frame at full opacity. The grid card makes that trip
-    /// under the backdrop, so the backdrop clears almost at once — 60ms — or the
-    /// card would start home washed out. Nothing fades mid-flight.
+    /// The lifted card with its backdrop and controls, drawn over the whole
+    /// sheet. It flies itself out of its slot and back (see `ReelCardDetail`).
     @ViewBuilder private var detail: some View {
-        ZStack {
-            if expanded != nil {
-                Theme.Color.canvas.opacity(0.92)
-                    .ignoresSafeArea()
-                    .onTapGesture { expand(nil) }
-                    .accessibilityHidden(true)
-                    // A plain fade in (a dim mustn't bounce with the card's
-                    // spring); cleared almost at once on close, since the card
-                    // flying home travels underneath it.
-                    .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.2)),
-                                            removal: .opacity.animation(.easeOut(duration: 0.06))))
-            }
-            if let id = expanded, let entity = store.entities[id] {
-                ReelCardDetail(entity: entity, linked: store.linked(to: entity), part: .card,
-                               namespace: liftNamespace, flipped: $flipped) { expand(nil) }
-                    .transition(reduceMotion ? .opacity : Self.handOff)
-                ReelCardDetail(entity: entity, linked: store.linked(to: entity), part: .controls,
-                               namespace: liftNamespace, flipped: $flipped) { expand(nil) }
-                    .transition(.asymmetric(insertion: .identity,
-                                            removal: .opacity.animation(.easeOut(duration: 0.1))))
-            }
+        if let id = expanded, let entity = store.entities[id] {
+            ReelCardDetail(entity: entity, linked: store.linked(to: entity),
+                           slot: slots.frames[id], closing: closing,
+                           flipped: $flipped, close: { expand(nil) })
         }
     }
 
     /// Flying home: quick and unbouncy — the system putting the card back.
     private static let homeFlight: Animation = .spring(duration: 0.38, bounce: 0)
 
-    /// How a card leaves when it hands over to its twin — the grid card as it
-    /// lifts, the lifted copy as it goes home. It needs *some* duration: with a
-    /// zero-length removal (`.identity`) SwiftUI has nothing to animate the
-    /// matched hand-off against, and the card appears lifted (or lands home) in a
-    /// single frame. But only a blink — held for the whole flight, a flipped
-    /// card's back travelled home beside the grid's front.
-    private static let handOff: AnyTransition = .asymmetric(
-        insertion: .identity,
-        removal: .opacity.animation(.easeOut(duration: 0.08))
-    )
-
-    /// Picking a card up is the deliberate moment, with a little settle;
-    /// putting it back is the system answering, so it snaps home.
+    /// Lift a card out (`id`), or send the one that's out home (`nil`). Picking
+    /// a card up is the deliberate moment and the detail runs its own open;
+    /// putting it back is the system answering, so it goes home quickly — a
+    /// flipped card turning to its front on the way — and only when it has
+    /// landed is it removed and the grid card shown again.
     private func expand(_ id: CollectedEntity.ID?) {
-        if id != nil { Haptics.lift() }
-        let animation: Animation = reduceMotion ? Theme.Motion.reducedFade
-            : id != nil ? .spring(duration: 0.4, bounce: 0.08) : Self.homeFlight
-        withAnimation(animation) {
-            expanded = id
+        if let id {
+            guard expanded == nil else { return }
+            Haptics.lift()
             flipped = false
+            expanded = id
+            return
+        }
+        guard expanded != nil, !closing else { return }
+        withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.homeFlight) {
+            closing = true
+            flipped = false
+        } completion: {
+            expanded = nil
+            closing = false
         }
     }
 
@@ -515,3 +483,27 @@ struct TMDBAttribution: View {
     CollectionView(store: .demo(), bestChain: 11)
 }
 #endif
+
+// MARK: - Grid slots
+
+/// Where each grid card is on screen. Deliberately not observed: the grid
+/// measures into it as it lays out and scrolls, and that must never re-render.
+final class SlotFrames {
+    var frames: [CollectedEntity.ID: CGRect] = [:]
+}
+
+/// A grid card's slot: records where it is on screen for the lift, and keeps it
+/// unseen (but in place) while its lifted copy is out.
+private struct Slot: ViewModifier {
+    let id: CollectedEntity.ID
+    let slots: SlotFrames
+    let out: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(out ? 0 : 1)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                slots.frames[id] = frame
+            }
+    }
+}

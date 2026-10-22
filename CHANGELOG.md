@@ -58,10 +58,13 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
   points and chain live from the game, and Play again resets them as that screen
   starts sliding away — so the points cross-faded to zero and lingered while it
   left. The finished run is now frozen into its game-over summary.
-- **Putting a Reel card back is clean.** Closing faded the lifted card and its
-  buttons out in place while the grid's own card faded in on its way home — two
-  half-see-through cards and buttons hanging mid-screen. Now the buttons go at once,
-  the dim clears fast, and one card flies home at full opacity, flipped or not.
+- **Lifting and putting back a Reel card is clean.** The card used to be handed
+  between two copies of itself: on the way back it faded out in place while the
+  grid's copy faded in underneath, its buttons hung on mid-screen, the colour behind
+  the photo could flash through, and the returning card slid *under* the cards next
+  to it. Now one card makes the whole trip, drawn above everything: it grows out of
+  its slot, and on close shrinks back onto it — turning to its front on the way if
+  it was flipped — while the buttons go at once and the dim clears.
 
 ### Changed
 
