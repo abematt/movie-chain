@@ -34,6 +34,9 @@ struct Movie: Identifiable, Hashable, Sendable {
     /// TMDB `poster_path` (e.g. `/xyz.jpg`), when known. The poster shown in the
     /// collection ("Your Reel"); `nil` for the stub graph → typographic tile.
     var imagePath: String? = nil
+    /// TMDB vote count, when known (filmography credits). Marks the actor's
+    /// well-known films for the Reel's Share tiers; `nil` for the stub graph.
+    var voteCount: Int? = nil
 
     var displayTitle: String {
         if let year { return "\(title) (\(year))" }
@@ -96,6 +99,14 @@ enum ChainNode: Identifiable, Hashable, Sendable {
         switch self {
         case .actor(let p): return p.imagePath
         case .movie(let m): return m.imagePath
+        }
+    }
+
+    /// The bare TMDB id, without the kind prefix `id` carries.
+    var tmdbID: Int {
+        switch self {
+        case .actor(let p): return p.id
+        case .movie(let m): return m.id
         }
     }
 

@@ -3,8 +3,9 @@
 //  movie-quiz
 //
 //  "Your Reel" — the collection screen. Every actor/movie the player has logged
-//  through play, shown as a grid of headshots/posters with pure count stats on
-//  top ("look how many you know"). Presented as a sheet from the seed and
+//  through play, with pure count stats on top ("look how many you know"):
+//  actors as a deck of playing cards numbered by the films linked through them,
+//  movies as stamps (`ReelCards.swift`). Presented as a sheet from the seed and
 //  game-over screens.
 //
 //  Built entirely on the `Theme` tokens and the node-category identity (blue =
@@ -25,6 +26,9 @@ struct CollectionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var filter: Filter = .actors
+    @AppStorage("reelTiers") private var tierModel: ReelTierModel = .rank
+    /// The actor card lifted out of the deck, if any.
+    @State private var expanded: CollectedEntity.ID?
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
 
@@ -67,6 +71,7 @@ struct CollectionView: View {
                             else { withAnimation(Theme.Motion.emphasized) { statsIn = true } }
                         }
                     }
+                    .overlay { detail }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -231,32 +236,61 @@ struct CollectionView: View {
     // MARK: Grids
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm), count: 3)
+        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.md), count: 2)
     }
 
     @ViewBuilder private var grids: some View {
         Group {
             switch filter {
             case .actors:
-                grid(store.sortedActors)
+                deck
             case .movies:
-                grid(store.sortedMovies)
+                stamps
             }
         }
         // Give each filter its own identity so switching cross-fades and re-deals
-        // the tiles, rather than reflowing one grid's contents into the other's.
+        // the cards, rather than reflowing one grid's contents into the other's.
         .id(filter)
         .transition(.opacity)
     }
 
-    // The tabs above already name the kind and its count, so the grid carries
-    // no header of its own.
-    private func grid(_ items: [CollectedEntity]) -> some View {
-        LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
-                ReelTile(entity: entity, isNew: store.isNew(entity))
+    // The tabs above already name the kind and its count, so neither grid
+    // carries a header of its own.
+    private var deck: some View {
+        LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
+            ForEach(Array(store.sortedActors.enumerated()), id: \.element.id) { i, entity in
+                Button { expand(entity.id) } label: {
+                    ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+                }
+                .buttonStyle(.pressScale)
+                // The lifted card stands in for this one while it's out.
+                .opacity(expanded == entity.id ? 0 : 1)
+                .appear(i)
+            }
+        }
+    }
+
+    private var stamps: some View {
+        LazyVGrid(columns: columns, spacing: Theme.Spacing.lg) {
+            ForEach(Array(store.sortedMovies.enumerated()), id: \.element.id) { i, entity in
+                ReelStamp(entity: entity, actors: store.linked(to: entity), isNew: store.isNew(entity))
                     .appear(i)
             }
+        }
+    }
+
+    @ViewBuilder private var detail: some View {
+        if let id = expanded, let entity = store.entities[id] {
+            ReelCardDetail(entity: entity, linked: store.linked(to: entity), model: tierModel) {
+                expand(nil)
+            }
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
+        }
+    }
+
+    private func expand(_ id: CollectedEntity.ID?) {
+        withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.emphasized) {
+            expanded = id
         }
     }
 
@@ -313,109 +347,10 @@ struct TMDBAttribution: View {
     }
 }
 
-// MARK: - Reel tile
-
-/// One collection entry: a poster/headshot (or typographic placeholder) with the
-/// name, a "×N chains" chip, and a "New" badge for this session's discoveries.
-private struct ReelTile: View {
-    let entity: CollectedEntity
-    let isNew: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                entity.kind.accent
-                artContent
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(3.0 / 4.0, contentMode: .fit)
-            .clipped()
-            .overlay(alignment: .topTrailing) { countChip }
-            .overlay(alignment: .topLeading) { if isNew { newBadge } }
-
-            Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
-
-            nameBar
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
-    }
-
-    @ViewBuilder private var artContent: some View {
-        if let url = Config.imageURL(path: entity.imagePath, size: "w185") {
-            AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .empty, .failure:
-                    glyph
-                @unknown default:
-                    glyph
-                }
-            }
-        } else {
-            glyph
-        }
-    }
-
-    private var glyph: some View {
-        Image(systemName: entity.kind.symbol)
-            .font(.system(size: 32))
-            .foregroundStyle(entity.kind.onAccent.opacity(0.5))
-    }
-
-    // A solid name strip under the art, not a gradient scrim over it — the spec
-    // allows no gradients, and ink-on-white reads in both themes.
-    private var nameBar: some View {
-        Text(entity.displayName)
-            .font(Theme.Font.small.weight(.semibold))
-            .foregroundStyle(Theme.Color.ink)
-            .lineLimit(2, reservesSpace: true)
-            .minimumScaleFactor(0.85)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.vertical, Theme.Spacing.xs + 2)
-            .background(Theme.Color.tile)
-    }
-
-    private var countChip: some View {
-        Text("×\(entity.timesLogged)")
-            .font(Theme.Font.numeral(.caption))
-            .monospacedDigit()
-            .foregroundStyle(Theme.Color.ink)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Theme.Color.tile))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .padding(6)
-    }
-
-    private var newBadge: some View {
-        Text("New")
-            .metaLabel(Theme.Color.onAccent, size: .small)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Theme.Color.good))
-            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .padding(6)
-    }
-}
-
 // MARK: - Preview
 
+#if DEBUG
 #Preview {
-    let store = CollectionStore(fileURL: nil)
-    // Seed some sample chains so the preview has content.
-    store.record(chain: [
-        .actor(Person(id: 1, name: "Samuel L. Jackson")),
-        .movie(Movie(id: 680, title: "Pulp Fiction", year: 1994)),
-        .actor(Person(id: 2, name: "Uma Thurman")),
-        .movie(Movie(id: 24, title: "Kill Bill", year: 2003)),
-    ])
-    store.record(chain: [
-        .actor(Person(id: 1, name: "Samuel L. Jackson")),
-        .movie(Movie(id: 954, title: "Mission: Impossible", year: 1996)),
-        .actor(Person(id: 3, name: "Tom Cruise")),
-    ])
-    return CollectionView(store: store)
+    CollectionView(store: .demo(), bestChain: 11)
 }
+#endif

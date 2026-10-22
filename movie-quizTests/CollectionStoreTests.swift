@@ -162,4 +162,94 @@ struct CollectionStoreTests {
         #expect(decoded.id == "m42")
         #expect(decoded.displayName == "Fargo (1999)")
     }
+
+    // MARK: Links — the actor card's number
+
+    @Test func adjacentPairsAreLinkedBothWays() {
+        let store = makeStore()
+        store.record(chain: [actor(1), movie(10), actor(2), movie(20)])
+
+        #expect(store.entities["p1"]?.links == [10])
+        #expect(store.entities["m10"]?.links == [1, 2])
+        #expect(store.entities["p2"]?.links == [10, 20])
+        #expect(store.entities["m20"]?.links == [2])
+    }
+
+    @Test func linksAccumulateAcrossChainsWithoutDuplicates() {
+        let store = makeStore()
+        store.record(chain: [actor(1), movie(10)])
+        store.record(chain: [actor(1), movie(20)])
+        store.record(chain: [movie(10), actor(1)])  // the same pair again
+
+        #expect(store.entities["p1"]?.links == [10, 20])
+        #expect(store.entities["p1"]?.timesLogged == 3)
+    }
+
+    /// Movie 10 and actor 2 are both in the Reel, but were never linked to each
+    /// other — only films linked *through* an actor count.
+    @Test func onlyAdjacentPairsCount() {
+        let store = makeStore()
+        store.record(chain: [actor(1), movie(10)])
+        store.record(chain: [actor(2), movie(20)])
+
+        #expect(store.entities["p2"]?.links == [20])
+    }
+
+    @Test func linkedResolvesFilmsNewestFirst() throws {
+        let store = makeStore()
+        store.record(chain: [actor(1), .movie(Movie(id: 10, title: "Old", year: 1990)),
+                             actor(2), .movie(Movie(id: 20, title: "New", year: 2020))])
+        store.record(chain: [actor(1), .movie(Movie(id: 20, title: "New", year: 2020))])
+
+        let actor1 = try #require(store.entities["p1"])
+        #expect(store.linked(to: actor1).map(\.name) == ["New", "Old"])
+    }
+
+    @Test func wellKnownSnapshotIsStoredAndRefreshed() {
+        let store = makeStore()
+        store.record(chain: [actor(1), movie(10)], wellKnownFilms: [1: 40])
+        #expect(store.entities["p1"]?.wellKnownFilms == 40)
+
+        store.record(chain: [actor(1), movie(20)], wellKnownFilms: [1: 42])
+        #expect(store.entities["p1"]?.wellKnownFilms == 42)
+
+        // A run where their filmography didn't load keeps the last snapshot.
+        store.record(chain: [actor(1), movie(30)])
+        #expect(store.entities["p1"]?.wellKnownFilms == 42)
+    }
+
+    @Test func deckLeadsWithTheMostLinks() {
+        let store = makeStore()
+        for _ in 0..<3 { store.record(chain: [actor(1), movie(10)]) }  // logged most, one film
+        store.record(chain: [actor(2), movie(20)])
+        store.record(chain: [actor(2), movie(30)])                       // two films
+
+        #expect(store.sortedActors.first?.tmdbID == 2)
+    }
+
+    /// A Reel saved before links existed must still load — a failed decode
+    /// would start the player over with an empty collection.
+    @Test func reelSavedBeforeLinksStillDecodes() throws {
+        let legacy = """
+        {"entities":[{"kind":"actor","tmdbID":1,"name":"Uma Thurman","firstSeen":0,
+          "lastSeen":0,"timesLogged":3}],"chainsLogged":3}
+        """
+        struct DiskShape: Decodable { let chainsLogged: Int; let entities: [CollectedEntity] }
+        let disk = try JSONDecoder().decode(DiskShape.self, from: Data(legacy.utf8))
+
+        #expect(disk.entities.first?.name == "Uma Thurman")
+        #expect(disk.entities.first?.links == [])
+        #expect(disk.entities.first?.wellKnownFilms == nil)
+    }
+
+    @Test func linksSurviveACodableRoundTrip() throws {
+        let store = makeStore()
+        store.record(chain: [actor(1), movie(10), actor(2)], wellKnownFilms: [1: 12])
+        let original = try #require(store.entities["p1"])
+
+        let decoded = try JSONDecoder().decode(CollectedEntity.self,
+                                               from: JSONEncoder().encode(original))
+        #expect(decoded.links == [10])
+        #expect(decoded.wellKnownFilms == 12)
+    }
 }

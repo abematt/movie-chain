@@ -22,7 +22,14 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init() {
+        #if DEBUG
+        // QA hook: a demo Reel in memory, leaving the saved one untouched. Pair
+        // with `-uiOpenReel` to land on it.
+        let store = ProcessInfo.processInfo.arguments.contains("-uiDemoReel")
+            ? CollectionStore.demo() : CollectionStore()
+        #else
         let store = CollectionStore()
+        #endif
         _collection = State(initialValue: store)
         let engine = GameEngine(collection: store)
         // The play screen releases the first turn's clock once the keyboard is up.

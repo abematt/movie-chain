@@ -32,6 +32,22 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+### Changed
+
+- **Your Reel is now a deck of collectibles.** Actors are playing cards whose
+  number is how many of their films you've linked *through them* — the rank, from A
+  to K — and movies are stamps showing the actors you linked through them. The old
+  "×N chains" figure only said how often someone came up; the card says how well
+  you know their work, and tapping it flips the card to the films behind the number.
+  A card earns an inked frame and then holographic foil as the number climbs; how
+  it earns them is a setting for now (Settings → Reel cards: Rank, Share or Plain)
+  so the three can be compared in real play before one is kept. Films are never
+  listed as missing — the Reel isn't a study sheet for the next run.
+- Links are counted from now on: cards already in your Reel show a dot until their
+  next chain. Existing Reels load unchanged, and the cards cost no extra TMDB
+  requests — the one number Share needs comes from the filmography each turn
+  already loads.
+
 ## [0.5.1] — 2026-10-22
 
 The motion re-tune that 0.5.0 left open. The chain becomes a physical **Deck** by

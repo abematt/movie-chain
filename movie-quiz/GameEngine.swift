@@ -136,6 +136,10 @@ final class GameEngine {
     /// Valid next nodes for the current turn (cast or filmography), pre-wrapped.
     private var candidates: [ChainNode] = []
     private var usedIds: Set<String> = []
+    /// Each actor's well-known film count (TMDB id → count), taken from the
+    /// filmography loaded for their turn this run and handed to the Reel at
+    /// game over. Costs no request: the filmography was fetched anyway.
+    private var wellKnownFilms: [Int: Int] = [:]
     private var countdownTask: Task<Void, Never>?
     /// Monotonic token identifying the current run/turn's async work. Every
     /// lifecycle transition (start, end, reset) bumps it; an async candidate load
@@ -400,6 +404,7 @@ final class GameEngine {
         stopCountdown()
         chain = []
         usedIds = []
+        wellKnownFilms = [:]
         candidates = []
         score = 0
         points = 0
@@ -428,16 +433,20 @@ final class GameEngine {
         for attempt in 0..<max(1, Config.candidateLoadAttempts) {
             do {
                 let loaded: [ChainNode]
+                var wellKnown: (actor: Int, count: Int)?
                 switch node {
                 case .movie(let movie):
                     loaded = try await provider.cast(of: movie).map(ChainNode.actor)
                 case .actor(let actor):
-                    loaded = try await provider.filmography(of: actor).map(ChainNode.movie)
+                    let films = try await provider.filmography(of: actor)
+                    wellKnown = (actor.id, films.count { ($0.voteCount ?? 0) >= Config.wellKnownVoteCount })
+                    loaded = films.map(ChainNode.movie)
                 }
                 // Drop a superseded result: a reset/quit/new game moved the token on
                 // while this fetch was in flight, so installing its candidates would
                 // corrupt the current round.
                 guard generation == token else { return }
+                if let wellKnown { wellKnownFilms[wellKnown.actor] = wellKnown.count }
                 candidates = loaded
                 feedback = nil
                 isChecking = false
@@ -542,7 +551,7 @@ final class GameEngine {
         // a seed-then-quit (length 1) logs nothing. `record` dedups by id, so
         // each entity is counted once per chain.
         if chain.count >= 2 {
-            summary.reelAdditions = collection?.record(chain: chain) ?? 0
+            summary.reelAdditions = collection?.record(chain: chain, wellKnownFilms: wellKnownFilms) ?? 0
         }
 
         phase = .gameOver(summary)
