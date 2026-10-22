@@ -44,6 +44,10 @@ struct GameOverView: View {
         .padding(.vertical, Theme.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
+        // The play screen lowers its keyboard before handing over; should one
+        // still be on its way down, it slides off over this screen instead of
+        // re-laying it out as it goes.
+        .ignoresSafeArea(.keyboard)
         .task {
             guard summary.isNewBest else { return }
             // Reduce Motion: the celebratory haptic still fires, but no visual pop.

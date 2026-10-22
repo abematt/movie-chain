@@ -31,13 +31,13 @@ struct GameView: View {
     @State private var recordPop = 0
     /// DEBUG screenshot hook: act as if this run had passed the record.
     @State private var forceBeating = false
+    /// Set by Quit while the keyboard goes down, before the run actually ends.
+    @State private var quitting = false
 
     /// This run is past the previous best: the score shows green with "new best"
     /// for the rest of the run.
     private var beatingBest: Bool { engine.isBeatingBest || forceBeating }
 
-    /// How many links stay visible in the rising window before older ones
-    /// collapse into "+N earlier". Tuned to the band above the keyboard.
     private var timeFraction: Double {
         Double(engine.secondsRemaining) / Double(Config.secondsPerTurn)
     }
@@ -161,7 +161,7 @@ struct GameView: View {
 
             Spacer()
 
-            Button { engine.quit() } label: {
+            Button(action: quit) {
                 Text("Quit").metaLabel()
             }
             .buttonStyle(.plain)
@@ -327,9 +327,8 @@ struct GameView: View {
                 .transition(dockSwap)
             }
         }
-        // Time's up: the input greys out for the beat before game over. Not
-        // `.disabled` — that would drop the keyboard mid-beat and jump the
-        // layout; the engine already ignores answers once `timeUp` is set.
+        // Time's up: the input greys out as the keyboard takes it down (see
+        // `onTimeUp`); the engine already ignores answers once `timeUp` is set.
         .opacity(engine.timeUp ? 0.5 : 1)
         .animation(.easeOut(duration: 0.2), value: engine.timeUp)
         .animation(.easeOut(duration: 0.2), value: engine.awaitingRetry)
@@ -379,9 +378,26 @@ struct GameView: View {
     /// The clock ran out: the "time's up" beat. The wrong-answer buzz marks the
     /// moment the run ends; the dock dims and the pile sags (above) on the same
     /// beat, then the engine moves on to game over.
+    /// The run is over, so the keyboard goes now — during the beat before game
+    /// over, which outlasts its ~250ms exit. Left up, it would close only once
+    /// this screen was pushed away, sliding down over the game-over screen.
     private func onTimeUp() {
         Haptics.wrong()
         if soundEnabled { SoundPlayer.shared.wrong() }
+        fieldFocused = false
+    }
+
+    /// Lower the keyboard first, then end the run once it's down, so it isn't
+    /// still sliding away as the game-over screen comes in. The keyboard moving
+    /// is the immediate answer to the tap, so the wait doesn't read as lag.
+    private func quit() {
+        guard !quitting else { return }
+        quitting = true
+        fieldFocused = false
+        Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            engine.quit()
+        }
     }
 
     private func onReject() {
@@ -391,6 +407,8 @@ struct GameView: View {
     }
 
     private func submit() {
+        // Once the run is ending, a Go mustn't raise the keyboard back up.
+        guard !engine.timeUp, !quitting else { return }
         let text = answer
         answer = ""
         fieldFocused = true

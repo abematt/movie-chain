@@ -48,6 +48,12 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
   draws at once, its first screen is fetched at launch, and a card loading for the
   first time goes straight from colour to photo in one fade. The cascade is gone.
 
+- **The keyboard is gone before game over.** It used to close only once the play
+  screen was pushed away, sliding down over the game-over screen and making it jump
+  as it re-laid itself out. Now it goes as the run ends — during the time's-up beat,
+  or straight away on Quit, with the run ending once it's down — and the game-over
+  screen no longer reacts to a keyboard at all.
+
 ### Changed
 
 - **Smaller cards, three across.** The Reel fits half as many again on a screen.
