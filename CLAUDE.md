@@ -63,9 +63,9 @@ drive SwiftUI canvas previews.
 ## Versioning & changelog
 
 The app is versioned and every notable change is recorded in
-[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.5.0`;
+[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.5.1`;
 `1.0.0` means launch.** Each remaining pre-launch milestone is allocated a minor
-version — design overhaul (0.5.0, **landed**; motion follows as 0.5.x), foundations &
+version — design overhaul (0.5.0, **landed**; motion re-tune landed as 0.5.1), foundations &
 safety net (0.6.0), the service /
 TMDB proxy (0.7.0), accounts (0.8.0), the Daily Chain (0.9.0), friend groups (0.10.0);
 share images ship with launch (1.0.0). Global leaderboards are dropped — **check the
@@ -77,8 +77,8 @@ the relevant section before starting one.
 > placeholder. How the chain is drawn is a **player setting** (Settings → Chain style):
 > **Deck** (`ChainDeck.swift`, the default — a physical pile that fills the space above
 > the keyboard), **Cards** (`ChainCards.swift`) and **Tiles** (`ChainStack.swift`). All
-> three are kept on purpose; keep them working when touching the chain. The 0.5.x
-> motion re-tune is on `feature_motion-overhaul`. The recurring
+> three are kept on purpose; keep them working when touching the chain. The motion
+> re-tune landed as 0.5.1. The recurring
 > constraint is still vertical room against the docked keyboard. Vocabulary is fixed:
 > a *chain* is a whole run, a *link* is one correct answer (the score counts links),
 > the dealt start is not a link, and the best run is the most links with points
@@ -98,7 +98,7 @@ the relevant section before starting one.
   `MARKETING_VERSION` (and `CURRENT_PROJECT_VERSION` for a submitted build), then
   tag it:
   ```bash
-  sed -i '' 's/MARKETING_VERSION = 0.5.0;/MARKETING_VERSION = 0.6.0;/g' \
+  sed -i '' 's/MARKETING_VERSION = 0.5.1;/MARKETING_VERSION = 0.6.0;/g' \
     movie-quiz.xcodeproj/project.pbxproj
   git tag -a v0.6.0 -m "0.6.0"
   ```

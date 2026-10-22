@@ -18,7 +18,7 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 | Version | Milestone |
 |---|---|
 | **0.4.0** | Solo game complete — engine, matching, providers, collection, tests |
-| **0.5.0** | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity: Cream Neobrutalist, Fraunces, the chain as cards (motion re-tune follows as 0.5.x) |
+| **0.5.0** | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity: Cream Neobrutalist, Fraunces, the chain as cards (motion re-tuned in 0.5.1) |
 | 0.6.0 | [**Foundations & safety net**](docs/ROADMAP.md#060--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
 | 0.7.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#070--the-service) — takes the shared key out of the app and caches it |
 | 0.8.0 | [**Accounts**](docs/ROADMAP.md#080--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
@@ -31,6 +31,13 @@ not a contract — if milestones land out of order, the version follows the work
 already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
+
+## [0.5.1] — 2026-10-22
+
+The motion re-tune that 0.5.0 left open. The chain becomes a physical **Deck** by
+default (Cards and Tiles stay as a setting), the start and a new best get holographic
+stickers, and the play loop's feedback — the timer, a miss, running out of time, game
+over — was re-timed so each moment reads as one clear beat.
 
 ### Added
 

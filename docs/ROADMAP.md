@@ -14,7 +14,7 @@
 
 | Version | Milestone | Depends on |
 |---|---|---|
-| 0.5.0 | [Design overhaul](#050--design-overhaul) — **landed 2026-10-22** (motion follows) | — |
+| 0.5.0 | [Design overhaul](#050--design-overhaul) — **landed 2026-10-22** (motion re-tuned in 0.5.1) | — |
 | 0.6.0 | [Foundations & safety net](#060--foundations--safety-net) | — |
 | 0.7.0 | [The service — TMDB proxy first](#070--the-service) | — |
 | 0.8.0 | [Accounts](#080--accounts) | 0.6.0 (device id), 0.7.0 (a backend) |
@@ -56,7 +56,7 @@ keep the endless mode as the always-available path.)*
 > Neobrutalist** — cream canvas, white cards with a 2pt ink border and a hard offset
 > shadow, a coral call-to-action, Fraunces for display type and numerals, blue = actor,
 > yellow = movie. The chain is drawn as **cards** (a hero card for the newest link,
-> compact cards for earlier ones). **Motion re-tune (0.5.x, `feature_motion-overhaul`):**
+> compact cards for earlier ones). **Motion re-tune (landed in 0.5.1):**
 > the prototyping below settled on a **Deck** — a physical pile — as the default, and
 > rather than deleting the losers, all three treatments (Deck, Cards, Tiles) stay as a
 > player setting. Details of what changed are in the
