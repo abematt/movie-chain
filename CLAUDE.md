@@ -252,18 +252,24 @@ warmed at launch. The store is owned at the app root and injected into the engin
 `engine.phase` between `SeedView`, `GameView`, and `GameOverView` with a
 **direction-free forward carousel** (`.screenPush` on `Theme.Motion.screen`: the
 app is a one-way loop, so every change pushes the new screen in from the trailing
-edge — no "back"; Reduce Motion → cross-fade). It owns the
+edge — no "back"; Reduce Motion → cross-fade; seed → play alone cross-fades under the handoff). It owns the
 shared `CollectionStore` (opened as a `.sheet` from the seed and game-over
 screens) and the persisted once-ever `seedIntroDone` flag driving `SeedView`'s
 first-run cold-launch intro (the `Wordmark` starts centered and large, then rises to
-the header as the rest cascades in). `SeedView` is **play-first**: under the wordmark
-header (Reel pill + gear pill) sits a best-run bar (the tagline before a first run),
-then the *dealt start* as a **card** — headshot/poster art (`w500`, warmed on deal),
-name, and the next link's rule — on a pile whose back card shows the next kind's
-accent. The card's art is flexible-height, so one layout fits SE to Pro Max. Shuffle
-flicks the card off on `.dealCard`; PLAY and Shuffle share a row; search is an opt-in
-link. The Reel pill is always reachable (count hidden when empty), because the Reel
-sheet hosts the required **TMDB attribution**. Brand art (`Wordmark`, `LogoMark`,
+the header as the rest cascades in). `SeedView` is **the first turn, as a sentence**:
+under the wordmark header (Reel pill + gear pill), the *dealt start* reads "⟨name⟩ *was
+in* / a movie…" (movies: "*starred* / an actor…") with the name in a fixed-height,
+bottom-pinned region so the **blank** never moves. The blank is the start button:
+tapping it runs the **handoff** (`Handoff.swift`) — a `HandoffStage` owned by
+`ContentView` collects frames both screens report, and `HandoffFlight` draws copies of
+the name/chip/avatar/blank flying into the deck's start card and the dock on its own
+`TimelineView` clock, waiting for the answer field's first (main-thread-blocking) focus
+to pass. Seed → play is a cross-fade under it, not a push. "Deal again" deals on
+`.dealSentence`; "Pick your own" opens search; the best run is a footer line. The engine
+prefetches the dealt start's candidates (`prefetchCandidates`) so the first turn is
+ready on arrival. `-uiAutoHandoff` (DEBUG) taps the blank two seconds after a deal, to
+record the transition. The Reel pill is always reachable (count hidden when empty),
+because the Reel sheet hosts the required **TMDB attribution**. Brand art (`Wordmark`, `LogoMark`,
 `FilmStrip`, the two-circle `AppIcon`) lives in the asset catalog as SVG/PNG with
 dark variants — never redraw it in code. Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +

@@ -43,14 +43,18 @@ Unspool rebrand was inserted as 0.6.0.)
   movies, and the ink where they overlap is the link between them: the game's one rule
   as a mark. It stands in for the "oo" in the wordmark, and the icon is the mark on a
   cream tile (with dark and tinted versions for iOS 18's home-screen styles).
-- **The home screen deals you a real card.** The start used to be a name on a coral
-  button; now it's a card with the actor's headshot or the film's poster, the name, and
-  the rule for your first link ("Name a movie they were in"), so a new player learns
-  the game from the card itself. The next link's colour peeks out from the card behind
-  it. Shuffle flicks the card off the pile and lands a fresh one, and PLAY and Shuffle
-  sit side by side under it.
-- **Your best run is back on the home screen,** in a bar above the card. Before your
-  first run, the game's question sits there instead.
+- **The home screen is the first turn.** It used to be a name on a coral "Start with"
+  button; now it's a sentence with a blank, "Chris Hemsworth *was in* a movie…" (or
+  "Inception *starred* an actor…"), so a new player reads the rule instead of being
+  told it. Tap the blank and the home turns into the play screen in place: the name,
+  its chip and its photo fly down into the start card, the card assembles around them,
+  and the blank settles into the answer box as the keyboard comes up. The clock starts
+  once it lands. **Deal again** flicks the start away and deals a fresh one; **Pick
+  your own** opens the search as before. Your best run sits in a quiet line at the
+  bottom.
+- **The first turn is ready when you get there.** The dealt start's films (or cast)
+  are fetched while you're still looking at it, so the first answer you type is checked
+  at once rather than after a load.
 - **Share squares use yellow for movies.** The spoiler-free share card still drew
   movies as 🟪, a leftover from the purple of the old palette; they're 🟨 now, to match
   the game.

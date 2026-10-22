@@ -228,6 +228,14 @@ enum Theme {
         /// with a gentle overshoot, so — stepped tight enough that consecutive
         /// items overlap — it reads as one springy wave rather than discrete pops.
         static let cascade: Animation = .spring(response: 0.5, dampingFraction: 0.72)
+        /// The home → play handoff: the sentence's pieces flying into the start
+        /// card and the dock. A spring sampled by the flight's own clock (see
+        /// `HandoffFlight`), with no bounce — an overshoot would carry the copies
+        /// past the real views they hand to — and long enough to ride the keyboard
+        /// up. By `handoffDuration` it is within a point of landing; the real
+        /// views take over then.
+        static let handoffSpring = Spring(duration: 0.6, bounce: 0)
+        static let handoffDuration: Double = 0.7
     }
 }
 

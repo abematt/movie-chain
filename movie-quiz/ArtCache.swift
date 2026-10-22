@@ -91,10 +91,9 @@ final class ArtCache {
         return result
     }
 
-    /// Warm a node's art so it can be drawn at once: `w185` is what `ChainArt`
-    /// draws in play; the home's dealt card asks for a larger size.
-    func warm(_ node: ChainNode, size: String = "w185") async {
-        guard let url = Config.imageURL(path: node.imagePath, size: size) else { return }
+    /// Warm the dealt start's art so `ChainArt` can draw it at once.
+    func warm(_ node: ChainNode) async {
+        guard let url = Config.imageURL(path: node.imagePath, size: "w185") else { return }
         await load(url)
     }
 

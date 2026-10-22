@@ -487,34 +487,35 @@ small, bold, uppercase and tracked.
   gameOver → *play again* → seed), so every change is a forward push on one
   horizontal axis via `.transition(.screenPush(reduceMotion:))` on
   `Theme.Motion.screen` — new screen in from the trailing edge, old out to the
-  leading edge; no "back" (Play again is the next lap, not a retreat). Reduce
-  Motion degrades it to a cross-fade. `ContentView` also owns `seedIntroDone`, the
+  leading edge; no "back" (Play again is the next lap, not a retreat). The one
+  exception is seed → playing, a cross-fade under the handoff flight (the home
+  becomes the play screen rather than being left). Reduce Motion degrades every push
+  to a cross-fade. `ContentView` also owns the `HandoffStage` and draws
+  `HandoffFlight` above the screens, and owns `seedIntroDone`, the
   persisted (`@AppStorage`) once-ever flag for the seed intro (below) — kept here,
   above `SeedView` (recreated on each `.seed` re-entry), so every launch after the
   first, and every Play-again re-entry, correctly starts assembled.
-- [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
-  home that leads with a **dealt start**, not a search box (that's what made it
-  read as a movie-logging app). Since 0.6.0 (Unspool) the layout is: a header of the
-  **`Wordmark`** asset with the Reel and gear pills overlaid on its trailing edge; a
-  **best-run bar** (`engine.bestChain` links · `bestPoints` pts), or before a first
-  run the tagline "How long can you keep the chain alive?"; the **dealt card**; then
-  **Shuffle + PLAY** in one row and a quiet **"Or search for your own start"** link.
-  The Reel pill is always reachable (count hidden when empty) because the Reel sheet
-  hosts the TMDB attribution.
-  - **The dealt card** (`DealtCardFace` in a shared `DealtCardShell`): kind chip +
-    "START WITH", the art, the name (Fraunces display, up to two lines, auto-shrunk)
-    and the next link's rule (`NodeKind.prompt`). The art (`DealtArt`) draws TMDB
-    `w500` through `ArtCache` — the home warms both that and the `w185` the first
-    chain card uses on every deal — and is **flexible-height**: the card takes
-    whatever is left between the header and the buttons, so SE and Pro Max share one
-    layout. Behind it a back card in the **next kind's accent** peeks out; tapping the
-    card plays, like PLAY. "Dealing…" shows in the same shell until the first deal.
+- [`SeedView.swift`](../movie-quiz/SeedView.swift) — the home, written as **the
+  first turn**: a sentence with a blank, not a search box or a button. Since 0.6.0
+  (Unspool): a header of the **`Wordmark`** asset with the Reel and gear pills
+  overlaid on its trailing edge; the dealt start as the head of a sentence (round
+  avatar + kind chip, the name in Fraunces display, "*was in*" for an actor or
+  "*starred*" for a movie); the **blank** ("a movie…" / "an actor…" over an ink rule,
+  with a coral arrow); "Deal again" and "Pick your own" links; and a footer line with
+  the best run and "tap the blank to start". The Reel pill is always reachable (count
+  hidden when empty) because the Reel sheet hosts the TMDB attribution.
+  - **The sentence's head** sits in a fixed-height region pinned to its bottom, so the
+    blank never moves: a long name grows upward and shrinks to fit three lines. Only
+    the head deals on Deal again (`AnyTransition.dealSentence`, keyed by
+    `.id(seed.id)`: flicked off to the leading side, turning; the new one lands from
+    just below on `Theme.Motion.drop`). Reduce Motion → cross-fade.
   - **The deal** is owned by the engine (`engine.dealtSeed`, dealt on every
-    appearance and on resume — see the engine's "Seed deal" note). Only the front
-    card transitions (`AnyTransition.dealCard`, keyed by `.id(seed.id)`): the old one
-    is flicked off to the leading side, turning, and the new one lands from just
-    below on `Theme.Motion.drop`; the back card stays and recolours. Reduce Motion →
-    cross-fade.
+    appearance and on resume — see the engine's "Seed deal" note). Each start warms
+    its w185 art, and once it has sat on screen for 400ms the engine
+    **prefetches its candidates** (`prefetchCandidates`; `startGame` uses them if the
+    played start matches), so the first turn is answerable on arrival.
+  - **Tapping the blank** starts the game through the handoff (below). Under Reduce
+    Motion it just starts, and the screens cross-fade.
   - **Search flow** (`searching` state, behind the link) reuses the prior pieces —
     the Actor/Movie **segment**, the in-app-styled debounced field (auto-focused
     on open), and warm-tile result rows — with a "‹ Deal a start" back affordance.
@@ -523,12 +524,34 @@ small, bold, uppercase and tracked.
     setting); iPad keeps all orientations.
   - **Cold-launch intro** (once ever): the wordmark fades up centered and 1.5×
     (an animatable top spacer + an alignment that animates center → leading), then
-    on `Theme.Motion.intro` rises to the header while the rest (best/tagline → card
-    → buttons → search link) assembles via the `ControlReveal` cascade. Gated by the
-    `introDone` binding from `ContentView` — a Play-again re-entry starts fully
-    assembled. Reduce Motion shows it at once, and a full-screen tap catcher lets a
-    tap **skip to the assembled screen** (the controls are inert until assembly, so
-    the catcher never eats a real tap).
+    on `Theme.Motion.intro` rises to the header while the rest (the start → the
+    blank → the links → the footer) assembles via the `ControlReveal` cascade. Gated
+    by the `introDone` binding from `ContentView` — a Play-again re-entry starts
+    fully assembled. Reduce Motion shows it at once, and a full-screen tap catcher
+    lets a tap **skip to the assembled screen**.
+- [`Handoff.swift`](../movie-quiz/Handoff.swift) — the **home → play handoff**. Not
+  `matchedGeometryEffect` (which, in the Reel, flew the wrong copy under other
+  layers): a flight. `HandoffStage` (`@Observable`, owned by `ContentView`, in the
+  environment) collects frames in one named coordinate space — the home reports its
+  avatar, chip, name, verb and blank, keyed by the start they belong to so a start
+  dealing *out* can't overwrite them; the deck's start card (`DeckCard`, while it is
+  the only card) reports its card, chip, art and name, and `GameView` its dock.
+  `begin(with:)` freezes the home's frames; `HandoffFlight`, an overlay above both
+  screens, draws copies from the tap on — held at the home's frames until play has
+  laid out **and the answer field's first focus has passed** (it blocks the main
+  thread for ~150ms loading the keyboard; flying through it lost the opening frames).
+  Then, on its own `TimelineView` clock sampling `Theme.Motion.handoffSpring`, each
+  frame draws every piece between its start and its destination *as laid out that
+  frame* — the keyboard rising moves the deck and dock mid-flight. The avatar
+  reshapes circle → rounded rect into the card's art; the name flies as two copies at
+  a shared letter size (the home's lines fading out, the card's line fading in), since
+  text can't reflow mid-flight; the card's surface and start sticker assemble in
+  place around them; the blank crossfades into a still of the dock. At
+  `handoffDuration` the stage finishes and the real start card and dock appear in the
+  same frame the copies go; `GameView` then releases the first turn's clock
+  (`playerReady`). Fallbacks: launch after 450ms without the focus, and give up (show
+  play) after 1s without destinations. `ContentView` makes seed → play a cross-fade
+  under it rather than a push.
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·
   seconds · quit) + `TimerBar`, the centered **serif score hero** (chain number +
   points), the `ChainDeck`, and the next-up hint, with the answer input

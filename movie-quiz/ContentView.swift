@@ -18,6 +18,9 @@ struct ContentView: View {
     /// each return to `.seed`) starts assembled. Owned here, above `SeedView`, and
     /// kept out of `GameEngine` so the engine stays free of view state.
     @AppStorage("seedIntroPlayed") private var seedIntroDone = false
+    /// The home → play handoff (see `Handoff.swift`): both screens report into
+    /// it, and the flight above them reads it.
+    @State private var handoff = HandoffStage()
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -41,18 +44,26 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch engine.phase {
+            // Home → play is not a push: the home *becomes* the play screen (the
+            // handoff flies its sentence into the deck and dock), so the two
+            // cross-fade underneath the flight. Every other change pushes.
             case .seed:
                 SeedView(engine: engine, collection: collection, introDone: $seedIntroDone)
-                    .transition(.screenPush(reduceMotion: reduceMotion))
+                    .transition(.asymmetric(insertion: .screenPush(reduceMotion: reduceMotion),
+                                            removal: .opacity))
             case .playing:
                 GameView(engine: engine)
-                    .transition(.screenPush(reduceMotion: reduceMotion))
+                    .transition(.asymmetric(insertion: .opacity,
+                                            removal: .screenPush(reduceMotion: reduceMotion)))
             case .gameOver(let summary):
                 GameOverView(engine: engine, collection: collection, summary: summary)
                     .transition(.screenPush(reduceMotion: reduceMotion))
             }
         }
         .animation(Theme.Motion.screen, value: engine.phase)
+        .overlay { HandoffFlight() }
+        .coordinateSpace(.named(HandoffStage.space))
+        .environment(handoff)
         .onChange(of: scenePhase) { old, phase in
             // Guarantee the latest collection snapshot is on disk before the app
             // is suspended/killed, not just eventually via the async save.

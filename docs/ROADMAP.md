@@ -150,19 +150,27 @@ than renaming before.
   the mark on a cream tile** — a coral tile with a yellow circle read as Mastercard at
   small sizes. Light, dark and tinted variants; opaque, no alpha. A film-reel-holes
   alternate was drawn and rejected (the holes read as buttons at 29–60px).
-- **The home screen:** the dealt start becomes a physical card (headshot or poster, the
-  name, the next link's rule) on a pile whose back card shows the next kind's colour.
-  The wordmark heads the screen with the Reel and settings pills; the best run gets a
-  bar above the card, and before there is one the game's question takes its place.
-  PLAY and Shuffle sit together; search stays a quiet link.
+- **The home screen is the first turn:** a sentence with a blank — "Chris Hemsworth
+  *was in* a movie…", "Inception *starred* an actor…". Tapping the blank hands off to
+  play in place (the name, chip and avatar fly into the deck's start card, the blank
+  into the answer dock as the keyboard rises); the clock starts when it lands. "Deal
+  again" deals a new start; "Pick your own" opens search. The best run is a footer
+  line. *(A dealt-card home — headshot card on a pile, PLAY + Shuffle — was built first
+  and replaced the same day: the sentence teaches the rule without a button.)* The
+  play screen itself is unchanged; it does not become a sentence.
 - **The film strip** (blue/yellow frames running into "?" frames) is the supporting
   graphic for the launch screen, store screenshots and share card — never the logo.
 
 **Traps:**
-- The card's art is flexible-height, so the SE and the Pro Max share one layout — keep
-  anything new on this screen out of the card's fixed parts.
-- The best bar brings the personal best back onto the home after 0.5.0 folded it into the
-  Reel sheet. The Reel sheet still shows it; that's fine — one is a glance, one a record.
+- The handoff is a **flight, not `matchedGeometryEffect`** (`Handoff.swift`): both
+  screens report frames into a `HandoffStage`, the root draws copies between them on its
+  own `TimelineView` clock, reading the destination live every frame. An animated
+  `Animatable` value didn't animate there; a time-based clock did.
+- **The first focus of the answer field blocks the main thread** (~150ms, loading the
+  keyboard). The flight holds still until it has passed — otherwise its opening frames
+  are lost and it jumps. Keep anything else expensive off that moment.
+- Long titles: the name shrinks to fit three lines inside a fixed-height region, so the
+  blank never moves when a shuffle deals a longer name.
 - Check that "Unspool" is clear on the App Store and as a trademark before 1.0's listing.
 
 ---

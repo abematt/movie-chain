@@ -134,22 +134,26 @@ struct DeckCard: View {
     /// 0 = the newest, on top; higher = further back in the pile.
     let depth: Int
 
+    /// The home → play handoff lands in the start card while it is the only one.
+    @Environment(HandoffStage.self) private var stage: HandoffStage?
+
     /// Fixed so every card in the pile is the same height and the peeks line up.
     static let height: CGFloat = 122
 
     private var isFront: Bool { depth == 0 }
+
+    /// This card is where the home's name, chip and avatar fly to.
+    private var isHandoffTarget: Bool { isStart && isFront }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             header
             HStack(alignment: .center, spacing: Theme.Spacing.md) {
                 ChainArt(node: node, width: 48, height: 72)
+                    .handoffTarget(.art, isHandoffTarget ? stage : nil)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(node.matchText)
-                        .font(Theme.Font.heading(.title2))
-                        .foregroundStyle(Theme.Color.ink)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
+                    DeckName(text: node.matchText)
+                        .handoffTarget(.name, isHandoffTarget ? stage : nil)
                     if case .movie(let m) = node, let year = m.year {
                         Text(String(year))
                             .font(Theme.Font.flourish(.subheadline))
@@ -174,6 +178,9 @@ struct DeckCard: View {
                     .padding(.trailing, Theme.Spacing.sm + 2)
             }
         }
+        .handoffTarget(.card, isHandoffTarget ? stage : nil)
+        // Hidden while the handoff's copies fly in; shown in the same frame they go.
+        .opacity(isHandoffTarget && stage?.isFlying == true ? 0 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityHidden(!isFront)
     }
@@ -181,6 +188,7 @@ struct DeckCard: View {
     private var header: some View {
         HStack(spacing: Theme.Spacing.sm) {
             KindChip(kind: node.kind)
+                .handoffTarget(.chip, isHandoffTarget ? stage : nil)
             // Only the peek needs the name up here; on the front card the body
             // already carries it in display type.
             Text(node.matchText)

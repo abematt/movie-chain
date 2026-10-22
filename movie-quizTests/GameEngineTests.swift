@@ -183,6 +183,49 @@ struct GameEngineTests {
         #expect(summary.shareText.hasSuffix("🟦🟨"))
     }
 
+    // MARK: Candidate prefetch (the home fetches the dealt start's answers)
+
+    /// One film per actor ("Film 10N" for actor N), counting filmography fetches.
+    @MainActor
+    final class CountingFilmographyProvider: MovieDataProvider {
+        private(set) var filmographyCalls = 0
+
+        func searchActors(_ query: String) async throws -> [Person] { [] }
+        func searchMovies(_ query: String) async throws -> [Movie] { [] }
+        func popularActors() async throws -> [Person] { [] }
+        func popularMovies() async throws -> [Movie] { [] }
+        func cast(of movie: Movie) async throws -> [Person] { [] }
+        func filmography(of actor: Person) async throws -> [Movie] {
+            filmographyCalls += 1
+            return [Movie(id: 100 + actor.id, title: "Film \(100 + actor.id)", year: 2001)]
+        }
+    }
+
+    @Test func startGameUsesThePrefetchedCandidates() async {
+        let provider = CountingFilmographyProvider()
+        let engine = makeEngine(provider)
+        let seed = ChainNode.actor(Person(id: 1, name: "Actor 1"))
+
+        engine.prefetchCandidates(for: seed)
+        engine.prefetchCandidates(for: seed)        // a repeat joins, doesn't refetch
+        await engine.startGame(with: seed)
+        await engine.submit("Film 101")
+
+        #expect(provider.filmographyCalls == 1, "the prefetch is the only fetch")
+        #expect(engine.score == 1, "the prefetched set validates the first link")
+    }
+
+    @Test func aPrefetchForAnotherStartIsIgnored() async {
+        let provider = CountingFilmographyProvider()
+        let engine = makeEngine(provider)
+
+        engine.prefetchCandidates(for: .actor(Person(id: 1, name: "Actor 1")))
+        await engine.startGame(with: .actor(Person(id: 2, name: "Actor 2")))
+        await engine.submit("Film 102")
+
+        #expect(engine.score == 1, "the played start's own set validates its link")
+    }
+
     // MARK: Candidate-load resilience (the "stuck turn" fix)
 
     /// Fails the first N candidate fetches (a transient rate limit / timeout), then
