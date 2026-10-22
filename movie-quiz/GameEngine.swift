@@ -45,9 +45,9 @@ final class GameEngine {
 
         /// Spoiler-free share card: each link as a coloured square, never a name.
         var shareText: String {
-            let squares = chain.map { $0.kind == .actor ? "🟦" : "🟪" }.joined()
+            let squares = chain.map { $0.kind == .actor ? "🟦" : "🟨" }.joined()
             let linkWord = links == 1 ? "link" : "links"
-            return "Movie Chain 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            return "Unspool 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
         }
     }
 
