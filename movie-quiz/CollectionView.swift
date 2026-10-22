@@ -30,8 +30,12 @@ struct CollectionView: View {
     @AppStorage("reelTiers") private var tierModel: ReelTierModel = .rank
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
-    /// The card or frame lifted out of the grid, if any.
+    /// The card or frame lifted out of the grid, if any, and whether it's
+    /// turned over.
     @State private var expanded: CollectedEntity.ID?
+    @State private var flipped = false
+    /// Ties each grid slot to its lifted card, so a lift flies out and back.
+    @Namespace private var lift
     /// Gates the hero numbers so they roll up from 0 on first appear.
     @State private var statsIn = false
 
@@ -209,6 +213,7 @@ struct CollectionView: View {
                         Text(f.label)
                         Text("\(count(for: f))")
                             .font(Theme.Font.numeral(.subheadline))
+                            .contentTransition(.numericText(value: Double(count(for: f))))
                             .opacity(0.6)
                             .monospacedDigit()
                     }
@@ -331,12 +336,17 @@ struct CollectionView: View {
             LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
                 ForEach(Array(actors.enumerated()), id: \.element.id) { i, entity in
                     Button { expand(entity.id) } label: {
-                        ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+                        let card = ReelActorCard(entity: entity, model: tierModel, isNew: store.isNew(entity))
+                        if expanded == entity.id {
+                            card.hidden()   // holds the slot while the card is out
+                        } else {
+                            card.reelLift(id: entity.id, in: liftNamespace)
+                        }
                     }
                     .buttonStyle(.pressScale)
-                    // The lifted card stands in for this one while it's out.
-                    .opacity(expanded == entity.id ? 0 : 1)
-                    .appear(i)
+                    // Only the first screenful cascades in. The grid is lazy, so
+                    // later cells are made as they scroll in and must arrive solid.
+                    .appear(i, enabled: i < Self.cascadeCount)
                 }
             }
         }
@@ -351,14 +361,19 @@ struct CollectionView: View {
                 ForEach(Array(movies.enumerated()), id: \.element.id) { i, entity in
                     Button { expand(entity.id) } label: {
                         VStack(spacing: Theme.Spacing.sm) {
-                            ReelFrame(entity: entity, isNew: store.isNew(entity))
-                                .opacity(expanded == entity.id ? 0 : 1)
+                            let frame = ReelFrame(entity: entity, isNew: store.isNew(entity))
+                            // The label stays on the wall while its frame is out.
+                            if expanded == entity.id {
+                                frame.hidden()
+                            } else {
+                                frame.reelLift(id: entity.id, in: liftNamespace)
+                            }
                             ReelFrameCaption(entity: entity)
                         }
                         .accessibilityElement(children: .combine)
                     }
                     .buttonStyle(.pressScale)
-                    .appear(i)
+                    .appear(i, enabled: i < Self.cascadeCount)
                 }
             }
         }
@@ -374,18 +389,42 @@ struct CollectionView: View {
             .padding(.vertical, Theme.Spacing.xl)
     }
 
+    /// Cells in the first screenful of a grid — the ones that cascade in.
+    private static let cascadeCount = 6
+
+    /// No travel under Reduce Motion: the card fades in place instead.
+    private var liftNamespace: Namespace.ID? { reduceMotion ? nil : lift }
+
+    /// The backdrop fades on its own; the card flies from its slot (identity
+    /// insertion, so it never fades in) and fades out over the card flying home.
     @ViewBuilder private var detail: some View {
-        if let id = expanded, let entity = store.entities[id] {
-            ReelCardDetail(entity: entity, linked: store.linked(to: entity), model: tierModel) {
-                expand(nil)
+        ZStack {
+            if expanded != nil {
+                Theme.Color.canvas.opacity(0.92)
+                    .ignoresSafeArea()
+                    .onTapGesture { expand(nil) }
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
             }
-            .transition(reduceMotion ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
+            if let id = expanded, let entity = store.entities[id] {
+                ReelCardDetail(entity: entity, linked: store.linked(to: entity), model: tierModel,
+                               namespace: liftNamespace, flipped: $flipped) {
+                    expand(nil)
+                }
+                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .identity, removal: .opacity))
+            }
         }
     }
 
+    /// Picking a card up is the deliberate moment, with a little settle;
+    /// putting it back is the system answering, so it snaps home.
     private func expand(_ id: CollectedEntity.ID?) {
-        withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.emphasized) {
+        if id != nil { Haptics.lift() }
+        let animation: Animation = reduceMotion ? Theme.Motion.reducedFade
+            : id != nil ? .spring(duration: 0.4, bounce: 0.15) : Theme.Motion.standard
+        withAnimation(animation) {
             expanded = id
+            flipped = false
         }
     }
 

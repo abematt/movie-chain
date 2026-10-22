@@ -122,6 +122,9 @@ struct ReelActorCard: View {
     var large = false
     var isNew = false
 
+    /// A poker card's proportions.
+    static let aspect: CGFloat = 5.0 / 7.0
+
     private var links: Int { entity.links.count }
     private var finish: ReelFinish {
         ReelTier.finish(links: links, wellKnown: entity.wellKnownFilms, model: model)
@@ -130,7 +133,9 @@ struct ReelActorCard: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            ReelArt(path: entity.imagePath, kind: .actor, name: entity.name, size: large ? "w342" : "w185")
+            // One size for grid and lift: the lifted card reuses the cached image
+            // instead of flashing its monogram mid-flight.
+            ReelArt(path: entity.imagePath, kind: .actor, name: entity.name, size: "w342")
                 .aspectRatio(4.0 / 5.0, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm)
@@ -148,7 +153,7 @@ struct ReelActorCard: View {
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
         .neoSurface(radius: Theme.Radius.md, fill: .clear,
                     shadow: large ? Theme.Shadow.large : Theme.Shadow.small)
-        .aspectRatio(5.0 / 7.0, contentMode: .fit)
+        .aspectRatio(Self.aspect, contentMode: .fit)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(entity.name), \(links) \(links == 1 ? "film" : "films") linked, \(finish.label)")
     }
@@ -197,16 +202,16 @@ struct ReelFrame: View {
     var isNew = false
 
     var body: some View {
-        ReelArt(path: entity.imagePath, kind: .movie, name: entity.name, size: large ? "w500" : "w342")
+        ReelArt(path: entity.imagePath, kind: .movie, name: entity.name, size: "w500")
             .aspectRatio(2.0 / 3.0, contentMode: .fit)
             .clipped()
             .overlay(Rectangle().strokeBorder(Theme.Color.border, lineWidth: 1))
             // The mat.
-            .padding(large ? 18 : 10)
+            .padding(Self.mat(large))
             .background(Theme.Color.tile)
             // The moulding, with a hairline inner edge where it meets the mat.
             .overlay(Rectangle().strokeBorder(Theme.Color.hairline, lineWidth: 1).padding(1))
-            .padding(large ? 10 : 6)
+            .padding(Self.moulding(large))
             .background(Theme.Color.ink)
             .background(Rectangle().fill(Theme.Color.shadow)
                 .offset(x: large ? Theme.Shadow.large : Theme.Shadow.small,
@@ -214,6 +219,16 @@ struct ReelFrame: View {
             .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 4, y: -6) } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(entity.displayName)
+    }
+
+    private static func mat(_ large: Bool) -> CGFloat { large ? 18 : 10 }
+    private static func moulding(_ large: Bool) -> CGFloat { large ? 10 : 6 }
+
+    /// Width ÷ height at `width`: a 2:3 poster inside a fixed border of mat
+    /// and moulding.
+    static func aspect(width: CGFloat, large: Bool) -> CGFloat {
+        let border = (mat(large) + moulding(large)) * 2
+        return width / ((width - border) * 1.5 + border)
     }
 }
 
@@ -241,72 +256,103 @@ struct ReelFrameCaption: View {
 
 // MARK: - Expanded card (flips to what's behind it)
 
-/// An actor card or framed poster lifted out of the grid. Tap it (or Flip) to
-/// turn it over: an actor's back lists the films linked through them, a movie's
-/// the actors. Holo cards catch the light here, and only here.
+/// An actor card or framed poster lifted out of the grid. It flies out of its
+/// slot and back into it (`matchedGeometryEffect` in `namespace`), and turns
+/// over on a tap: an actor's back lists the films linked through them, a
+/// movie's the actors. Holo cards catch the light here, and only here.
+///
+/// The dimmed backdrop and the lift itself belong to `CollectionView`, so a tap
+/// anywhere puts the card back.
 struct ReelCardDetail: View {
     let entity: CollectedEntity
     let linked: [CollectedEntity]
     let model: ReelTierModel
-    let dismiss: () -> Void
+    /// The grid's lift namespace; `nil` under Reduce Motion, where the card
+    /// fades in place instead of travelling.
+    let namespace: Namespace.ID?
+    @Binding var flipped: Bool
+    let close: () -> Void
 
-    @State private var flipped = false
+    /// The buttons fade in once the card is on its way; the card never fades.
+    @State private var settled = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Turning over: quick enough to flip back and forth, a touch of settle.
+    static let flip: Animation = .spring(duration: 0.42, bounce: 0.1)
 
     private var links: Int { entity.links.count }
     private var isActor: Bool { entity.kind == .actor }
+    private var width: CGFloat { isActor ? 270 : 250 }
+    private var aspect: CGFloat {
+        isActor ? ReelActorCard.aspect : ReelFrame.aspect(width: width, large: true)
+    }
     private var live: Bool {
         isActor && !reduceMotion && TiltMotion.shared.isAvailable
             && ReelTier.finish(links: links, wellKnown: entity.wellKnownFilms, model: model) == .holo
     }
 
     var body: some View {
-        ZStack {
-            Theme.Color.canvas.opacity(0.92)
-                .ignoresSafeArea()
-                .onTapGesture(perform: dismiss)
-                .accessibilityHidden(true)
-
-            VStack(spacing: Theme.Spacing.lg) {
-                Group {
-                    if reduceMotion {
-                        // No turning over: the faces cross-fade.
-                        front.opacity(flipped ? 0 : 1)
-                            .overlay { back.opacity(flipped ? 1 : 0) }
-                    } else {
-                        FlipView(angle: flipped ? 180 : 0, front: front, back: back)
-                    }
-                }
-                .frame(width: isActor ? 270 : 250)
-                .onTapGesture(perform: toggle)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityHint(flipped ? "Shows the front"
-                                   : isActor ? "Shows the films linked through them"
-                                   : "Shows the actors linked through it")
-
-                HStack(spacing: Theme.Spacing.sm) {
-                    Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
-                    Button("Close", action: dismiss).buttonStyle(.ghost)
-                }
-                .frame(width: 270)
+        VStack(spacing: Theme.Spacing.lg) {
+            card
+            HStack(spacing: Theme.Spacing.sm) {
+                Button(flipped ? "Front" : "Flip", action: toggle).buttonStyle(.ghost)
+                Button("Close", action: close).buttonStyle(.ghost)
+            }
+            .frame(width: 270)
+            .opacity(settled ? 1 : 0)
+        }
+        .onAppear {
+            withAnimation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard.delay(0.12)) {
+                settled = true
             }
         }
-        .onAppear { if live { TiltMotion.shared.start() } }
-        .onDisappear { if live { TiltMotion.shared.stop() } }
+        .accessibilityAction(.escape, close)
+    }
+
+    /// Laid out once at full size and scaled to whatever frame the lift gives
+    /// it, so the card grows out of its grid slot without re-flowing its text.
+    private var card: some View {
+        GeometryReader { g in
+            faces
+                .frame(width: width, height: width / aspect)
+                .scaleEffect(g.size.width / width, anchor: .topLeading)
+        }
+        .aspectRatio(aspect, contentMode: .fit)
+        .reelLift(id: entity.id, in: namespace)
+        .frame(width: width, height: width / aspect)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: toggle)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(flipped ? "Shows the front"
+                           : isActor ? "Shows the films linked through them"
+                           : "Shows the actors linked through it")
+    }
+
+    @ViewBuilder private var faces: some View {
+        if reduceMotion {
+            // No turning over: the faces cross-fade.
+            front.opacity(flipped ? 0 : 1)
+                .overlay { back.opacity(flipped ? 1 : 0) }
+        } else {
+            FlipView(angle: flipped ? 180 : 0, front: front, back: back)
+        }
     }
 
     private func toggle() {
-        withAnimation(reduceMotion ? Theme.Motion.reducedFade : .spring(duration: 0.55, bounce: 0.15)) {
+        Haptics.selection()
+        withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.flip) {
             flipped.toggle()
         }
     }
 
     @ViewBuilder private var front: some View {
-        if isActor {
-            ReelActorCard(entity: entity, model: model,
-                          tilt: live ? TiltMotion.shared.tilt : .zero, large: true)
-        } else {
+        if !isActor {
             ReelFrame(entity: entity, large: true)
+        } else if live {
+            LiveHoloActorCard(entity: entity, model: model)
+        } else {
+            ReelActorCard(entity: entity, model: model, large: true)
         }
     }
 
@@ -392,6 +438,31 @@ struct ReelCardDetail: View {
             Text("In \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
                 .font(Theme.Font.flourish(.footnote))
                 .foregroundStyle(Theme.Color.muted)
+        }
+    }
+}
+
+/// The lifted actor card with the gyro driving its foil. A view of its own so
+/// the 30Hz tilt redraws only the card, not the detail around it.
+private struct LiveHoloActorCard: View {
+    let entity: CollectedEntity
+    let model: ReelTierModel
+
+    var body: some View {
+        ReelActorCard(entity: entity, model: model, tilt: TiltMotion.shared.tilt, large: true)
+            .onAppear { TiltMotion.shared.start() }
+            .onDisappear { TiltMotion.shared.stop() }
+    }
+}
+
+extension View {
+    /// Ties a Reel card to its slot in the grid so lifting it flies it out and
+    /// back. No namespace (Reduce Motion) means no travel.
+    @ViewBuilder func reelLift(id: CollectedEntity.ID, in namespace: Namespace.ID?) -> some View {
+        if let namespace {
+            matchedGeometryEffect(id: id, in: namespace)
+        } else {
+            self
         }
     }
 }
