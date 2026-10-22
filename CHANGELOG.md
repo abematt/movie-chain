@@ -32,6 +32,13 @@ already has: the design overhaul landed before Foundations and took 0.5.0.)
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-10-22
+
+Fixes from playing 0.5.2 on a real phone: sounds that went missing, a Reel that
+stuttered open, the keyboard and the last run's points lingering into the next
+screen, and lifting a card in and out of the Reel made clean. Two settings that had
+served their purpose — Chain style and Reel cards — are gone.
+
 ### Fixed
 
 - **Sounds stop going missing.** iOS stops the audio engine on its own — a call,
