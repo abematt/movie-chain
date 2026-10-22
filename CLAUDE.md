@@ -103,6 +103,48 @@ the relevant section before starting one.
   Bump **minor** when a roadmap milestone lands, **patch** for fixes/polish in
   between. Pre-1.0, breaking internal changes go in a minor bump.
 
+## Swift conventions
+
+**Load the `write-swift` skill before writing or reviewing Swift here** (it's committed
+under `.claude/skills/`). It's the standard; this section adds the rules this codebase
+has actually been bitten by, and how they're enforced.
+
+- **Leaving the main actor needs `@concurrent`.** Approachable Concurrency is on, so a
+  `nonisolated async` func runs on its *caller's* actor — main, here. That's how TMDB
+  decoding sat on the main thread while its comment said otherwise.
+- **`.task` / `.task(id:)`, not `onAppear { Task { … } }`.** `.task` is cancelled when
+  the view goes away; an `onAppear` task isn't (a stale celebration fired after a fast
+  "Play again"). `try? await Task.sleep` swallows cancellation, so check
+  `Task.isCancelled` after it before doing anything visible.
+- **`@Sendable` view closures** (`keyframeAnimator`, `visualEffect`, `onGeometryChange`,
+  `Shape.path`) copy what they need in a capture list — `{ [reduceMotion] … }` — never
+  read `self`.
+- **No device locale in matching or parsing** — `locale: nil`, never `.current` (Turkish
+  folds "III" to "ııı").
+- **Storage is injected** (`UserDefaults`, file URLs, clocks) so tests never touch the
+  app's real records.
+- **Shared async loads are joined, not duplicated** — keep the in-flight `Task` and
+  await it (see `GameEngine.poolLoad`).
+- **State that only exists in one phase lives on that phase** (`.gameOver(Summary)`),
+  and resets go through one function (`resetRun()`).
+- **Tests use Swift Testing** — struct suites, `#expect`, `@Test(arguments:)` for
+  tables. XCTest only for UI automation or `XCTMetric`.
+- Spell existentials `any P`; prefer `some P` unless it's stored or swapped at runtime.
+
+**Enforcement:**
+- **Compiler** — Swift 6 language mode and `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`
+  (all configurations), so a data-race or isolation warning fails the build.
+- **`scripts/swift-check.py`** — the grep-able rules: `XCTestCase`, `Task.detached`,
+  `DispatchQueue.main`, `locale: .current`, `print(`, `ObservableObject`/`@Published`,
+  `nonisolated … async` without `@concurrent`, and a `Task` inside `onAppear`. A
+  deliberate exception carries `// swift-check:ignore — <why>` on the line.
+  - Runs after every Claude Code edit to a Swift file (`.claude/settings.json`
+    PostToolUse hook) — a violation is reported back immediately; fix it.
+  - Runs as a git pre-commit hook on staged Swift. **Enable it once per clone:**
+    `git config core.hooksPath .githooks`
+- **`/swift-review [base]`** — the judgment pass a script can't do (value vs reference,
+  `some`/`any`, reentrancy, structure, test coverage). Run it on a branch before merging.
+
 ## Architecture
 
 > For the full module-by-module breakdown, game-loop diagram, and design

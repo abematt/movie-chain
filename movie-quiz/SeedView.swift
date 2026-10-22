@@ -122,7 +122,9 @@ struct SeedView: View {
         // lands on an animation.
         .task(id: introRunning) { await warmFeedbackWhenIdle() }
         .onAppear {
-            if introTask == nil { introTask = Task { await runIntro() } }
+            // swift-check:ignore on the next line — kept as a stored Task so `skipIntro`
+            // can cancel it; the screen can't leave mid-intro (controls are inert).
+            if introTask == nil { introTask = Task { await runIntro() } }  // swift-check:ignore
             #if DEBUG
             // Screenshot hook: open straight onto the Reel sheet.
             if ProcessInfo.processInfo.arguments.contains("-uiOpenReel") { showReel = true }
