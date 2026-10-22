@@ -139,8 +139,14 @@ struct SeedView: View {
         }
     }
 
+    /// The space above the title lockup. During the intro it starts tall (the
+    /// lockup centered) and settles to its resting value as the controls
+    /// assemble. The resting value isn't zero: a small inset lowers the title so
+    /// the title + controls composition sits just above the screen's middle
+    /// instead of hugging the top and leaving the bottom empty.
     private func topInset(_ height: CGFloat) -> CGFloat {
-        revealed ? 0 : max(Theme.Spacing.xl, height * 0.30)
+        let rest = searching ? 0 : height * 0.06
+        return revealed ? rest : max(Theme.Spacing.xl, height * 0.30)
     }
 
     private var introRunning: Bool {
@@ -201,14 +207,27 @@ struct SeedView: View {
 
     // MARK: Deal section — the dealt start, Play, Shuffle, and the search link
 
+    // Two zones, not three: the title up top, and every control in one tight
+    // group below it — start, hint, shuffle, and the search link as a quiet third
+    // option rather than a footer floating on its own. The free space splits
+    // 2 : 3 above and below the group, which puts the start button a little
+    // below the screen's middle, where the thumb rests.
     private var dealSection: some View {
-        VStack(spacing: Theme.Spacing.md) {
+        VStack(spacing: 0) {
             Spacer(minLength: Theme.Spacing.md)
-            cascade(startButton, 0)
-            cascade(hintLine, 1)
-            cascade(shuffleButton, 2)
+            Spacer(minLength: 0)
+            VStack(spacing: Theme.Spacing.md) {
+                VStack(spacing: Theme.Spacing.sm) {
+                    cascade(startButton, 0)
+                    cascade(hintLine, 1)
+                }
+                cascade(shuffleButton, 2)
+                cascade(searchLink, 3)
+                    .padding(.top, Theme.Spacing.xs)
+            }
             Spacer(minLength: Theme.Spacing.md)
-            cascade(searchLink, 3)
+            Spacer(minLength: 0)
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -220,7 +239,7 @@ struct SeedView: View {
         Button { play() } label: {
             VStack(spacing: Theme.Spacing.sm) {
                 Text("Start with")
-                    .metaLabel(Theme.Color.onInk.opacity(0.6))
+                    .metaLabel(.white.opacity(0.85))
                 seedContent
             }
         }
@@ -234,12 +253,14 @@ struct SeedView: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(seed.accent)
-                        .frame(width: 12, height: 12)
+                        .overlay(RoundedRectangle(cornerRadius: 4)
+                            .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+                        .frame(width: 14, height: 14)
                     Text(seed.matchText)                 // bare name/title, no year
                         // Fixed size (not a text style): the button's height is
                         // locked so the deal transition never reflows.
                         .font(Theme.Font.display(26))
-                        .foregroundStyle(Theme.Color.onInk)
+                        .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)          // shrink to fit, never clip
                 }
@@ -248,7 +269,7 @@ struct SeedView: View {
             } else {
                 Text("Dealing…")
                     .font(Theme.Font.flourish(size: 20))
-                    .foregroundStyle(Theme.Color.onInk.opacity(0.6))
+                    .foregroundStyle(.white.opacity(0.85))
             }
         }
         .frame(height: 40)                                // fixed one-line height
@@ -563,11 +584,13 @@ struct SeedView: View {
     }
 }
 
-// MARK: - Start button style (the ink "Start with …" pill)
+// MARK: - Start button style (the coral "Start with …" card)
 
-/// The home's primary action: an ink-filled rounded card carrying the "START
-/// WITH" label + the dealt seed. Its own style (not `PrimaryButtonStyle`) because
-/// it hosts custom multi-line content and a taller card radius.
+/// The home's primary action: a coral card carrying the "START WITH" label and
+/// the dealt seed. Coral because it is this screen's call-to-action, exactly
+/// like "Play again" on game over (an ink fill also hid its ink shadow, which
+/// made the card read as shifted). Its own style rather than
+/// `PrimaryButtonStyle` because it hosts multi-line content and a taller radius.
 private struct StartButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -577,7 +600,7 @@ private struct StartButtonStyle: ButtonStyle {
             // The screen's one loud surface: ink fill, hard shadow, and the
             // neobrutalist press (shadow collapses, card shifts into the page).
             .neoSurface(radius: Theme.Radius.card + 4,
-                        fill: Theme.Color.ink,
+                        fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
                         pressed: configuration.isPressed)
             .animation(.snappy(duration: 0.12), value: configuration.isPressed)
     }

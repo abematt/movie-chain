@@ -68,6 +68,13 @@ not a contract — if milestones land out of order, the version follows the work
   total sits at the top and the per-kind counts live only in the tabs. "Your
   *regulars*" lost its "most logged" caption, which said the same thing, and its two
   cards now always match in height.
+- **A balanced home screen with a coral start button.** The start button was ink on
+  an ink shadow, so the shadow merged into the card and it read as shifted. The
+  screen also had no coral, though coral marks the main action everywhere else. It's
+  coral now, like "Play again". The controls form one group, with the search link
+  tucked under Shuffle instead of floating at the bottom. The title sits a little
+  lower, so the whole composition centers on the screen with the start button just
+  below the middle, where the thumb rests.
 
 ### Changed
 
