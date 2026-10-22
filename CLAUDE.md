@@ -233,11 +233,17 @@ you". Pure count stats from your own play — no TMDB rarity. `record` also link
 each adjacent pair both ways (`CollectedEntity.links`), so **actors are playing
 cards earned through the films linked through them** and **movies are framed
 posters**; either flips over to the other side of its links (no progress for movies
-— a cast is never completable). No numbers on the fronts; the finish is the reward.
+— a cast is never completable). An actor card's front carries only its collector
+number (`ReelNumber`: the order you first linked them, a set number, not a score) and
+five dots toward holo — **no counts on the fronts**; the finish is the reward. Its
+photo is printed in the actor's own `Duotone` (one of the foil's five pastels, by
+TMDB id), **baked into the cached image off-main by `ArtCache`** — never tint it
+with a mask or blend mode, which would push a tilting card offscreen every frame.
 `ReelCards.swift` draws both. The Reel narrows by decade and genre (`ReelFilter`:
 films match directly, actors through a linked film; genre ids ride along on every
 TMDB movie response, names are a fixed table). An actor card's finish comes from the
-pure, tested `ReelTier`: paper, inked at 5 films linked, holo at 11 — **no TMDB data,
+pure, tested `ReelTier`: paper, pastel at 5 films linked (the face in the
+photo's pastel), holo at 11 — **no TMDB data,
 no extra request; never add a fetch on Reel open**. Cards and frames are drawn once
 at their grid size and scaled (`ReelCanvas`), so a lift is a pure zoom: the lifted
 card flies itself out of its measured grid slot and back onto it, drawn above

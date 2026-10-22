@@ -19,6 +19,10 @@
 //  in an `NSCache` bounded by bytes, so memory pressure evicts rather than grows.
 //  Never written anywhere but the URL cache.
 //
+//  An actor card's duotone (`Duotone`) is baked in during that same off-main
+//  decode and cached as its own image, keyed by the URL plus the pair
+//  (`key(_:duotone:)`), so a tinted photo costs nothing to draw.
+//
 
 import SwiftUI
 import ImageIO
@@ -69,25 +73,36 @@ final class ArtCache {
         }
     }
 
-    /// Download (or read from disk) and decode `url`'s art, keeping it in memory.
-    /// `nil` on failure; callers fall back to their placeholder.
+    /// Where `url`'s art is cached when printed in `duotone` — the plain art's
+    /// key when there's none. Pass it to `image(for:)` for a synchronous read.
+    func key(_ url: URL, duotone: Duotone?) -> URL {
+        guard let duotone else { return url }
+        var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        parts?.fragment = "duotone-\(duotone.index)"
+        return parts?.url ?? url
+    }
+
+    /// Download (or read from disk) and decode `url`'s art, keeping it in memory
+    /// — printed in `duotone` when given. `nil` on failure; callers fall back to
+    /// their placeholder.
     @discardableResult
-    func load(_ url: URL) async -> Image? {
-        if let hit = image(for: url) { return hit }
-        if let inFlight = loading[url] { return await inFlight.value }
+    func load(_ url: URL, duotone: Duotone? = nil) async -> Image? {
+        let key = key(url, duotone: duotone)
+        if let hit = image(for: key) { return hit }
+        if let inFlight = loading[key] { return await inFlight.value }
         let task = Task { () -> Image? in
             guard let (data, _) = try? await session.data(from: url),
-                  let cgImage = await Self.decode(data)
+                  let cgImage = await Self.decode(data, duotone: duotone)
             else { return nil }
             let image = Image(decorative: cgImage, scale: 1)
-            images.setObject(CachedImage(image), forKey: url as NSURL,
+            images.setObject(CachedImage(image), forKey: key as NSURL,
                              cost: cgImage.bytesPerRow * cgImage.height)
-            remember(image, for: url)
+            remember(image, for: key)
             return image
         }
-        loading[url] = task
+        loading[key] = task
         let result = await task.value
-        loading[url] = nil
+        loading[key] = nil
         return result
     }
 
@@ -97,13 +112,13 @@ final class ArtCache {
         await load(url)
     }
 
-    /// Warm several images, four at a time so a long list doesn't open dozens of
-    /// connections at once.
-    func warm(_ urls: [URL]) async {
-        for start in stride(from: 0, to: urls.count, by: 4) {
+    /// Warm several images — each plain or in its duotone — four at a time so a
+    /// long list doesn't open dozens of connections at once.
+    func warm(_ items: [(url: URL, duotone: Duotone?)]) async {
+        for start in stride(from: 0, to: items.count, by: 4) {
             await withTaskGroup(of: Void.self) { group in
-                for url in urls[start..<min(start + 4, urls.count)] {
-                    group.addTask { await self.load(url) }
+                for item in items[start..<min(start + 4, items.count)] {
+                    group.addTask { await self.load(item.url, duotone: item.duotone) }
                 }
             }
         }
@@ -112,12 +127,15 @@ final class ArtCache {
     /// Off-main decode, `@concurrent` for the same reason as `TMDBProvider.decode`:
     /// a plain `nonisolated async` function would run on the caller's actor (Main).
     /// `ShouldCacheImmediately` decodes now, not lazily on first draw — which
-    /// would land on the main thread mid-animation.
+    /// would land on the main thread mid-animation. A duotone is applied here
+    /// too, so it never costs the main thread anything either.
     @concurrent
-    nonisolated private static func decode(_ data: Data) async -> CGImage? {
+    nonisolated private static func decode(_ data: Data, duotone: Duotone?) async -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
-        return CGImageSourceCreateImageAtIndex(source, 0, options)
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, options) else { return nil }
+        guard let duotone else { return image }
+        return duotone.apply(to: image)
     }
 }
 

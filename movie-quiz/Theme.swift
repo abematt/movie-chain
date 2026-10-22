@@ -130,6 +130,9 @@ enum Theme {
         /// label-sm: in-card stamps ("ACTOR", "NEW", "+2 EARLIER").
         static let labelSmall: SwiftUI.Font = .system(.caption2, weight: .bold)
         static let labelSmallTracking: CGFloat = 0.9  // ≈ 0.08em at 11pt
+        /// Stamps printed on a Reel card ("NO. 027", "NEW"). Fixed, not Dynamic
+        /// Type: cards are drawn at one design size and scaled as a picture.
+        static let cardStamp: SwiftUI.Font = .system(size: 7, weight: .heavy)
         /// Button labels: uppercase and tracked like labels, at body size.
         static let button: SwiftUI.Font = .system(.subheadline, weight: .bold)
         static let buttonTracking: CGFloat = 0.8

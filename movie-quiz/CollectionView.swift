@@ -347,6 +347,8 @@ struct CollectionView: View {
     // just there.
     @ViewBuilder private var deck: some View {
         let actors = store.actors(matching: narrow)
+        // From the whole Reel, so a card keeps its number under any filter.
+        let numbers = ReelNumber.numbers(for: store.sortedActors)
         if actors.isEmpty {
             nothingMatches
         } else {
@@ -354,7 +356,8 @@ struct CollectionView: View {
                 ForEach(actors) { entity in
                     Button { expand(entity.id) } label: {
                         ReelCanvas(aspect: ReelActorCard.aspect) {
-                            ReelActorCard(entity: entity, isNew: store.isNew(entity))
+                            ReelActorCard(entity: entity, number: numbers[entity.id],
+                                          isNew: store.isNew(entity))
                         }
                         .modifier(Slot(id: entity.id, slots: slots, out: expanded == entity.id))
                     }
@@ -402,7 +405,9 @@ struct CollectionView: View {
     /// sheet. It flies itself out of its slot and back (see `ReelCardDetail`).
     @ViewBuilder private var detail: some View {
         if let id = expanded, let entity = store.entities[id] {
-            ReelCardDetail(entity: entity, linked: store.linked(to: entity),
+            ReelCardDetail(entity: entity,
+                           number: ReelNumber.numbers(for: store.sortedActors)[entity.id],
+                           linked: store.linked(to: entity),
                            slot: slots.frames[id], closing: closing,
                            flipped: $flipped, close: { expand(nil) })
         }
