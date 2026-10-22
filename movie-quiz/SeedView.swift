@@ -2,23 +2,24 @@
 //  SeedView.swift
 //  movie-quiz
 //
-//  The home screen. It leads with a *dealt start*, not a search box: the branded
-//  lockup, then one big "Start with · <name>" button whose pill is a random
-//  popular actor or movie (blue = actor, yellow = movie). Tapping it plays
-//  immediately; Shuffle deals a fresh start; a quiet link drops down to the
-//  search flow for players who want to pick their own. This reads as a game's
-//  start screen rather than a movie-logging app.
+//  The home screen. It leads with a *dealt start*, not a search box: the
+//  Unspool wordmark with the Reel and settings pills, the player's best run (or,
+//  before there is one, the game's question), then the start itself as a
+//  physical card — the actor's headshot or the film's poster, the name, and the
+//  rule for the next link ("Name a movie they were in"). The next link's kind
+//  peeks out behind it in its accent colour. PLAY starts; Shuffle deals the card
+//  away and a fresh one in; a quiet link drops down to the search flow for
+//  players who want to pick their own.
 //
 //  The dealt seed is owned by the engine (`engine.dealtSeed`, refreshed on every
-//  appearance and on resume). The name lives on one line, auto-sized to fit
-//  (`minimumScaleFactor`, like the in-game `NodeTile`) so the button never
-//  reflows — which lets Shuffle animate as one clean "deal" (old start drops out,
-//  new drops in on `Theme.Motion.drop`) instead of a janky slot-machine roll.
+//  appearance and on resume). The card takes whatever height is left between
+//  the header and the buttons (its art flexes, the name never moves), so the
+//  same layout works from an SE to a Pro Max, and a deal never reflows the page.
 //
-//  Cold-launch intro (once ever): the lockup starts centered, its mini-chain
-//  drops in, then the lockup rises to its header rest as the deal controls
-//  cascade in beneath it. Gated by `introDone` (owned by `ContentView`,
-//  persisted); every later launch and every "Play again" starts assembled.
+//  Cold-launch intro (once ever): the wordmark appears centered and large, rises
+//  to its header rest, and the rest of the screen cascades in beneath it. Gated
+//  by `introDone` (owned by `ContentView`, persisted); every later launch and
+//  every "Play again" starts assembled.
 //
 
 import SwiftUI
@@ -36,15 +37,15 @@ struct SeedView: View {
     @State private var searching = false
 
     // MARK: Intro state (see `runIntro`)
-    /// The mini-chain tiles have dropped in.
-    @State private var chainBuilt: Bool
-    /// The lockup has risen to its header rest.
+    /// The wordmark has faded in.
+    @State private var markShown: Bool
+    /// The wordmark has risen to its header rest.
     @State private var revealed: Bool
     /// How many deal controls have been revealed (0…`controlSlotCount`).
     @State private var revealedControls: Int
     /// Latches "this instance plays the intro" so it survives the view re-init
-    /// that fires when `runIntro` sets the `introDone` binding (see the long note
-    /// in the previous revision — a plain `let` snapped the cascade).
+    /// that fires when `runIntro` sets the `introDone` binding (a plain `let`
+    /// snapped the cascade).
     @State private var playsIntro: Bool
     @State private var introTask: Task<Void, Never>?
 
@@ -63,9 +64,12 @@ struct SeedView: View {
     @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Staggered slots for the intro cascade: start button(0), hint(1),
-    /// shuffle(2), search link(3).
+    /// Staggered slots for the intro cascade: best/tagline(0), card(1),
+    /// shuffle + play(2), search link(3).
     private static let controlSlotCount = 4
+
+    /// The TMDB size the dealt card draws (it is ~300pt wide, so `w185` is soft).
+    static let dealtArtSize = "w500"
 
     init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
         self.engine = engine
@@ -73,7 +77,7 @@ struct SeedView: View {
         self._introDone = introDone
         let done = introDone.wrappedValue
         _playsIntro = State(initialValue: !done)
-        _chainBuilt = State(initialValue: done)
+        _markShown = State(initialValue: done)
         _revealed = State(initialValue: done)
         _revealedControls = State(initialValue: done ? Self.controlSlotCount : 0)
         // Start the pill at the last-seen total (read here, not in `.task`, so
@@ -86,10 +90,10 @@ struct SeedView: View {
         GeometryReader { geo in
             VStack(spacing: Theme.Spacing.lg) {
                 // Animatable centering spacer for the intro; collapses to nothing
-                // once the lockup has risen.
+                // once the wordmark has risen.
                 Color.clear.frame(height: topInset(geo.size.height))
 
-                titleLockup
+                header
 
                 Group {
                     if searching {
@@ -101,13 +105,12 @@ struct SeedView: View {
                 }
             }
             .padding(.horizontal, Theme.Spacing.gutter)
-            .padding(.top, searching ? Theme.Spacing.sm : Theme.Spacing.xl)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.sm)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(Theme.Motion.standard, value: searching)
         }
         .background(Theme.Color.canvas.ignoresSafeArea())
-        .overlay(alignment: .topLeading) { settingsButton }
-        .overlay(alignment: .topTrailing) { reelButton }
         .overlay {
             // Tap-to-skip while the intro plays (controls are inert until assembly,
             // so this never eats a real tap and is gone the instant it completes).
@@ -127,10 +130,14 @@ struct SeedView: View {
         }
         // Deal a fresh start on every appearance (cold launch and "Play again").
         .task { await engine.prepareSeeds() }
-        // Pre-fetch each dealt start's art, so the first chain card arrives with
-        // its poster already drawn instead of loading in mid screen-push.
+        // Pre-fetch each dealt start's art: the card's large size, and the small
+        // one the first chain card draws, so it arrives with its art already in
+        // place instead of loading in mid screen-push.
         .task(id: engine.dealtSeed?.id) {
-            if let seed = engine.dealtSeed { await ArtCache.shared.warm(seed) }
+            guard let seed = engine.dealtSeed else { return }
+            async let card: Void = ArtCache.shared.warm(seed, size: Self.dealtArtSize)
+            async let chain: Void = ArtCache.shared.warm(seed)
+            _ = await (card, chain)
         }
         // Warm the haptic/audio engines HERE, on the seed screen, rather than in
         // GameView. `AVAudioEngine.start()` briefly blocks the main actor, and
@@ -160,252 +167,217 @@ struct SeedView: View {
         }
     }
 
-    /// The space above the title lockup. During the intro it starts tall (the
-    /// lockup centered) and settles to its resting value as the controls
-    /// assemble. The resting value isn't zero: a small inset lowers the title so
-    /// the title + controls composition sits just above the screen's middle
-    /// instead of hugging the top and leaving the bottom empty.
+    /// The space above the header. During the intro it starts tall (the wordmark
+    /// centered on the screen) and collapses as the rest assembles.
     private func topInset(_ height: CGFloat) -> CGFloat {
-        let rest = searching ? 0 : height * 0.06
-        return revealed ? rest : max(Theme.Spacing.xl, height * 0.30)
+        revealed ? 0 : max(Theme.Spacing.xl, height * 0.36)
     }
 
     private var introRunning: Bool {
         playsIntro && revealedControls < Self.controlSlotCount
     }
 
-    // MARK: Title lockup — mini-chain · serif wordmark · tagline
+    // MARK: Header — wordmark · Reel pill · settings
     //
-    // In search mode the mini-chain and tagline fold away (the wordmark stays —
-    // it's the identity) so the field + results clear the keyboard.
+    // The pills are an overlay, not siblings, so the wordmark can sit truly
+    // centred during the intro; they fade out for the intro and the search flow.
 
-    private var titleLockup: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            if !searching {
-                chainLockup
-                    .transition(.scale(scale: 0.7, anchor: .bottom).combined(with: .opacity))
-            }
-
-            // Roman word + italic flourish word: the spec's heading recipe.
-            Text("\(Text("Movie"))\n\(Text("Chain").font(Theme.Font.flourish(size: 46)))")
-                .font(Theme.Font.display(46))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-                .scaleEffect(revealed ? 1 : 1.1)
-
-            if !searching {
-                Text("How long can you keep the chain alive?")
-                    .font(Theme.Font.body)
-                    .foregroundStyle(Theme.Color.muted)
-                    .multilineTextAlignment(.center)
-                    .transition(.opacity)
-            }
-        }
-    }
-
-    private var chainLockup: some View {
-        HStack(spacing: 5) {
-            ForEach(Array([NodeKind.actor, .movie, .actor, .movie].enumerated()), id: \.offset) { i, kind in
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(kind.accent)
-                    .overlay(RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-                    .frame(width: 26, height: 15)
-                    .modifier(TileBuild(shown: chainBuilt, index: i))
-            }
-            RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(Theme.Color.border, style: StrokeStyle(lineWidth: Theme.Border.width, dash: [3, 3]))
-                .frame(width: 26, height: 15)
-                .overlay(
-                    Text("?")
-                        .font(Theme.Font.label)
-                        .foregroundStyle(Theme.Color.muted)
-                )
-                .modifier(TileBuild(shown: chainBuilt, index: 4))
-        }
-    }
-
-    // MARK: Deal section — the dealt start, Play, Shuffle, and the search link
-
-    // Two zones, not three: the title up top, and every control in one tight
-    // group below it — start, hint, shuffle, and the search link as a quiet third
-    // option rather than a footer floating on its own. The free space splits
-    // 2 : 3 above and below the group, which puts the start button a little
-    // below the screen's middle, where the thumb rests.
-    private var dealSection: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: Theme.Spacing.md)
-            Spacer(minLength: 0)
-            VStack(spacing: Theme.Spacing.md) {
-                VStack(spacing: Theme.Spacing.sm) {
-                    cascade(startButton, 0)
-                    cascade(hintLine, 1)
+    private var header: some View {
+        Image("Wordmark")
+            .resizable()
+            .scaledToFit()
+            .frame(height: 40)
+            .scaleEffect(revealed ? 1 : 1.5)
+            .opacity(markShown ? 1 : 0)
+            .frame(maxWidth: .infinity, alignment: revealed ? .leading : .center)
+            .accessibilityLabel("Unspool")
+            .accessibilityAddTraits(.isHeader)
+            .overlay(alignment: .trailing) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    reelButton
+                    settingsButton
                 }
-                cascade(shuffleButton, 2)
-                cascade(searchLink, 3)
-                    .padding(.top, Theme.Spacing.xs)
+                .animation(Theme.Motion.standard, value: pillsVisible)
             }
-            Spacer(minLength: Theme.Spacing.md)
-            Spacer(minLength: 0)
-            Spacer(minLength: 0)
+    }
+
+    private var pillsVisible: Bool { !searching && !introRunning }
+
+    private var settingsButton: some View {
+        Button { showSettings = true } label: {
+            Image(systemName: "gearshape")
+                .font(Theme.Font.bodyStrong)
+                .foregroundStyle(Theme.Color.ink)
+                .frame(width: 40, height: 40)
+                .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
+        }
+        .buttonStyle(.pressScale)
+        .opacity(pillsVisible ? 1 : 0)
+        .disabled(!pillsVisible)
+        .accessibilityLabel("Settings")
+    }
+
+    private var reelCount: Int { reelDisplayed ?? collection.total }
+
+    // Always reachable (not gated on `collection.total > 0`): the Reel sheet holds
+    // the required TMDB attribution, so a first-run player — who is already being
+    // served TMDB-powered dealt seeds — must be able to open it before logging any
+    // chain. The count only appears once there's something to count.
+    private var reelButton: some View {
+        Button { showReel = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "film.stack")
+                    .font(Theme.Font.bodyStrong)
+                if reelCount > 0 {
+                    Text("\(reelCount)")
+                        .font(Theme.Font.numeral(.headline))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: Double(reelCount)))
+                }
+            }
+            .foregroundStyle(Theme.Color.ink)
+            .padding(.horizontal, reelCount > 0 ? Theme.Spacing.md : 0)
+            .frame(minWidth: 40, minHeight: 40)
+            .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
+            // One small bump as the number rolls up. Reduce Motion: the
+            // number still rolls, the pill holds still.
+            .keyframeAnimator(initialValue: 1.0, trigger: reelBump) { [reduceMotion] view, scale in
+                view.scaleEffect(reduceMotion ? 1 : scale)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(1.06, duration: 0.12)
+                    SpringKeyframe(1.0, duration: 0.3, spring: .snappy)
+                }
+            }
+        }
+        .buttonStyle(.pressScale)
+        .opacity(pillsVisible ? 1 : 0)
+        .disabled(!pillsVisible)
+        .accessibilityLabel(collection.total > 0 ? "Your Reel, \(collection.total) logged" : "Your Reel")
+    }
+
+    // MARK: Deal section — best run, the dealt card, Shuffle + Play, search link
+
+    private var dealSection: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            cascade(bestOrTagline, 0)
+            cascade(dealtCard, 1)
+                .frame(maxHeight: .infinity)
+            VStack(spacing: Theme.Spacing.md) {
+                cascade(actionRow, 2)
+                cascade(searchLink, 3)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // Play + seed as one button. The chrome ("START WITH") and the button frame
-    // stay fixed; only the inner seed content deals in/out, so the button never
-    // jumps. Disabled until the first deal lands (pool still loading).
-    private var startButton: some View {
-        Button { play() } label: {
-            VStack(spacing: Theme.Spacing.sm) {
-                Text("Start with")
-                    .metaLabel(.white.opacity(0.85))
-                seedContent
+    /// The best run, once there is one. Before that, the game's question — the
+    /// one line of "what is this" a first-time player gets.
+    @ViewBuilder private var bestOrTagline: some View {
+        if engine.bestChain > 0 {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Your best").metaLabel()
+                Spacer(minLength: Theme.Spacing.sm)
+                Text("\(Text("\(engine.bestChain)").font(Theme.Font.numeral(.title2)).foregroundStyle(Theme.Color.ink)) \(Text(engine.bestChain == 1 ? "link" : "links").font(Theme.Font.flourish(.body))) · \(engine.bestPoints) pts")
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+            .padding(.horizontal, Theme.Spacing.md + 4)
+            .padding(.vertical, Theme.Spacing.md - 2)
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+            .accessibilityElement(children: .combine)
+        } else {
+            Text("How long can you keep the chain alive?")
+                .font(Theme.Font.body)
+                .foregroundStyle(Theme.Color.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(StartButtonStyle())
-        .disabled(engine.dealtSeed == nil)
     }
 
-    private var seedContent: some View {
+    // The start as a card on a pile: the next link's kind peeks out behind it.
+    // Only the front card deals; the one behind stays put and recolours, so a
+    // shuffle reads as one card leaving the top of the pile and a new one landing.
+    private var dealtCard: some View {
         ZStack {
-            if let seed = engine.dealtSeed {
-                HStack(spacing: Theme.Spacing.sm) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(seed.accent)
-                        .overlay(RoundedRectangle(cornerRadius: 4)
-                            .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-                        .frame(width: 14, height: 14)
-                    Text(seed.matchText)                 // bare name/title, no year
-                        // Fixed size (not a text style): the button's height is
-                        // locked so the deal transition never reflows.
-                        .font(Theme.Font.display(26))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)          // shrink to fit, never clip
+            RoundedRectangle(cornerRadius: Theme.Radius.card + 4)
+                .fill(engine.dealtSeed?.nextKind.accent ?? Theme.Color.hairline)
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card + 4)
+                    .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+                .padding(.vertical, Theme.Spacing.md)
+                .rotationEffect(.degrees(5))
+                .offset(x: Theme.Spacing.sm)
+                .animation(Theme.Motion.standard, value: engine.dealtSeed?.nextKind)
+                .accessibilityHidden(true)
+
+            Group {
+                if let seed = engine.dealtSeed {
+                    Button { play() } label: { DealtCardFace(seed: seed) }
+                        .buttonStyle(.pressScale)
+                        .accessibilityLabel("Start with \(seed.matchText), \(seed.kind == .actor ? "actor" : "movie")")
+                        .accessibilityHint(seed.nextKind.prompt)
+                        .id(seed.id)
+                        .transition(reduceMotion ? .opacity : .dealCard)
+                } else {
+                    DealingCardFace()
+                        .transition(.opacity)
                 }
-                .id(seed.id)
-                .transition(reduceMotion ? .opacity : .dealDrop)
-            } else {
-                Text("Dealing…")
-                    .font(Theme.Font.flourish(size: 20))
-                    .foregroundStyle(.white.opacity(0.85))
             }
+            .rotationEffect(.degrees(-2))
         }
-        .frame(height: 40)                                // fixed one-line height
+        .padding(.horizontal, Theme.Spacing.md)
         .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.dealtSeed)
     }
 
-    private var hintLine: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.right")
-                .font(.caption.weight(.bold))
-            Text(engine.dealtSeed?.nextKind.prompt ?? " ")
-        }
-        .font(Theme.Font.body)
-        .foregroundStyle(Theme.Color.muted)
-        .contentTransition(.opacity)
-        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.standard, value: engine.dealtSeed)
-    }
-
-    private var shuffleButton: some View {
-        Button {
-            Haptics.selection()
-            engine.shuffleSeed()
-        } label: {
-            HStack(spacing: Theme.Spacing.sm) {
+    private var actionRow: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Button {
+                Haptics.selection()
+                engine.shuffleSeed()
+            } label: {
                 Image(systemName: "shuffle")
-                Text("Shuffle")
+                    .font(.title3.weight(.bold))
+                    .padding(.vertical, Theme.Spacing.md - 2)
             }
+            .buttonStyle(.ghost)
+            .frame(width: 72)
+            .disabled(engine.dealtSeed == nil)
+            .accessibilityLabel("Shuffle")
+
+            Button { play() } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Text("Play")
+                    Image(systemName: "arrow.right")
+                }
+                .font(.title3.weight(.heavy))
+                .padding(.vertical, Theme.Spacing.md - 2)
+            }
+            .buttonStyle(.primary)
+            .disabled(engine.dealtSeed == nil)
         }
-        .buttonStyle(.ghost)
-        .disabled(engine.dealtSeed == nil)
     }
 
     private var searchLink: some View {
         Button {
             withAnimation(Theme.Motion.standard) { searching = true }
         } label: {
-            Text("or search for your own start")
-                .font(Theme.Font.bodyStrong)
-                .foregroundStyle(Theme.Color.muted)
-                .underline(true, pattern: .solid)
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "magnifyingglass")
+                Text("Or search for your own start")
+            }
+            .font(Theme.Font.bodyStrong)
+            .foregroundStyle(Theme.Color.ink)
+            .padding(.vertical, Theme.Spacing.xs)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressScale)
     }
 
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         searchTask?.cancel()
         Task { await engine.startGame(with: seed) }
-    }
-
-    // MARK: Reel — a single corner button (also the route to the TMDB attribution)
-
-    // Always reachable (not gated on `collection.total > 0`): the Reel sheet holds
-    // the required TMDB attribution, so a first-run player — who is already being
-    // served TMDB-powered dealt seeds — must be able to open it before logging any
-    // chain. The count only appears once there's something to count, so an empty
-    // Reel reads as a quiet "open your collection / about" affordance, keeping the
-    // home play-first while the attribution stays one tap away.
-    // A quiet gear that mirrors the Reel pill on the opposite corner — the route
-    // to the (new) settings sheet. Hidden during search and the intro, exactly
-    // like the Reel pill, so the home stays clean.
-    @ViewBuilder private var settingsButton: some View {
-        if !searching, !introRunning {
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape")
-                    .font(Theme.Font.bodyStrong)
-                    .foregroundStyle(Theme.Color.ink)
-                    .padding(.horizontal, Theme.Spacing.sm + 2)
-                    .padding(.vertical, Theme.Spacing.xs + 2)
-                    .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, Theme.Spacing.gutter)
-            .padding(.top, Theme.Spacing.xs)
-            .transition(.opacity)
-            .accessibilityLabel("Settings")
-        }
-    }
-
-    private var reelCount: Int { reelDisplayed ?? collection.total }
-
-    @ViewBuilder private var reelButton: some View {
-        if !searching, !introRunning {
-            Button { showReel = true } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "film.stack")
-                    if reelCount > 0 {
-                        Text("\(reelCount)")
-                            .font(Theme.Font.numeral(.subheadline))
-                            .monospacedDigit()
-                            .contentTransition(.numericText(value: Double(reelCount)))
-                    }
-                }
-                .font(Theme.Font.bodyStrong)
-                .foregroundStyle(Theme.Color.ink)
-                .padding(.horizontal, Theme.Spacing.sm + 2)
-                .padding(.vertical, Theme.Spacing.xs + 2)
-                .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
-                // One small bump as the number rolls up. Reduce Motion: the
-                // number still rolls, the pill holds still.
-                .keyframeAnimator(initialValue: 1.0, trigger: reelBump) { [reduceMotion] view, scale in
-                    view.scaleEffect(reduceMotion ? 1 : scale)
-                } keyframes: { _ in
-                    KeyframeTrack {
-                        CubicKeyframe(1.06, duration: 0.12)
-                        SpringKeyframe(1.0, duration: 0.3, spring: .snappy)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, Theme.Spacing.gutter)
-            .padding(.top, Theme.Spacing.xs)
-            .transition(.opacity)
-            .accessibilityLabel(collection.total > 0 ? "Your Reel, \(collection.total) logged" : "Your Reel")
-        }
     }
 
     // MARK: Search section — the demoted "pick your own start" flow
@@ -570,24 +542,24 @@ struct SeedView: View {
 
     private func runIntro() async {
         if introDone || reduceMotion {
-            chainBuilt = true
+            markShown = true
             revealed = true
             revealedControls = Self.controlSlotCount
             introDone = true
             return
         }
-        chainBuilt = true                                        // 1. mini-chain drops in
-        try? await Task.sleep(for: .milliseconds(950))
+        withAnimation(.easeOut(duration: 0.4)) { markShown = true }  // 1. wordmark fades up
+        try? await Task.sleep(for: .milliseconds(850))
         if Task.isCancelled { return }
-        withAnimation(Theme.Motion.intro) { revealed = true }     // 2. lockup rises
-        try? await Task.sleep(for: .milliseconds(500))
+        withAnimation(Theme.Motion.intro) { revealed = true }        // 2. it rises to the header
+        try? await Task.sleep(for: .milliseconds(350))
         if Task.isCancelled { return }
-        for slot in 0..<Self.controlSlotCount {                   // 3. controls deal in
+        for slot in 0..<Self.controlSlotCount {                      // 3. the rest deals in
             withAnimation(Theme.Motion.cascade) { revealedControls = slot + 1 }
             try? await Task.sleep(for: .milliseconds(100))
             if Task.isCancelled { return }
         }
-        introDone = true                                          // (re-inits the view — last)
+        introDone = true                                             // (re-inits the view — last)
     }
 
     /// Warm haptics + audio once the screen is idle. Re-run by `.task(id:)` when
@@ -625,7 +597,7 @@ struct SeedView: View {
         guard playsIntro, !introDone else { return }
         introTask?.cancel()
         withAnimation(Theme.Motion.cascade) {
-            chainBuilt = true
+            markShown = true
             revealed = true
             revealedControls = Self.controlSlotCount
         }
@@ -633,48 +605,140 @@ struct SeedView: View {
     }
 }
 
-// MARK: - Start button style (the coral "Start with …" card)
+// MARK: - The dealt card
 
-/// The home's primary action: a coral card carrying the "START WITH" label and
-/// the dealt seed. Coral because it is this screen's call-to-action, exactly
-/// like "Play again" on game over (an ink fill also hid its ink shadow, which
-/// made the card read as shifted). Its own style rather than
-/// `PrimaryButtonStyle` because it hosts multi-line content and a taller radius.
-private struct StartButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.md + 2)
-            .padding(.horizontal, Theme.Spacing.md)
-            // The screen's one loud surface: ink fill, hard shadow, and the
-            // neobrutalist press (shadow collapses, card shifts into the page).
-            .neoSurface(radius: Theme.Radius.card + 4,
-                        fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
-                        pressed: configuration.isPressed)
-            .animation(Theme.Motion.press, value: configuration.isPressed)
+/// The front of the dealt start: kind chip and "START WITH", the art (which
+/// takes whatever height the card is given), the name, and the next link's rule.
+private struct DealtCardFace: View {
+    let seed: ChainNode
+
+    var body: some View {
+        DealtCardShell {
+            HStack {
+                KindChip(kind: seed.kind)
+                Spacer()
+                Text("Start with").metaLabel()
+            }
+            DealtArt(node: seed)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(seed.matchText)                     // bare name/title, no year
+                    .font(Theme.Font.display(34))
+                    .foregroundStyle(Theme.Color.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)             // shrink to fit, never clip
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.bold))
+                    Text(seed.nextKind.prompt)
+                }
+                .font(Theme.Font.body)
+                .foregroundStyle(Theme.Color.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// The card while the first deal is still loading — same shell, so the page
+/// doesn't move when the real card lands.
+private struct DealingCardFace: View {
+    var body: some View {
+        DealtCardShell {
+            HStack {
+                Spacer()
+                Text("Start with").metaLabel()
+            }
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .fill(Theme.Color.hairline)
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+            Text("Dealing…")
+                .font(Theme.Font.flourish(size: 28))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct DealtCardShell<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            content
+        }
+        .padding(Theme.Spacing.md + 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .neoSurface(radius: Theme.Radius.card + 4)
+    }
+}
+
+/// The dealt card's art at a size that holds up ~300pt wide. Drawn at once if
+/// the home already warmed it, else loaded through `ArtCache` and faded in.
+/// Faces sit near the top of a headshot, so the crop keeps the top.
+private struct DealtArt: View {
+    let node: ChainNode
+    @State private var loaded: Image?
+
+    private var url: URL? { Config.imageURL(path: node.imagePath, size: SeedView.dealtArtSize) }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.md)
+        let image = loaded ?? url.flatMap(ArtCache.shared.image(for:))
+        node.accent
+            .overlay(alignment: .top) {
+                if let image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                } else {
+                    Image(systemName: node.symbol)
+                        .font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(node.kind.onAccent.opacity(0.75))
+                        .frame(maxHeight: .infinity)
+                }
+            }
+            .frame(minHeight: 80)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+            .accessibilityHidden(true)
+            .task(id: url) {
+                guard loaded == nil, let url else { return }
+                let image = await ArtCache.shared.load(url)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.22)) { loaded = image }
+            }
     }
 }
 
 // MARK: - Deal transition
 //
-// The single "deal": the old start drops out downward while the new one drops in
-// from above — the same falling motion a chain tile lands on in-game. Because the
-// name is always one line (auto-sized), the button height is fixed, so this reads
-// as a clean replacement with no reflow. Reduce Motion uses a plain cross-fade.
+// Shuffle as a card leaving the pile: the old start is flicked off to the
+// leading side, turning as it goes, while the new one lands on the pile from
+// just below — the same spring a chain card is dealt on in play. Reduce Motion
+// uses a plain cross-fade.
 
 private struct DealShift: ViewModifier {
-    var y: CGFloat
-    var opacity: Double
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+    var angle: Double = 0
+    var scale: CGFloat = 1
+    var opacity: Double = 1
     func body(content: Content) -> some View {
-        content.offset(y: y).opacity(opacity)
+        content
+            .scaleEffect(scale)
+            .rotationEffect(.degrees(angle))
+            .offset(x: x, y: y)
+            .opacity(opacity)
     }
 }
 
 private extension AnyTransition {
-    static var dealDrop: AnyTransition {
+    static var dealCard: AnyTransition {
         .asymmetric(
-            insertion: .modifier(active: DealShift(y: -13, opacity: 0), identity: DealShift(y: 0, opacity: 1)),
-            removal: .modifier(active: DealShift(y: 12, opacity: 0), identity: DealShift(y: 0, opacity: 1))
+            insertion: .modifier(active: DealShift(y: 40, scale: 0.94, opacity: 0), identity: DealShift()),
+            removal: .modifier(active: DealShift(x: -420, y: -20, angle: -14), identity: DealShift())
         )
     }
 }
@@ -725,25 +789,6 @@ private struct ControlReveal: ViewModifier {
             .offset(y: shown ? 0 : 26)
             .disabled(!shown)
             .accessibilityHidden(!shown)
-    }
-}
-
-// MARK: - Mini-chain tile build
-
-/// Drops one lockup tile in — scaling up from just above its slot — delayed by
-/// its position, so the mini-chain assembles left-to-right like the in-game
-/// stack landing. No-op under Reduce Motion.
-private struct TileBuild: ViewModifier {
-    let shown: Bool
-    let index: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(shown ? 1 : 0)
-            .scaleEffect(shown ? 1 : 0.5, anchor: .bottom)
-            .offset(y: shown ? 0 : -12)
-            .animation(reduceMotion ? nil : Theme.Motion.drop.delay(Double(index) * 0.10), value: shown)
     }
 }
 
