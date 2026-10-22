@@ -177,6 +177,27 @@ themed week.
 But note the consequence for sequencing: **the daily is not hard-blocked on a backend.**
 If the service slips, a bundled pack ships the mode.
 
+### When the day turns over
+
+**Decided 2026-10-23: the player's local midnight**, the Wordle / Duolingo model. One
+global rollover would change the puzzle mid-evening for half the world, which reads as
+broken in a daily game.
+
+- **Each puzzle is keyed by its calendar date and carries a number** (#1 is launch day).
+  Everyone plays the same puzzle on the same local date; Sydney simply gets it hours
+  before New York. Accepted, as Wordle does — earlier time zones can spoil it, and nobody
+  can do anything about that without a global rollover.
+- **Results are stored by puzzle number, never by timestamp.** "One attempt per day" is
+  really "one result per puzzle", which is also what the two-devices merge rule ("highest
+  wins") keys on.
+- **Today is decided by the phone's current time zone**, read when the app opens.
+  Travelling west gives a longer day, east a shorter one; that's accepted rather than
+  engineered around.
+- **Streaks count consecutive local dates with a result**, stored as the set of completed
+  dates (`ROADMAP.md` 0.7.0).
+- **Moving the phone's clock forward shows tomorrow's puzzle early.** Accepted, for the
+  same reason as below — there's nothing to win.
+
 ### One attempt, without a server
 
 Device-local enforcement only, until accounts exist. Reinstalling or changing the phone's
