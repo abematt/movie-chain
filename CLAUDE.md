@@ -11,7 +11,8 @@ guidance when working in this repository; only this file and the code apply.
 
 ## Project
 
-`movie-quiz` — a SwiftUI game (working title "Movie Chain"). You build a chain
+`movie-quiz` — a SwiftUI game called **Unspool** (it was "Movie Chain" until 0.6.0; the
+bundle id and code names stay `movie-quiz`). You build a chain
 that alternates actor → movie → actor → movie …, where each link must be real
 (the actor appeared in the movie). Score = chain length; each turn is timed.
 
@@ -65,9 +66,9 @@ drive SwiftUI canvas previews.
 The app is versioned and every notable change is recorded in
 [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.5.3`;
 `1.0.0` means launch.** Each remaining pre-launch milestone is allocated a minor
-version — design overhaul (0.5.0, **landed**; motion re-tune landed as 0.5.1, the Reel as a collection as 0.5.2, its polish as 0.5.3), foundations &
-safety net (0.6.0), the service /
-TMDB proxy (0.7.0), accounts (0.8.0), the Daily Chain (0.9.0), friend groups (0.10.0);
+version — design overhaul (0.5.0, **landed**; motion re-tune landed as 0.5.1, the Reel as a collection as 0.5.2, its polish as 0.5.3),
+the Unspool rebrand (0.6.0, in progress), foundations & safety net (0.7.0), the service /
+TMDB proxy (0.8.0), accounts (0.9.0), the Daily Chain (0.10.0), friend groups (0.11.0);
 share images ship with launch (1.0.0). Global leaderboards are dropped — **check the
 changelog table before choosing a bump**. Each is documented in
 [`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
@@ -254,16 +255,17 @@ app is a one-way loop, so every change pushes the new screen in from the trailin
 edge — no "back"; Reduce Motion → cross-fade). It owns the
 shared `CollectionStore` (opened as a `.sheet` from the seed and game-over
 screens) and the persisted once-ever `seedIntroDone` flag driving `SeedView`'s
-first-run cold-launch intro (the title lockup starts centered, the mini-chain drops in, then
-it rises as the controls assemble). `SeedView` is **play-first**: it leads with a
-*dealt start* — one ink **"Start with ⟨name⟩" button** (Play + seed fused; the
-name auto-fits one line so Shuffle can deal it in/out on `.dealDrop` without
-reflow) + a **Shuffle** button, with
-search demoted to an opt-in link, a **gear pill** opening the `SettingsView`
-sheet (sound), and **Your
-Reel** shrunk to a corner pill (personal best folded into that sheet; the pill is
-always reachable, count hidden when empty, because the Reel sheet hosts the
-required **TMDB attribution**). Styling is a
+first-run cold-launch intro (the `Wordmark` starts centered and large, then rises to
+the header as the rest cascades in). `SeedView` is **play-first**: under the wordmark
+header (Reel pill + gear pill) sits a best-run bar (the tagline before a first run),
+then the *dealt start* as a **card** — headshot/poster art (`w500`, warmed on deal),
+name, and the next link's rule — on a pile whose back card shows the next kind's
+accent. The card's art is flexible-height, so one layout fits SE to Pro Max. Shuffle
+flicks the card off on `.dealCard`; PLAY and Shuffle share a row; search is an opt-in
+link. The Reel pill is always reachable (count hidden when empty), because the Reel
+sheet hosts the required **TMDB attribution**. Brand art (`Wordmark`, `LogoMark`,
+`FilmStrip`, the two-circle `AppIcon`) lives in the asset catalog as SVG/PNG with
+dark variants — never redraw it in code. Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, yellow = movie**) and
 `Components.swift` (`.neoSurface` = border + hard shadow, `PrimaryButtonStyle` = coral, `GhostButtonStyle`,
@@ -290,7 +292,7 @@ values.
 
 Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall
 every Nth link) all layer on this same engine — keep the engine/provider split clean.
-Accounts arrive at 0.8.0 (Sign in with Apple over a device id); the local
+Accounts arrive at 0.9.0 (Sign in with Apple over a device id); the local
 collection/session data is forward-compatible with that sync. There will be no global
 leaderboard.
 

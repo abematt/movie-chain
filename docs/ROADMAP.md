@@ -2,9 +2,11 @@
 
 > **1.0.0 means launch.** The solo game loop is complete and tested at
 > [`0.4.0`](../CHANGELOG.md), and the visual design overhaul landed as `0.5.0`
-> (2026-10-22) — ahead of Foundations, so the two swapped version numbers. This plan was re-cut on **2026-08-08** after a planning
+> (2026-10-22) — ahead of Foundations, so the two swapped version numbers. The rebrand
+> to **Unspool** was inserted as `0.6.0` on 2026-10-22, pushing every later milestone
+> down one minor version. This plan was re-cut on **2026-08-08** after a planning
 > conversation that changed the launch scope, dropped global leaderboards, and added a
-> new headline mode. Six milestones stand between here and a public release.
+> new headline mode. Seven milestones stand between here and a public release.
 >
 > This doc is the *planning* layer: scope, rationale, what each milestone touches, and
 > the decisions/traps to settle before writing code. Deep technical designs live in
@@ -15,11 +17,12 @@
 | Version | Milestone | Depends on |
 |---|---|---|
 | 0.5.0 | [Design overhaul](#050--design-overhaul) — **landed 2026-10-22** (motion re-tuned in 0.5.1) | — |
-| 0.6.0 | [Foundations & safety net](#060--foundations--safety-net) | — |
-| 0.7.0 | [The service — TMDB proxy first](#070--the-service) | — |
-| 0.8.0 | [Accounts](#080--accounts) | 0.6.0 (device id), 0.7.0 (a backend) |
-| 0.9.0 | [The Daily Chain](#090--the-daily-chain) | 0.7.0 (generation job) |
-| 0.10.0 | [Friend groups](#0100--friend-groups) | 0.8.0 |
+| 0.6.0 | [Unspool — the rebrand](#060--unspool) — name, icon, wordmark, dealt-card home | 0.5.0 |
+| 0.7.0 | [Foundations & safety net](#070--foundations--safety-net) | — |
+| 0.8.0 | [The service — TMDB proxy first](#080--the-service) | — |
+| 0.9.0 | [Accounts](#090--accounts) | 0.7.0 (device id), 0.8.0 (a backend) |
+| 0.10.0 | [The Daily Chain](#0100--the-daily-chain) | 0.8.0 (generation job) |
+| 0.11.0 | [Friend groups](#0110--friend-groups) | 0.9.0 |
 | 1.0.0 | [Launch](#100--launch) | all of the above |
 
 ## The decisions this plan rests on
@@ -127,7 +130,44 @@ with a card/poster direction.
 
 ---
 
-## 0.6.0 — Foundations & safety net
+## 0.6.0 — Unspool
+
+> **In progress (2026-10-22), on `feature_unspool`.** Settles the name question the
+> 0.5.0 traps list deferred.
+
+**Why now:** the name and icon were the last placeholder in the identity 0.5.0 built,
+and everything after this point (TestFlight, the store listing, share images, the Daily
+Chain's share card) carries the name. Renaming after those exist is far more expensive
+than renaming before.
+
+**Scope:**
+
+- **The name: Unspool.** Film coming off a reel, and a chain playing out link by link.
+  User-facing only — the bundle id stays `abe.movie-quiz`, and the domain vocabulary
+  stays "chain" (`ChainNode`, `bestChain`; a *chain* is still a run).
+- **The mark:** two overlapping circles, blue (actor) and yellow (movie), with the ink
+  overlap as the link between them. It replaces the "oo" in the wordmark. **The icon is
+  the mark on a cream tile** — a coral tile with a yellow circle read as Mastercard at
+  small sizes. Light, dark and tinted variants; opaque, no alpha. A film-reel-holes
+  alternate was drawn and rejected (the holes read as buttons at 29–60px).
+- **The home screen:** the dealt start becomes a physical card (headshot or poster, the
+  name, the next link's rule) on a pile whose back card shows the next kind's colour.
+  The wordmark heads the screen with the Reel and settings pills; the best run gets a
+  bar above the card, and before there is one the game's question takes its place.
+  PLAY and Shuffle sit together; search stays a quiet link.
+- **The film strip** (blue/yellow frames running into "?" frames) is the supporting
+  graphic for the launch screen, store screenshots and share card — never the logo.
+
+**Traps:**
+- The card's art is flexible-height, so the SE and the Pro Max share one layout — keep
+  anything new on this screen out of the card's fixed parts.
+- The best bar brings the personal best back onto the home after 0.5.0 folded it into the
+  Reel sheet. The Reel sheet still shows it; that's fine — one is a glance, one a record.
+- Check that "Unspool" is clear on the App Store and as a trademark before 1.0's listing.
+
+---
+
+## 0.7.0 — Foundations & safety net
 
 **Why first:** none of it depends on a design decision, none of it can be wasted, and
 until it exists we're blind. The app currently has **zero logging statements and 18
@@ -143,7 +183,7 @@ rate-limited launch leaves the home screen stuck on "Dealing…" forever. A test
   privacy-aware by default, pullable off a real device. Wire it through the 18 silent
   failure paths.
 - **Crash reporting.** Start with Xcode's built-in reports — zero work, no SDK, no
-  privacy-label change. Add a real tool (Sentry) at 0.7.0 so app and server errors land
+  privacy-label change. Add a real tool (Sentry) at 0.8.0 so app and server errors land
   in one place.
 - **Automated builds → TestFlight.** The release pipeline as a habit rather than an
   event, even though testers come later.
@@ -182,10 +222,10 @@ rate-limited launch leaves the home screen stuck on "Dealing…" forever. A test
 
 ---
 
-## 0.7.0 — The service
+## 0.8.0 — The service
 
 **One deployment, three jobs over its life:** proxy TMDB (now), serve publishable content
-(0.9.0), hold accounts and groups (0.8.0 / 0.10.0). Don't run three things.
+(0.10.0), hold accounts and groups (0.9.0 / 0.11.0). Don't run three things.
 
 **Why it's the first backend:** the proxy job is small, well-defined, genuinely needed,
 and **nobody's data is at risk if it falls over.** It's the right place to learn hosting,
@@ -247,7 +287,7 @@ Three rules that matter:
 
 ### Job 3 — accounts and groups
 
-Lands with 0.8.0 and 0.10.0 on the same deployment.
+Lands with 0.9.0 and 0.11.0 on the same deployment.
 
 ### Client-side rules
 
@@ -265,20 +305,20 @@ rationale, not architecture.*
 
 ---
 
-## 0.8.0 — Accounts
+## 0.9.0 — Accounts
 
 **Why:** durable identity, so scores attach to a *person* rather than a device — the
-prerequisite for friend groups (0.10.0).
+prerequisite for friend groups (0.11.0).
 
 **Shape — anonymous first, upgradeable:**
-1. The **stable device id** from 0.6.0 is already carrying local data.
+1. The **stable device id** from 0.7.0 is already carrying local data.
 2. **Sign in with Apple** as the upgrade path. Lowest friction on iOS, no password
    infrastructure, privacy-preserving.
 
 You can play forever without an account; signing in is a migration, never a gate.
 
 **Traps:**
-- **Migration must merge, not clobber** — apply the rule written at 0.6.0.
+- **Migration must merge, not clobber** — apply the rule written at 0.7.0.
 - Sign in with Apple gives a **stable but app-specific** user id, and the email may be a
   private relay — don't use email as the identity key.
 - **Account deletion is an App Store requirement** once you offer accounts, and the
@@ -286,7 +326,7 @@ You can play forever without an account; signing in is a migration, never a gate
 
 ---
 
-## 0.9.0 — The Daily Chain
+## 0.10.0 — The Daily Chain
 
 **The headline mode.** Two names and a par score, same for everyone that day; build the
 **longest** chain that still reaches the target before the clock stops. One attempt.
@@ -306,7 +346,7 @@ share card, the engine changes, and the puzzle-generation job.
 
 ---
 
-## 0.10.0 — Friend groups
+## 0.11.0 — Friend groups
 
 **Not a leaderboard.** A group you join by **invite link with a code** — no usernames, no
 search, no directory, no strangers. Everyone's daily result, and a challenge you can send
@@ -363,7 +403,7 @@ The shipping checklist, plus the last player-facing pieces.
   this. The argument for keeping it is [`ASSISTED-MODE.md`](ASSISTED-MODE.md): a mode
   survived four commits of refinement and died in one playtest.
 - **App Store requirements:** privacy manifest / nutrition label (note: accounts and any
-  analytics SDK change these answers), **account deletion** since 0.8.0 ships accounts,
+  analytics SDK change these answers), **account deletion** since 0.9.0 ships accounts,
   and the **TMDB attribution** already rendered in the Reel sheet — keep it reachable.
 - **Changelog + tag** per the process in `CLAUDE.md`.
 

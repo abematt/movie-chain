@@ -1,4 +1,4 @@
-# Movie Chain — Architecture & Overview
+# Unspool — Architecture & Overview
 
 > Detailed source-of-truth for the app's design. `CLAUDE.md` is the lean,
 > auto-loaded summary; **this file is the deep reference** — point a chat here to
@@ -22,7 +22,7 @@ add a changelog entry; when a plan changes, edit the roadmap.
 
 ## What the app is
 
-**Movie Chain** (`movie-quiz`) is a single-player recall game. You build a chain
+**Unspool** (`movie-quiz`; called Movie Chain until 0.6.0) is a single-player recall game. You build a chain
 that alternates **actor → movie → actor → movie …**, where every link must be
 real: the actor actually appeared in the movie. Your score is the chain length,
 and each turn is on a countdown — run out of time and the game ends.
@@ -460,13 +460,15 @@ small, bold, uppercase and tracked.
   `movie_quizApp`; **no `.fontDesign`** — the look pairs the system serif (wordmark,
   game-over number) with the default sans for UI. The accent is defined for
   light/dark in `Assets.xcassets/AccentColor` (near-black / off-white).
-- **App icon** (`Assets.xcassets/AppIcon.appiconset/icon-1024.png`) distills the
-  `ChainStack`/lockup identity: a bold zigzag stack of alternating actor-blue /
-  movie-purple rounded tiles on ink. Rendered from the same palette via a
-  CoreGraphics script (kept in the scratchpad, not the repo — regenerate if the
-  mark changes); a single 1024 universal iOS entry. The bitmap is **opaque
-  (no alpha channel)** — iOS app icons with alpha are rejected at archive/upload —
-  so the render uses a `noneSkipLast` context; verify with `sips -g hasAlpha`.
+- **Brand art** (0.6.0, Unspool) is supplied as finished assets, not drawn in code:
+  the **two-circle mark** (blue actor + yellow movie, the ink overlap is the link) as
+  `LogoMark`; the **`Wordmark`** ("unspool" in outlined Fraunces Display Bold with the
+  mark as its "oo"); the **`FilmStrip`** supporting graphic (launch screen, store
+  screenshots, share card — never the logo). All are SVG with "Preserve Vector Data"
+  and an on-dark variant. The **app icon** (`AppIcon.appiconset`) is the mark on a
+  cream tile, one 1024 universal entry plus iOS 18 **dark** (ink tile) and **tinted**
+  variants. Every icon bitmap is **opaque (no alpha channel)** — iOS rejects icons
+  with alpha at archive/upload; verify with `sips -g hasAlpha`.
 
 ### UI — SwiftUI, routed by phase
 
@@ -492,43 +494,41 @@ small, bold, uppercase and tracked.
   first, and every Play-again re-entry, correctly starts assembled.
 - [`SeedView.swift`](../movie-quiz/SeedView.swift) — the branded, **play-first**
   home that leads with a **dealt start**, not a search box (that's what made it
-  read as a movie-logging app). Layout: the mini-chain lockup + **serif wordmark**
-  + tagline hero, then the signature control — a single ink **"Start with ·
-  ⟨name⟩" button** (Play and the seed fused into one; the dealt seed is a category
-  dot + name, blue = actor / purple = movie) that starts the round on tap — a
-  **"→ Name a movie they were in" hint** (reuses `NodeKind.prompt`), a
-  **Shuffle** ghost button. A quiet
-  **"or search for your own start"** link drops down to the (now demoted) search
-  flow. A **gear pill** (top-leading) opens the `SettingsView` sheet, and
-  **Your Reel** shrinks to a single top-trailing corner pill (shown once the player
-  has logged art; personal best folded into that sheet via
-  `CollectionView(bestChain:)`, off the hero). The intro cascade assembles four
-  control slots (start → hint → shuffle → search link).
+  read as a movie-logging app). Since 0.6.0 (Unspool) the layout is: a header of the
+  **`Wordmark`** asset with the Reel and gear pills overlaid on its trailing edge; a
+  **best-run bar** (`engine.bestChain` links · `bestPoints` pts), or before a first
+  run the tagline "How long can you keep the chain alive?"; the **dealt card**; then
+  **Shuffle + PLAY** in one row and a quiet **"Or search for your own start"** link.
+  The Reel pill is always reachable (count hidden when empty) because the Reel sheet
+  hosts the TMDB attribution.
+  - **The dealt card** (`DealtCardFace` in a shared `DealtCardShell`): kind chip +
+    "START WITH", the art, the name (Fraunces display, up to two lines, auto-shrunk)
+    and the next link's rule (`NodeKind.prompt`). The art (`DealtArt`) draws TMDB
+    `w500` through `ArtCache` — the home warms both that and the `w185` the first
+    chain card uses on every deal — and is **flexible-height**: the card takes
+    whatever is left between the header and the buttons, so SE and Pro Max share one
+    layout. Behind it a back card in the **next kind's accent** peeks out; tapping the
+    card plays, like PLAY. "Dealing…" shows in the same shell until the first deal.
   - **The deal** is owned by the engine (`engine.dealtSeed`, dealt on every
-    appearance and on resume — see the engine's "Seed deal" note). The name lives
-    on **one line, auto-sized to fit** (`lineLimit(1)` + `minimumScaleFactor`, like
-    the in-game `NodeTile`) so the button never reflows — which is what lets
-    Shuffle animate as one clean **deal** (`AnyTransition.dealDrop`: old start
-    drops out downward, new drops in from above on `Theme.Motion.drop`, keyed by
-    `.id(seed.id)`) instead of a janky slot-machine roll that changed height. The
-    hint crossfades (`contentTransition(.opacity)`); Reduce Motion → plain swap.
-    The button chrome ("START WITH") and frame stay fixed while only the inner
-    seed content deals in/out, so the button itself never jumps. Disabled with a
-    "Dealing…" placeholder until the first deal lands (pool still loading).
+    appearance and on resume — see the engine's "Seed deal" note). Only the front
+    card transitions (`AnyTransition.dealCard`, keyed by `.id(seed.id)`): the old one
+    is flicked off to the leading side, turning, and the new one lands from just
+    below on `Theme.Motion.drop`; the back card stays and recolours. Reduce Motion →
+    cross-fade.
   - **Search flow** (`searching` state, behind the link) reuses the prior pieces —
     the Actor/Movie **segment**, the in-app-styled debounced field (auto-focused
     on open), and warm-tile result rows — with a "‹ Deal a start" back affordance.
     It's the flexible region (`maxHeight: .infinity`) so keyboard avoidance shrinks
     it and the field stays clear of the keys. iPhone is **portrait** (project
     setting); iPad keeps all orientations.
-  - **Cold-launch intro** (once ever): the lockup starts centered (an animatable
-    top spacer), its mini-chain drops in tile-by-tile via `TileBuild`, then on
-    `Theme.Motion.intro` the lockup rises to its header rest and the deal controls
-    (start button → hint → shuffle → search link) assemble beneath it via the
-    `ControlReveal` cascade. Gated by the `introDone` binding from `ContentView` —
-    a Play-again re-entry starts fully assembled. Reduce Motion shows it at once,
-    and a full-screen tap catcher lets a tap **skip to the assembled screen** (the
-    controls are inert until assembly, so the catcher never eats a real tap).
+  - **Cold-launch intro** (once ever): the wordmark fades up centered and 1.5×
+    (an animatable top spacer + an alignment that animates center → leading), then
+    on `Theme.Motion.intro` rises to the header while the rest (best/tagline → card
+    → buttons → search link) assembles via the `ControlReveal` cascade. Gated by the
+    `introDone` binding from `ContentView` — a Play-again re-entry starts fully
+    assembled. Reduce Motion shows it at once, and a full-screen tap catcher lets a
+    tap **skip to the assembled screen** (the controls are inert until assembly, so
+    the catcher never eats a real tap).
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·
   seconds · quit) + `TimerBar`, the centered **serif score hero** (chain number +
   points), the `ChainDeck`, and the next-up hint, with the answer input
@@ -603,7 +603,7 @@ The collection ("Your Reel") is the first fan-out built on top of the loop —
 a local, login-free registry that layers on the engine without touching the
 engine/provider split (it's just another observable store the engine records
 into at game over). Still planned: genre locks, memory-recall every Nth link,
-the Daily Chain and friend groups (accounts arrive at 0.8.0 — local
+the Daily Chain and friend groups (accounts arrive at 0.9.0 — local
 session/collection data is forward-compatible with that sync). The rule of thumb: **keep the
 engine/provider split clean.** New rules live in `GameEngine`; new data sources
 implement `MovieDataProvider`; new screens read observable state and call methods.
@@ -668,7 +668,7 @@ scratch:
   + an `apple-app-site-association` file) fix both and are the eventual target —
   and since the codec already speaks URLs, only the transport changes.
 
-Accounts arrive at 0.8.0 on the roadmap; the per-device player id (now a 0.6.0
+Accounts arrive at 0.9.0 on the roadmap; the per-device player id (now a 0.7.0
 foundation), plus the local session/collection data, are all
 forward-compatible with a future sync.
 
