@@ -31,14 +31,17 @@ struct HoloSticker<Label: View>: View {
     /// Seeds this sticker's scratches and specks, so each sticker has its own
     /// wear and keeps it between launches.
     var wearSeed: UInt64 = 1
+    /// False while covered — a sheet over it — so a sticker nobody can see
+    /// doesn't keep the gyro running.
+    var active = true
     @ViewBuilder var label: Label
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
-            if reduceMotion || !TiltMotion.shared.isAvailable {
-                // No gyro (the simulator) or Reduce Motion: a still sticker. A
+            if reduceMotion || !active || !TiltMotion.shared.isAvailable {
+                // No gyro (the simulator), Reduce Motion or covered: a still sticker. A
                 // real sticker never moves on its own — only the light on it
                 // does, and with no tilt there is nothing to drive that.
                 sticker(tilt: .zero)
@@ -83,28 +86,55 @@ struct HoloSticker<Label: View>: View {
 /// Hairline scratches and a few specks of grime, so the sticker looks handled
 /// rather than freshly printed. The scratches are bright — they catch the light —
 /// and catch it more as the phone tilts. Deterministic per `seed`.
+///
+/// Each layer is drawn once: tilt only changes the scratch layer's opacity, so
+/// a tilt frame never redraws a canvas (the start sticker sits on the deck while
+/// you type).
 private struct StickerWear: View {
     let seed: UInt64
     let tilt: CGSize
 
     var body: some View {
+        let glint = min(1, abs(tilt.width) + abs(tilt.height))
+        ZStack {
+            StickerWearLayer(seed: seed, layer: .scratches)
+                .opacity(0.35 + 0.4 * glint)
+            StickerWearLayer(seed: seed, layer: .specks)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// One layer of a sticker's wear. Its inputs never change with tilt, so SwiftUI
+/// keeps the drawn canvas instead of re-running it.
+private struct StickerWearLayer: View {
+    enum Layer { case scratches, specks }
+
+    let seed: UInt64
+    let layer: Layer
+
+    var body: some View {
         // Theme colours are main-actor values; read them here, not in the canvas.
         let grime = Theme.Color.shadow
-        let glint = min(1, abs(tilt.width) + abs(tilt.height))
-        Canvas { context, size in
+        Canvas { [layer] context, size in
+            // Both layers walk the same random stream in the same order, so the
+            // specks land where they always have.
             var rng = SeededRandom(seed: seed)
-            // Scratches: short, mostly-diagonal hairlines.
+            // Scratches: short, mostly-diagonal hairlines, full white — the
+            // layer's opacity sets how much light they catch.
             for _ in 0..<7 {
                 let start = CGPoint(x: rng.next(in: 0...size.width), y: rng.next(in: 0...size.height))
                 let length = rng.next(in: 5...(size.width * 0.45))
                 let angle = rng.next(in: -0.9...(-0.3))
+                let width = rng.next(in: 0.4...0.8)
+                guard layer == .scratches else { continue }
                 var path = Path()
                 path.move(to: start)
                 path.addLine(to: CGPoint(x: start.x + cos(angle) * length,
                                          y: start.y + sin(angle) * length))
-                context.stroke(path, with: .color(.white.opacity(0.35 + 0.4 * glint)),
-                               lineWidth: rng.next(in: 0.4...0.8))
+                context.stroke(path, with: .color(.white), lineWidth: width)
             }
+            guard layer == .specks else { return }
             // Specks: tiny flecks of dirt, darker.
             for _ in 0..<12 {
                 let r = rng.next(in: 0.3...0.8)
@@ -113,7 +143,6 @@ private struct StickerWear: View {
                 context.fill(Path(ellipseIn: rect), with: .color(grime.opacity(0.25)))
             }
         }
-        .allowsHitTesting(false)
     }
 }
 
@@ -140,24 +169,39 @@ nonisolated struct SeededRandom: RandomNumberGenerator {
 // MARK: - Foil
 
 /// The iridescent face: a pastel sweep whose hue rotates with tilt, under a
-/// bright sheen band that slides across as the light "moves".
+/// bright sheen band; tilt slides both, it never redraws them.
 struct HoloFoil: View {
     let tilt: CGSize
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: Theme.Holo.colors,
-                           startPoint: UnitPoint(x: -0.2 + tilt.width * 0.4, y: 0),
-                           endPoint: UnitPoint(x: 1.2 + tilt.width * 0.4, y: 1))
-                .hueRotation(.degrees(Double(tilt.width + tilt.height) * 70))
-            LinearGradient(stops: [
-                .init(color: .white.opacity(0), location: 0.30),
-                .init(color: .white.opacity(0.75), location: 0.5),
-                .init(color: .white.opacity(0), location: 0.70),
-            ],
-            startPoint: UnitPoint(x: -0.6 + tilt.width * 1.2, y: -0.2 + tilt.height),
-            endPoint: UnitPoint(x: 1.0 + tilt.width * 1.2, y: 1.2 + tilt.height))
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height
+            ZStack {
+                // The colour sweep, widened by its full travel (0.4 of the width
+                // each way) so a full tilt never shows its edge. The stops map the
+                // original span (-0.2…1.2 of the width) into the wider frame, so
+                // at rest it is the same sweep as before. Drawn once; tilt slides it.
+                LinearGradient(colors: Theme.Holo.colors,
+                               startPoint: UnitPoint(x: 0.2 / 1.8, y: 0),
+                               endPoint: UnitPoint(x: 1.6 / 1.8, y: 1))
+                    .frame(width: w * 1.8, height: h)
+                    .offset(x: tilt.width * w * 0.4)
+                    .hueRotation(.degrees(Double(tilt.width + tilt.height) * 70))
+                // The sheen: a fixed diagonal band the light slides across —
+                // 1.2 widths and 1 height of travel each way, same mapping.
+                LinearGradient(stops: [
+                    .init(color: .white.opacity(0), location: 0.30),
+                    .init(color: .white.opacity(0.75), location: 0.5),
+                    .init(color: .white.opacity(0), location: 0.70),
+                ],
+                startPoint: UnitPoint(x: 0.6 / 3.4, y: 0.8 / 3),
+                endPoint: UnitPoint(x: 2.2 / 3.4, y: 2.2 / 3))
+                    .frame(width: w * 3.4, height: h * 3)
+                    .offset(x: tilt.width * w * 1.2, y: tilt.height * h)
+            }
+            .frame(width: w, height: h)
         }
+        .clipped()
     }
 }
 
@@ -254,10 +298,14 @@ struct StartSticker: View {
 
 // MARK: - Tilt
 
-/// The phone's tilt from the gyro, shared by every sticker on screen. Runs only
-/// while at least one sticker is showing. Tilt is measured relative to how the
-/// phone is being held (a slowly adapting baseline), so it reacts to *changes*
-/// in angle whether you're sitting up or lying down.
+/// The phone's tilt from the gyro, shared by every sticker and lifted card on
+/// screen. Runs only while at least one is showing. Tilt is measured relative to
+/// how the phone is being held (a slowly adapting baseline), so it reacts to
+/// *changes* in angle whether you're sitting up or lying down.
+///
+/// The sensor only records its latest reading; the tilt advances once per
+/// display frame, by elapsed time, so its feel doesn't depend on the sensor or
+/// screen rate.
 @MainActor @Observable
 final class TiltMotion {
     static let shared = TiltMotion()
@@ -267,44 +315,66 @@ final class TiltMotion {
 
     @ObservationIgnored private let manager = CMMotionManager()
     @ObservationIgnored private var users = 0
+    /// The latest gravity reading. Unobserved: only the frame tick reads it.
+    @ObservationIgnored private var raw: CGSize?
     @ObservationIgnored private var baseline: CGSize?
+    @ObservationIgnored private lazy var frames = DisplayLink { [weak self] dt in self?.advance(dt) }
+
+    /// Light smoothing so sensor jitter doesn't shimmer the foil (seconds). Any
+    /// more and a lifted card feels heavy, trailing the phone.
+    private static let smoothing = 0.04
+    /// How long a held angle takes to become "level" (seconds).
+    private static let drift = 1.65
+    /// How far the phone turns for a full tilt: 1 / gain of gravity, ~15°.
+    private static let gain: CGFloat = 4
+    /// The smallest change worth publishing (about 0.016° of card lean).
+    private static let deadBand: CGFloat = 0.002
 
     var isAvailable: Bool { manager.isDeviceMotionAvailable }
 
     func start() {
         users += 1
         guard users == 1, manager.isDeviceMotionAvailable else { return }
-        manager.deviceMotionUpdateInterval = 1.0 / 30
+        manager.deviceMotionUpdateInterval = 1.0 / 60
         manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let gravity = motion?.gravity else { return }
             let x = gravity.x, y = gravity.y
             // Delivered on the main queue, as requested above.
-            MainActor.assumeIsolated { self?.update(x: x, y: y) }
+            MainActor.assumeIsolated { self?.raw = CGSize(width: x, height: y) }
         }
+        frames.start()
     }
 
     func stop() {
         users = max(0, users - 1)
         guard users == 0 else { return }
         manager.stopDeviceMotionUpdates()
+        frames.stop()
+        raw = nil
         baseline = nil
         tilt = .zero
     }
 
-    private func update(x: Double, y: Double) {
-        let raw = CGSize(width: x, height: y)
+    /// One display frame: drift the baseline toward the held angle and ease the
+    /// tilt toward the reading, by elapsed time.
+    private func advance(_ dt: Double) {
+        guard let raw else { return }
         var base = baseline ?? raw
-        // Drift the resting angle toward the current one, slowly, so a held angle
-        // becomes "level" after a few seconds.
-        base.width += (raw.width - base.width) * 0.02
-        base.height += (raw.height - base.height) * 0.02
+        let d = CGFloat(1 - exp(-dt / Self.drift))
+        base.width += (raw.width - base.width) * d
+        base.height += (raw.height - base.height) * d
         baseline = base
-        let gain: CGFloat = 3
-        let target = CGSize(width: clamp((raw.width - base.width) * gain),
-                            height: clamp((raw.height - base.height) * gain))
-        // Light smoothing so sensor jitter doesn't shimmer the foil.
-        tilt = CGSize(width: tilt.width + (target.width - tilt.width) * 0.3,
-                      height: tilt.height + (target.height - tilt.height) * 0.3)
+        let target = CGSize(width: clamp((raw.width - base.width) * Self.gain),
+                            height: clamp((raw.height - base.height) * Self.gain))
+        let s = CGFloat(1 - exp(-dt / Self.smoothing))
+        let next = CGSize(width: tilt.width + (target.width - tilt.width) * s,
+                          height: tilt.height + (target.height - tilt.height) * s)
+        // Under ~0.02° of card lean nothing visibly moves:
+        // skip the write, so a phone held still doesn't re-render every reader
+        // of the tilt every frame.
+        guard abs(next.width - tilt.width) >= Self.deadBand
+                || abs(next.height - tilt.height) >= Self.deadBand else { return }
+        tilt = next
     }
 
     private func clamp(_ v: CGFloat) -> CGFloat { min(1, max(-1, v)) }

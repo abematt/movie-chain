@@ -359,6 +359,10 @@ pure-value + observable-store split as the rest of the app:
   the whole trip itself, drawn above the grid: each grid card records its on-screen
   frame (`SlotFrames`), and `LiftFlight` scales and moves the lifted card from that
   slot to rest and back, the grid card staying unseen in place until it lands.
+  Once out, a card or frame tips with the gyro or a finger (`CardTilt`): only small
+  leaf views read the per-frame tilt, everything moves by transform, and the tilt
+  eases in after the card settles and flattens before it flies home. The
+  lifted card has no hard shadow; tilting in 3D, it never looked attached.
   (`matchedGeometryEffect` was tried first; it flies the *grid's* card, which
   travels under the dim layer and under later grid cells.) Art reads through
   `ArtCache` (memory + disk cache, off-main decode) so a reopened Reel draws at

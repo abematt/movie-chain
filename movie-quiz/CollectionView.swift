@@ -82,6 +82,17 @@ struct CollectionView: View {
                         }
                     }
                     .overlay { detail }
+                    #if DEBUG
+                    // QA hook: lift the first actor card a moment after opening,
+                    // to watch the lift and the tilt without tapping.
+                    .task {
+                        guard ProcessInfo.processInfo.arguments.contains("-uiLiftFirst"),
+                              let first = store.actors(matching: narrow).first else { return }
+                        try? await Task.sleep(for: .seconds(1.5))
+                        guard !Task.isCancelled else { return }
+                        expand(first.id)
+                    }
+                    #endif
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

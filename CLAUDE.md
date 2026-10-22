@@ -246,7 +246,14 @@ flew the grid's own card under the dim layer and its neighbours. Art is read
 through **`ArtCache`** (memory `NSCache` + a 150MB disk-cached session, off-main
 decode), not `AsyncImage`, which has no memory cache; the Reel's first screen is
 warmed at launch. The store is owned at the app root and injected into the engine.
-`-uiDemoReel -uiOpenReel` (DEBUG) opens a demo Reel without touching the saved one.
+A lifted card or framed poster tips with the gyro or a drag (`CardTilt.swift`): the tilt object is
+injected through `\.cardTilt` and **read only by leaf views** (foil, parallax, glare,
+rotation) — never pass the tilt value into the card, or every frame
+re-runs its body. Tilt, its intensity ramps and the drag release all run on
+`DisplayLink` with hand-sampled springs (`Theme.Motion.tiltIn/Out/Release`), and the
+card is flat whenever `LiftFlight` is flying it.
+`-uiDemoReel -uiOpenReel` (DEBUG) opens a demo Reel without touching the saved one;
+add `-uiLiftFirst` to lift its first card.
 
 **UI (NYT-Games / Connections treatment)** — `ContentView.swift` routes on
 `engine.phase` between `SeedView`, `GameView`, and `GameOverView` with a
