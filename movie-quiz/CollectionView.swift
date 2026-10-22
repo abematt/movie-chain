@@ -350,7 +350,7 @@ struct CollectionView: View {
                                 .transition(Self.handOff)
                         }
                     }
-                    .buttonStyle(.pressScale)
+                    .buttonStyle(.reelPress)
                 }
             }
         }
@@ -380,7 +380,7 @@ struct CollectionView: View {
                         }
                         .accessibilityElement(children: .combine)
                     }
-                    .buttonStyle(.pressScale)
+                    .buttonStyle(.reelPress)
                 }
             }
         }
@@ -402,8 +402,8 @@ struct CollectionView: View {
     /// Three layers, each leaving on its own terms. On close the controls go at
     /// once and the lifted card hands over to the grid's own card, which flies
     /// home from its exact frame at full opacity. The grid card makes that trip
-    /// under the backdrop, so the backdrop clears fast — 150ms — or the card
-    /// would start home washed out. Nothing fades mid-flight.
+    /// under the backdrop, so the backdrop clears almost at once — 60ms — or the
+    /// card would start home washed out. Nothing fades mid-flight.
     @ViewBuilder private var detail: some View {
         ZStack {
             if expanded != nil {
@@ -411,8 +411,11 @@ struct CollectionView: View {
                     .ignoresSafeArea()
                     .onTapGesture { expand(nil) }
                     .accessibilityHidden(true)
-                    .transition(.asymmetric(insertion: .opacity,
-                                            removal: .opacity.animation(.easeOut(duration: 0.15))))
+                    // A plain fade in (a dim mustn't bounce with the card's
+                    // spring); cleared almost at once on close, since the card
+                    // flying home travels underneath it.
+                    .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.2)),
+                                            removal: .opacity.animation(.easeOut(duration: 0.06))))
             }
             if let id = expanded, let entity = store.entities[id] {
                 ReelCardDetail(entity: entity, linked: store.linked(to: entity), part: .card,
@@ -445,7 +448,7 @@ struct CollectionView: View {
     private func expand(_ id: CollectedEntity.ID?) {
         if id != nil { Haptics.lift() }
         let animation: Animation = reduceMotion ? Theme.Motion.reducedFade
-            : id != nil ? .spring(duration: 0.4, bounce: 0.15) : Self.homeFlight
+            : id != nil ? .spring(duration: 0.4, bounce: 0.08) : Self.homeFlight
         withAnimation(animation) {
             expanded = id
             flipped = false

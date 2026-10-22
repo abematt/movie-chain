@@ -469,6 +469,33 @@ extension View {
 
 // MARK: - Pieces
 
+/// Press feedback for a Reel card or frame: the card sinks a touch (0.97), and
+/// that's all. The app's `.pressScale` also dims to 85%, which on a photo card
+/// read as a pop when the lift then started from the undimmed card. Under
+/// Reduce Motion the scale is motion, so the dim stands in for it instead.
+struct ReelPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PressBody(configuration: configuration)
+    }
+
+    private struct PressBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+                .opacity(configuration.isPressed && reduceMotion ? 0.85 : 1)
+                .animation(Theme.Motion.press, value: configuration.isPressed)
+        }
+    }
+}
+
+extension ButtonStyle where Self == ReelPressStyle {
+    /// Usage: `.buttonStyle(.reelPress)`
+    static var reelPress: ReelPressStyle { .init() }
+}
+
 private struct NewBadge: View {
     var body: some View {
         Text("New")
@@ -496,6 +523,13 @@ private struct ReelArt: View {
     var monogramSize: CGFloat = 28
 
     @State private var image: Image?
+    /// Which URL `image` came from — identifies it, so a sharper swap is a
+    /// cross-fade between two views rather than a pop inside one.
+    @State private var shownURL: URL?
+    /// Off for art that was already in memory when this view was made: a
+    /// child's insertion transition also runs when its *parent* is inserted, so
+    /// without this the lifted card's photo faded in over the accent mid-lift.
+    @State private var fadesIn = false
     @State private var failed = false
 
     init(path: String?, kind: NodeKind, name: String, sharpSize: String? = nil, monogramSize: CGFloat = 28) {
@@ -507,9 +541,10 @@ private struct ReelArt: View {
         // Whatever is in memory draws on the first frame — no fade, no flash.
         let cached = [sharpSize, ReelLayout.artSize].lazy
             .compactMap { $0.flatMap { Config.imageURL(path: path, size: $0) } }
-            .compactMap { ArtCache.shared.image(for: $0) }
+            .compactMap { url in ArtCache.shared.image(for: url).map { (url, $0) } }
             .first
-        _image = State(initialValue: cached)
+        _image = State(initialValue: cached?.1)
+        _shownURL = State(initialValue: cached?.0)
     }
 
     var body: some View {
@@ -517,6 +552,14 @@ private struct ReelArt: View {
             .overlay {
                 if let image {
                     image.resizable().aspectRatio(contentMode: .fill)
+                        .id(shownURL)
+                        // The new image fades in over the old, which stays
+                        // fully drawn until it's covered — so a swap never dips
+                        // to the accent behind.
+                        .transition(fadesIn ? .asymmetric(
+                            insertion: .opacity,
+                            removal: .opacity.animation(.linear(duration: 0).delay(Self.sharpenFade))
+                        ) : .identity)
                 } else if path == nil || failed {
                     monogram
                 }
@@ -525,22 +568,35 @@ private struct ReelArt: View {
             .task(id: path) { await load() }
     }
 
+    /// The sharper image's cross-fade: short, since it's the same picture.
+    private static let sharpenFade = 0.15
+
     private func load() async {
         guard let base = Config.imageURL(path: path, size: ReelLayout.artSize) else { return }
         if image == nil {
             let loaded = await ArtCache.shared.load(base)
             guard !Task.isCancelled else { return }
             if let loaded {
-                withAnimation(.easeOut(duration: 0.2)) { image = loaded }
+                fadesIn = true
+                withAnimation(.easeOut(duration: 0.2)) {
+                    image = loaded
+                    shownURL = base
+                }
             } else {
                 failed = true
                 return
             }
         }
-        // The same picture, sharper: swapped without a fade.
-        if let sharpSize, let sharp = Config.imageURL(path: path, size: sharpSize),
-           let loaded = await ArtCache.shared.load(sharp), !Task.isCancelled {
-            image = loaded
+        // The same picture, sharper — cross-faded, or the moment it sharpens
+        // shows as a pop on a large lifted card.
+        guard let sharpSize, let sharp = Config.imageURL(path: path, size: sharpSize),
+              shownURL != sharp else { return }
+        if let loaded = await ArtCache.shared.load(sharp), !Task.isCancelled {
+            fadesIn = true
+            withAnimation(.easeOut(duration: Self.sharpenFade)) {
+                image = loaded
+                shownURL = sharp
+            }
         }
     }
 
