@@ -63,6 +63,11 @@ not a contract — if milestones land out of order, the version follows the work
   Labels come in the spec's two sizes, and headings pair a roman phrase with an
   italic word ("Your *regulars*"). The Reel and Settings sheets get a cream bar with
   an ink rule, and Settings uses a bordered segmented control.
+- **A leaner Reel.** It used to state the actor and movie counts three times: in two
+  big count cards, in the filter tabs, and again in a header above the grid. Now the
+  total sits at the top and the per-kind counts live only in the tabs. "Your
+  *regulars*" lost its "most logged" caption, which said the same thing, and its two
+  cards now always match in height.
 
 ### Changed
 

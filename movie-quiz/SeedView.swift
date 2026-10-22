@@ -123,6 +123,10 @@ struct SeedView: View {
         .task { await warmFeedbackWhenIdle() }
         .onAppear {
             if introTask == nil { introTask = Task { await runIntro() } }
+            #if DEBUG
+            // Screenshot hook: open straight onto the Reel sheet.
+            if ProcessInfo.processInfo.arguments.contains("-uiOpenReel") { showReel = true }
+            #endif
         }
         .onChange(of: searching) { _, now in
             // Focus the field when the search flow opens; drop it when it closes.

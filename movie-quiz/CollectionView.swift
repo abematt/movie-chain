@@ -90,7 +90,11 @@ struct CollectionView: View {
         }
     }
 
-    // MARK: Hero — the flex line + category split + stat strip
+    // MARK: Hero — the flex line + best chain
+    //
+    // Each fact appears once on this sheet: the total here, the per-kind counts
+    // only in the Actors / Movies tabs, and no header repeating them above the
+    // grid.
 
     private var hero: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -103,11 +107,6 @@ struct CollectionView: View {
                     .monospacedDigit()
                     .contentTransition(.numericText(value: Double(store.total)))
                     .foregroundStyle(Theme.Color.ink)
-            }
-
-            HStack(spacing: Theme.Spacing.sm) {
-                countCard(.actor, store.actorCount, "Actors")
-                countCard(.movie, store.movieCount, "Movies")
             }
 
             if bestChain > 0 {
@@ -124,31 +123,19 @@ struct CollectionView: View {
         }
     }
 
-    private func countCard(_ kind: NodeKind, _ value: Int, _ label: String) -> some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            Text("\(statsIn ? value : 0)")
-                .font(Theme.Font.display(44))
-                .monospacedDigit()
-                .foregroundStyle(Theme.Color.ink)
-                .contentTransition(.numericText(value: Double(value)))
-            KindChip(kind: kind)
-                .accessibilityLabel(label)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.md)
-        .neoSurface(radius: Theme.Radius.card)
-    }
-
     // MARK: Regulars — most-logged actor + movie
 
     @ViewBuilder private var regulars: some View {
         if store.mostLoggedActor != nil || store.mostLoggedMovie != nil {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                sectionLabel("Your", "regulars", trailing: "most logged")
+                SplitHeading(roman: "Your", flourish: "regulars")
                 HStack(spacing: Theme.Spacing.sm) {
                     if let a = store.mostLoggedActor { regularCard(a) }
                     if let m = store.mostLoggedMovie { regularCard(m) }
                 }
+                // Both cards take the taller one's height, so a two-line name
+                // doesn't leave its neighbour short.
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -173,7 +160,7 @@ struct CollectionView: View {
             Spacer(minLength: 0)
         }
         .padding(Theme.Spacing.sm + 2)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
     }
 
@@ -250,9 +237,9 @@ struct CollectionView: View {
         Group {
             switch filter {
             case .actors:
-                gridSection(.actor, "Actors", store.actorCount, store.sortedActors)
+                grid(store.sortedActors)
             case .movies:
-                gridSection(.movie, "Movies", store.movieCount, store.sortedMovies)
+                grid(store.sortedMovies)
             }
         }
         // Give each filter its own identity so switching cross-fades and re-deals
@@ -261,35 +248,18 @@ struct CollectionView: View {
         .transition(.opacity)
     }
 
-    private func gridSection(_ kind: NodeKind, _ title: String, _ n: Int, _ items: [CollectedEntity]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            HStack(spacing: Theme.Spacing.sm) {
-                NodeDot(kind: kind, size: 9)
-                Text(title).metaLabel()
-                Spacer()
-                Text("\(n)")
-                    .font(Theme.Font.numeral(.subheadline))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.Color.muted)
-            }
-            LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
-                    ReelTile(entity: entity, isNew: store.isNew(entity))
-                        .appear(i)
-                }
+    // The tabs above already name the kind and its count, so the grid carries
+    // no header of its own.
+    private func grid(_ items: [CollectedEntity]) -> some View {
+        LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { i, entity in
+                ReelTile(entity: entity, isNew: store.isNew(entity))
+                    .appear(i)
             }
         }
     }
 
     // MARK: Helpers
-
-    private func sectionLabel(_ roman: String, _ flourish: String, trailing: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            SplitHeading(roman: roman, flourish: flourish)
-            Spacer()
-            Text(trailing).font(Theme.Font.flourish(.footnote)).foregroundStyle(Theme.Color.muted)
-        }
-    }
 
     private var emptyState: some View {
         VStack(spacing: 0) {
