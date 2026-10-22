@@ -16,6 +16,7 @@ struct GameView: View {
     @Bindable var engine: GameEngine
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Prototype switch between chain treatments (Settings → Chain style).
     @AppStorage("chainStyle") private var chainStyle: ChainStyle = .cards
 
@@ -23,6 +24,7 @@ struct GameView: View {
     @FocusState private var fieldFocused: Bool
     @State private var gainToken = 0     // bumps to replay the "+N" pop
     @State private var shakeToken = 0    // bumps to shake the field on reject
+    @State private var showRecordCue = false  // the transient in-play "a new best" pill
 
     /// How many links stay visible in the rising window before older ones
     /// collapse into "+N earlier". Tuned to the band above the keyboard.
@@ -43,6 +45,7 @@ struct GameView: View {
             header
             TimerBar(fraction: timeFraction)
             scoreHero
+                .zIndex(1)   // the record cue floats over the chain band
 
             // The stack renders at its *natural* height, pinned to the bottom of
             // this flexible region; any overflow (the oldest links) is clipped off
@@ -84,6 +87,12 @@ struct GameView: View {
             guard !Task.isCancelled else { return }
             fieldFocused = true
         }
+        #if DEBUG
+        .onAppear {
+            // Screenshot hook: show the record cue without having to beat a best.
+            if ProcessInfo.processInfo.arguments.contains("-uiDemoRecordCue") { showRecordCue = true }
+        }
+        #endif
         .onChange(of: engine.score) { old, new in
             if new > old { onCorrect() }
         }
@@ -155,6 +164,17 @@ struct GameView: View {
                 .font(Theme.Font.numeral(.body))
                 .foregroundStyle(Theme.Color.muted)
                 .contentTransition(.numericText())
+                // The record cue floats in the open space under the score, so it
+                // costs the chain no vertical room.
+                .overlay(alignment: .bottom) {
+                    if showRecordCue {
+                        RecordCue()
+                            .offset(y: 40)
+                            .transition(reduceMotion
+                                        ? .opacity
+                                        : .scale(scale: 0.6).combined(with: .opacity))
+                    }
+                }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, Theme.Spacing.sm)
@@ -242,9 +262,21 @@ struct GameView: View {
     // MARK: Feedback reactions
 
     private func onCorrect() {
-        Haptics.correct(streak: engine.score)
-        if soundEnabled { SoundPlayer.shared.correct(streak: engine.score) }
         gainToken += 1
+        guard engine.justPassedBest else {
+            Haptics.correct(streak: engine.score)
+            if soundEnabled { SoundPlayer.shared.correct(streak: engine.score) }
+            return
+        }
+        // The link that passed the record: a bigger beat than a normal link.
+        Haptics.celebrate()
+        if soundEnabled { SoundPlayer.shared.record() }
+        withAnimation(Theme.Motion.emphasized) { showRecordCue = true }
+        AccessibilityNotification.Announcement("A new best").post()
+        Task {
+            try? await Task.sleep(for: .seconds(1.8))
+            withAnimation(Theme.Motion.standard) { showRecordCue = false }
+        }
     }
 
     private func onReject() {
@@ -258,6 +290,24 @@ struct GameView: View {
         answer = ""
         fieldFocused = true
         Task { await engine.submit(text) }
+    }
+}
+
+// MARK: - Record cue
+
+/// The transient "a new best" pill shown the moment a run passes the record —
+/// the same green pill the game-over card uses, so the two moments read as one.
+private struct RecordCue: View {
+    var body: some View {
+        Text("a new best")
+            .font(Theme.Font.flourish(.subheadline))
+            .foregroundStyle(Theme.Color.onAccent)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.xs + 1)
+            .neoSurface(radius: Theme.Radius.pill, fill: Theme.Color.good,
+                        shadow: Theme.Shadow.small)
+            .fixedSize()
+            .accessibilityLabel("A new best")
     }
 }
 

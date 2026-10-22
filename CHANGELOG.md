@@ -88,6 +88,11 @@ not a contract — if milestones land out of order, the version follows the work
   number and the points, so "links" read like a separate stat. It now sits on the
   numeral's baseline, with the points on their own line beneath, on both the play
   and game-over screens.
+- **You find out the moment you pass your best, not just at the end.** On the answer
+  that takes a run one link past the record, a green "a new best" pill pops in under
+  the score, the phone gives the celebration haptic, and a brighter two-note chime
+  replaces the usual one. It fires once per run, never on a first game, and VoiceOver
+  announces it. Previously the only signal came on the game-over screen.
 
 ### Changed
 

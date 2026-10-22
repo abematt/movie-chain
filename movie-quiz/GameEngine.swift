@@ -51,6 +51,11 @@ final class GameEngine {
     /// Set at game over when this run beat the previous best chain — the trigger
     /// for the celebration on the game-over screen.
     private(set) var isNewBest = false
+    /// True right after the link that passed the previous best. `bestChain` only
+    /// updates at game over, so during play it still holds the record to beat.
+    var justPassedBest: Bool {
+        phase == .playing && Scoring.passesRecord(score: score, previousBest: bestChain)
+    }
     /// A valid answer the player *didn't* give on the turn that timed out — the
     /// "you were one away" near-miss shown at game over. `nil` on a manual quit
     /// (there was no missed turn — the player chose to stop).

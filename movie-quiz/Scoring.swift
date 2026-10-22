@@ -18,6 +18,14 @@ import Foundation
 
 enum Scoring {
 
+    /// True on the one link that takes a run past the previous best — the
+    /// moment for the in-play "a new best" cue. Fires once (on `previousBest + 1`,
+    /// not every link after), and never on a first-ever game, where there is no
+    /// record to pass.
+    static func passesRecord(score: Int, previousBest: Int) -> Bool {
+        previousBest > 0 && score == previousBest + 1
+    }
+
     /// Flat points every accepted link is worth, before bonuses.
     static let base = 10
 

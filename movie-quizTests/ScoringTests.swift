@@ -11,6 +11,18 @@ import XCTest
 
 final class ScoringTests: XCTestCase {
 
+    // MARK: Passing the record (the in-play "a new best" cue)
+
+    func testPassesRecordFiresOnlyOnTheLinkThatPassesIt() {
+        XCTAssertFalse(Scoring.passesRecord(score: 5, previousBest: 5))   // tying isn't passing
+        XCTAssertTrue(Scoring.passesRecord(score: 6, previousBest: 5))    // this link passes it
+        XCTAssertFalse(Scoring.passesRecord(score: 7, previousBest: 5))   // once, not every link after
+    }
+
+    func testPassesRecordNeverFiresOnAFirstGame() {
+        XCTAssertFalse(Scoring.passesRecord(score: 1, previousBest: 0))
+    }
+
     // MARK: Speed bonus
 
     func testSpeedBonusIsSecondsRemaining() {
