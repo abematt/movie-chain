@@ -105,9 +105,11 @@ struct SeedView: View {
                 Group {
                     if searching {
                         searchSection
+                            .transition(modeSwap)
                     } else {
                         dealSection
                             .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
+                            .transition(modeSwap)
                     }
                 }
             }
@@ -176,10 +178,28 @@ struct SeedView: View {
             #endif
         }
         .onChange(of: searching) { _, now in
-            // Focus the field when the search flow opens; drop it when it closes.
-            searchFocused = now
-            if !now { searchTask?.cancel(); query = ""; results = [] }
+            // Closing drops the keyboard at once (the search fades as it goes);
+            // opening focuses only once the search has landed (below).
+            guard !now else { return }
+            searchFocused = false
+            searchTask?.cancel(); query = ""; results = []
         }
+        .task(id: searching) {
+            guard searching else { return }
+            try? await Task.sleep(for: Theme.Motion.swapSettle)
+            guard !Task.isCancelled, searching else { return }
+            searchFocused = true
+        }
+        #if DEBUG
+        // QA hook: open the search flow a moment after launch, to watch the swap.
+        .task(id: engine.dealtSeed == nil) {
+            guard ProcessInfo.processInfo.arguments.contains("-uiOpenSearch"),
+                  engine.dealtSeed != nil, !searching else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            withAnimation(Theme.Motion.standard) { searching = true }
+        }
+        #endif
         .onDisappear {
             introTask?.cancel()
             searchTask?.cancel()
@@ -216,7 +236,8 @@ struct SeedView: View {
                     reelButton
                     settingsButton
                 }
-                .animation(Theme.Motion.standard, value: pillsVisible)
+                // Out with the layout they belong to, not trailing after it.
+                .animation(Theme.Motion.swapOut, value: pillsVisible)
             }
     }
 
@@ -290,6 +311,14 @@ struct SeedView: View {
             cascade(footer, 3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    /// Deal ⇄ search: the leaving layout fades out fast, the arriving one fades
+    /// in a beat later with a short rise (just the fade under Reduce Motion).
+    private var modeSwap: AnyTransition {
+        let arrive: AnyTransition = reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 12))
+        return .asymmetric(insertion: arrive.animation(Theme.Motion.swapIn),
+                           removal: .opacity.animation(Theme.Motion.swapOut))
     }
 
     /// The flying pieces hide the moment the blank is tapped: the handoff's

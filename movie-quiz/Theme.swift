@@ -243,6 +243,14 @@ enum Theme {
         /// The play screen's chrome arriving under the handoff, a beat after the
         /// home's has started to go.
         static let handoffEnter: Animation = .easeOut(duration: 0.25).delay(0.06)
+        /// The home swapping between the deal and the search flow ("Pick your
+        /// own" / "Deal a start"): the old content gone fast, the new arriving a
+        /// beat later, so the two full-height layouts never sit over each other.
+        static let swapOut: Animation = .easeOut(duration: 0.15)
+        static let swapIn: Animation = .easeOut(duration: 0.25).delay(0.1)
+        /// How long the search flow takes to land, before its field takes focus:
+        /// the keyboard rising mid-swap re-lays out whatever is still fading.
+        static let swapSettle: Duration = .milliseconds(300)
         /// A start leaving on Deal again: quicker than the new one lands, so it is
         /// out of the way rather than competing with it.
         static let dealOut: Animation = .snappy(duration: 0.22)
