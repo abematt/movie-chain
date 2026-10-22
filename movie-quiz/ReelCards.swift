@@ -136,7 +136,10 @@ struct ReelActorCard: View {
             // One size for grid and lift: the lifted card reuses the cached image
             // instead of flashing its monogram mid-flight.
             ReelArt(path: entity.imagePath, kind: .actor, name: entity.name, size: "w342")
-                .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                // The photo takes whatever the name and pips leave, so the card
+                // is truly 5:7 — the lift sizes it by that ratio, and a card
+                // taller than it would spill out of its frame.
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm)
                     .strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
@@ -516,20 +519,24 @@ private struct ReelArt: View {
     var monogramSize: CGFloat = 28
 
     var body: some View {
-        ZStack {
-            kind.accent
-            if let url = Config.imageURL(path: path, size: size) {
-                AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        monogram
+        // The art is an overlay so only the accent sizes this view. A filling
+        // image inside a ZStack would size it instead — larger than the space
+        // offered — and push the card past its 5:7.
+        kind.accent
+            .overlay {
+                if let url = Config.imageURL(path: path, size: size) {
+                    AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
+                        if case .success(let image) = phase {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            monogram
+                        }
                     }
+                } else {
+                    monogram
                 }
-            } else {
-                monogram
             }
-        }
+            .clipped()
     }
 
     private var monogram: some View {
