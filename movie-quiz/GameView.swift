@@ -20,6 +20,7 @@ struct GameView: View {
     /// The home → play handoff, when this screen was reached by tapping the
     /// home's blank: the start card and the dock wait hidden for it to land.
     @Environment(HandoffStage.self) private var stage: HandoffStage?
+    @Environment(\.telemetry) private var telemetry
 
     @State private var answer = ""
     @FocusState private var fieldFocused: Bool
@@ -127,7 +128,14 @@ struct GameView: View {
         }
         #endif
         .onChange(of: engine.score) { old, new in
-            if new > old { onCorrect() }
+            guard new > old else { return }
+            onCorrect()
+            if let turn = engine.turns.last {
+                telemetry?.linkLanded(turn, link: new, fast: engine.lastAnswerFast)
+            }
+        }
+        .onChange(of: engine.awaitingRetry) { _, failed in
+            if failed { telemetry?.turnLoadFailed(links: engine.score) }
         }
         // `rejections`, not `feedback`: two identical misses in a row leave
         // `feedback` unchanged, and the second must still shake and buzz.

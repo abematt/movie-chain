@@ -24,6 +24,7 @@ struct ContentView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.telemetry) private var telemetry
 
     init() {
         #if DEBUG
@@ -70,7 +71,11 @@ struct ContentView: View {
         // with it, rather than leaving them over the game-over screen.
         .onChange(of: engine.phase) { _, phase in
             if phase != .playing { handoff.finish() }
+            // Every run ends here, and screen times start here.
+            telemetry?.phaseChanged(to: phase)
         }
+        // Settings ride on every event as context, never as events of their own.
+        .onChange(of: soundEnabled, initial: true) { _, on in telemetry?.context.soundOn = on }
         .onChange(of: scenePhase) { old, phase in
             // Guarantee the latest collection snapshot is on disk before the app
             // is suspended/killed, not just eventually via the async save.
@@ -79,6 +84,7 @@ struct ContentView: View {
             // the home screen — "a new start every open/resume". Cold launch is
             // handled by SeedView's `.task`; this covers background → foreground.
             if old == .background, phase == .active {
+                telemetry?.resumed()
                 engine.dealFreshOnResume()
                 // iOS often stops the audio engine while we're away; restart it
                 // now so the next chime isn't the one that pays for it.

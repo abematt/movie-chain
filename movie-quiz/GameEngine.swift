@@ -42,6 +42,16 @@ final class GameEngine {
         var chain: [ChainNode] = []
         var links = 0
         var points = 0
+        /// The player tapped Quit, rather than the clock running out.
+        var endedByQuit = false
+        /// Every answered turn, in order — the run as it was played.
+        var turns: [Turn] = []
+        /// The turn the run ended on: what was showing and what was tried.
+        var finalMisses: [String] = []
+        /// Time the clock actually ran, summed over turns (loading excluded).
+        var playTime: Duration = .zero
+        /// Manual retries after a failed candidate load.
+        var retries = 0
 
         /// Spoiler-free share card: each link as a coloured square, never a name.
         var shareText: String {
@@ -51,9 +61,28 @@ final class GameEngine {
         }
     }
 
+    /// One answered turn, as played. The game never reads these back; they're the
+    /// run's record for analytics, kept here because only the engine sees the
+    /// clock and the misses.
+    struct Turn: Equatable {
+        /// What the player was answering from.
+        var prompt: ChainNode
+        var answer: ChainNode
+        /// What they typed for the accepted answer.
+        var typed: String
+        /// Rejected attempts this turn, in order.
+        var misses: [String]
+        /// Clock running → accepted.
+        var answerTime: Duration
+        /// Waiting for this turn's answers to load, before its clock started.
+        var loadTime: Duration
+    }
+
     // MARK: State
 
     private(set) var phase: Phase = .seed
+    /// This run's answered turns so far. See `Turn`.
+    private(set) var turns: [Turn] = []
     private(set) var chain: [ChainNode] = []
     /// The headline metric: chain length (accepted links). Drives the flame and
     /// the hero number.
@@ -165,6 +194,17 @@ final class GameEngine {
     /// can't catch it, because the new game is also `.playing`.
     private var generation = 0
 
+    // The current turn's record, folded into a `Turn` when it's answered.
+    /// Injectable so tests can time turns exactly.
+    private let now: () -> ContinuousClock.Instant
+    private var turnMisses: [String] = []
+    /// When the running clock last started; nil while it's stopped.
+    private var turnClockStart: ContinuousClock.Instant?
+    private var turnClockTime: Duration = .zero
+    private var turnLoadTime: Duration = .zero
+    private var playTime: Duration = .zero
+    private var retries = 0
+
     /// Where the best run persists. Injectable so tests never touch the app's
     /// real records.
     private let defaults: UserDefaults
@@ -172,7 +212,8 @@ final class GameEngine {
     private static let bestPointsKey = "bestPoints"
 
     init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
@@ -180,6 +221,7 @@ final class GameEngine {
         self.provider = provider ?? Config.makeProvider()
         self.collection = collection
         self.defaults = defaults
+        self.now = now
         self.bestChain = defaults.integer(forKey: Self.bestChainKey)
         self.bestPoints = defaults.integer(forKey: Self.bestPointsKey)
     }
@@ -333,7 +375,12 @@ final class GameEngine {
         if let ahead {
             expectedKind = seed.nextKind
             isChecking = true
-            if let loaded = await ahead.value, !loaded.isEmpty {
+            let began = now()
+            let loaded = await ahead.value
+            // Counted only if this run still owns the wait; a reset during it
+            // has already moved on to a new run's record.
+            if generation == token { turnLoadTime += now() - began }
+            if let loaded, !loaded.isEmpty {
                 guard generation == token else { return }
                 candidates = loaded
                 isChecking = false
@@ -381,6 +428,7 @@ final class GameEngine {
         guard let match else {
             feedback = "Not in the \(expectedKind == .actor ? "cast" : "filmography") — try again."
             rejections += 1
+            turnMisses.append(trimmed)
             return
         }
         let node = match.item
@@ -388,19 +436,29 @@ final class GameEngine {
         guard !usedIds.contains(node.id) else {
             feedback = "\(node.displayName) is already in your chain."
             rejections += 1
+            turnMisses.append(trimmed)
             return
         }
-        await accept(node, token: token)
+        await accept(node, typed: trimmed, token: token)
     }
 
     /// Commit an accepted link: pause the clock across the fetch, score, extend the
     /// chain, load the next candidate set, then resume — unless the run was
     /// reset/quit mid-await.
-    private func accept(_ node: ChainNode, token: Int) async {
+    private func accept(_ node: ChainNode, typed: String, token: Int) async {
         // Pause the timer during the network fetch so a slow candidate load can't
         // fire game-over on an answer submitted in time.
         stopCountdown()
         feedback = nil
+        if let prompt = chain.last {
+            // Recorded before `score` moves, so a view reacting to the new score
+            // finds this turn already on the list.
+            turns.append(Turn(prompt: prompt, answer: node, typed: typed, misses: turnMisses,
+                              answerTime: turnClockTime, loadTime: turnLoadTime))
+        }
+        turnMisses = []
+        turnClockTime = .zero
+        turnLoadTime = .zero
         // Score before the clock is reset by the next turn: fast answers and
         // obscure picks bank more points.
         lastGain = Scoring.gain(secondsRemaining: secondsRemaining, popularity: node.popularity)
@@ -438,6 +496,12 @@ final class GameEngine {
         stopCountdown()
         chain = []
         usedIds = []
+        turns = []
+        turnMisses = []
+        turnClockTime = .zero
+        turnLoadTime = .zero
+        playTime = .zero
+        retries = 0
         candidates = []
         score = 0
         points = 0
@@ -458,6 +522,9 @@ final class GameEngine {
         // these are never stale writes — only the post-fetch writes below can be.
         expectedKind = node.nextKind
         isChecking = true
+        let began = now()
+        // Counted only for a load this run still owns; a superseded one is dropped.
+        defer { if generation == token { turnLoadTime += now() - began } }
         // Retry a transient failure (a shared-key rate limit or a stalled request —
         // see `Config.makeProvider`'s TODO and `requestTimeout`). The clock is paused
         // across this load, so retries cost the player no time. Without this, one
@@ -511,6 +578,7 @@ final class GameEngine {
     func retryTurn() async {
         guard phase == .playing, !isChecking, let node = chain.last else { return }
         stopCountdown()
+        retries += 1
         let token = generation
         await loadCandidates(for: node, token: token)
         guard phase == .playing, generation == token else { return }
@@ -523,10 +591,19 @@ final class GameEngine {
     private func stopCountdown() {
         countdownTask?.cancel()
         countdownTask = nil
+        // Bank the time the clock ran. Capped at a turn's length, so the
+        // time's-up hold before game over isn't counted as play.
+        if let start = turnClockStart {
+            let ran = min(now() - start, .seconds(Config.secondsPerTurn))
+            turnClockTime += ran
+            playTime += ran
+            turnClockStart = nil
+        }
     }
 
     private func startCountdown() {
         stopCountdown()
+        turnClockStart = now()
         secondsRemaining = Config.secondsPerTurn
         countdownTask = Task { [weak self] in
             // Tick against fixed deadlines from the turn's start, so each second's
@@ -557,7 +634,9 @@ final class GameEngine {
         guard phase == .playing else { return }
         generation += 1                            // drop any in-flight candidate load
         stopCountdown()
-        var summary = Summary(chain: chain, links: score, points: points)
+        var summary = Summary(chain: chain, links: score, points: points, endedByQuit: quit,
+                              turns: turns, finalMisses: turnMisses, playTime: playTime,
+                              retries: retries)
 
         // "You were one away": surface a valid answer the player didn't give on
         // the turn that ran out — the sting that drives the next run. Skip it on a

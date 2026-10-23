@@ -18,12 +18,16 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("soundEnabled") private var soundEnabled = true
+    /// Read at launch by `movie_quizApp` too, so the choice holds from the first event.
+    @AppStorage(Telemetry.enabledKey) private var analyticsEnabled = true
+    @Environment(\.telemetry) private var telemetry
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
+                    privacySection
                     aboutSection
                 }
                 .padding(.horizontal, Theme.Spacing.gutter)
@@ -60,6 +64,29 @@ struct SettingsView: View {
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+        }
+    }
+
+    // MARK: Privacy — the analytics opt-out
+
+    private var privacySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("Privacy")
+            Toggle(isOn: $analyticsEnabled) {
+                Text("Share usage data")
+                    .font(Theme.Font.bodyStrong)
+                    .foregroundStyle(Theme.Color.ink)
+            }
+            .tint(Theme.Color.ink)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm + 2)
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+            .onChange(of: analyticsEnabled) { _, on in telemetry?.setEnabled(on) }
+
+            Text("How you play — your turns, what you type, what you look at in your Reel — so the game gets better. Not linked to who you are.")
+                .font(Theme.Font.flourish(.footnote))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, Theme.Spacing.xs)
         }
     }
 

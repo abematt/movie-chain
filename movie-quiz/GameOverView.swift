@@ -15,6 +15,7 @@ struct GameOverView: View {
     let summary: GameEngine.Summary
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.telemetry) private var telemetry
     @State private var showReel = false
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
@@ -72,7 +73,7 @@ struct GameOverView: View {
             withAnimation(.spring(duration: 0.55, bounce: 0.3).delay(0.06)) { stickerPressed = true }
         }
         .sheet(isPresented: $showReel) {
-            CollectionView(store: collection, bestChain: engine.bestChain)
+            CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .gameOver)
         }
     }
 
@@ -296,6 +297,11 @@ struct GameOverView: View {
                 Text("Share").frame(maxWidth: .infinity)
             }
             .buttonStyle(.ghost)
+            // ShareLink has no action of its own; a tap opening the sheet is the
+            // signal (whether they then sent it isn't knowable).
+            .simultaneousGesture(TapGesture().onEnded {
+                telemetry?.shared(from: .gameOver)
+            })
         }
     }
 }

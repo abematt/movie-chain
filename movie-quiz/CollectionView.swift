@@ -23,9 +23,12 @@ struct CollectionView: View {
     /// Personal best chain length, surfaced here now that it's off the home
     /// screen. `0` (never played) hides the line.
     var bestChain: Int = 0
+    /// Where the sheet was opened from, for analytics.
+    var openedFrom: Telemetry.Screen = .home
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.telemetry) private var telemetry
     @State private var filter: Filter = .actors
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
@@ -111,10 +114,25 @@ struct CollectionView: View {
                         ShareLink(item: store.shareText) {
                             Image(systemName: "square.and.arrow.up")
                         }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            telemetry?.shared(from: .reel)
+                        })
                     }
                 }
             }
         }
+        // What was looked at, and for how long: one `card_viewed` per card put
+        // back, one `reel_closed` for the visit.
+        .onChange(of: flipped) { _, over in if over { telemetry?.cardFlipped() } }
+        .onChange(of: filter) { _, tab in telemetry?.reelFiltered("tab:\(tab.rawValue)") }
+        .onChange(of: narrow.decade) { _, decade in
+            if let decade { telemetry?.reelFiltered("decade:\(decade)") }
+        }
+        .onChange(of: narrow.genre) { _, genre in
+            if let genre { telemetry?.reelFiltered("genre:\(genre)") }
+        }
+        .onAppear { telemetry?.reelOpened(from: openedFrom) }
+        .onDisappear { telemetry?.reelClosed() }
     }
 
     // MARK: Hero — the flex line + best chain
@@ -427,9 +445,13 @@ struct CollectionView: View {
             Haptics.lift()
             flipped = false
             expanded = id
+            if let entity = store.entities[id] {
+                telemetry?.cardLifted(entity)
+            }
             return
         }
         guard expanded != nil, !closing else { return }
+        telemetry?.cardPutDown()
         withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.homeFlight) {
             closing = true
             flipped = false

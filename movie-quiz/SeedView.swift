@@ -52,6 +52,7 @@ struct SeedView: View {
     @State private var introTask: Task<Void, Never>?
 
     @State private var showSettings = false
+    @Environment(\.telemetry) private var telemetry
 
     /// The Reel total the player last *saw* on the pill, so growth since then can
     /// be shown rolling up rather than already there.
@@ -132,7 +133,7 @@ struct SeedView: View {
             }
         }
         .sheet(isPresented: $showReel) {
-            CollectionView(store: collection, bestChain: engine.bestChain)
+            CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .home)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -374,6 +375,7 @@ struct SeedView: View {
             Button {
                 Haptics.selection()
                 engine.shuffleSeed()
+                telemetry?.dealt()
             } label: {
                 Label("Deal again", systemImage: "shuffle")
             }
@@ -422,6 +424,7 @@ struct SeedView: View {
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         searchTask?.cancel()
+        telemetry?.runStarted(seed: seed, source: .dealt)
         Task { await engine.startGame(with: seed) }
     }
 
@@ -588,6 +591,7 @@ struct SeedView: View {
 
     private func start(with node: ChainNode) {
         searchTask?.cancel()
+        telemetry?.runStarted(seed: node, source: .picked)
         Task { await engine.startGame(with: node) }
     }
 

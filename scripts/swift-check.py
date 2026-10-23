@@ -39,6 +39,17 @@ LINE_RULES = [
      "use @Observable with @State / @Bindable"),
 ]
 
+# (id, pattern, files it applies to, why/what instead) — rules about *where* code
+# may live, the boundaries docs/ANALYTICS.md draws.
+FILE_RULES = [
+    ("posthog-outside-sink", re.compile(r"\bPostHog(SDK|Config)?\b"),
+     lambda path: path.name != "Analytics.swift",
+     "only Analytics.swift talks to PostHog; report through Telemetry (docs/ANALYTICS.md)"),
+    ("engine-telemetry", re.compile(r"\b(Telemetry|Analytics|telemetry)\b"),
+     lambda path: path.name == "GameEngine.swift",
+     "the engine records plain facts (Turn, Summary); views send them through Telemetry"),
+]
+
 
 def code_part(line):
     """The line with any // comment removed (not inside a URL)."""
@@ -67,6 +78,10 @@ def check_file(path):
 
         for rule, pattern, message in LINE_RULES:
             if pattern.search(code):
+                report(i, rule, message)
+
+        for rule, pattern, applies, message in FILE_RULES:
+            if applies(path) and pattern.search(code):
                 report(i, rule, message)
 
         # A `nonisolated ... async` func runs on its caller's actor under

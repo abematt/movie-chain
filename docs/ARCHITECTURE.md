@@ -595,6 +595,21 @@ small, bold, uppercase and tracked.
 - Token is loaded **at runtime** from a gitignored
   `movie-quiz/TMDBSecrets.plist` (key `TMDBToken`, optional `UsesBearerToken`).
   Copy `TMDBSecrets.example.plist` to set one up. **Never commit the token.**
+- The PostHog project token rides in the same plist (key `PostHogProjectToken`); absent
+  → analytics is off.
+
+### Analytics — [`Telemetry.swift`](../movie-quiz/Telemetry.swift) + [`Analytics.swift`](../movie-quiz/Analytics.swift)
+The full tracking plan (events, properties, rules, how to add analytics to a feature)
+is [`ANALYTICS.md`](ANALYTICS.md). In short:
+- **`Telemetry`** (`\.telemetry`, owned by `movie_quizApp`) is the only thing views call.
+  The core holds the sink, an injected clock, shared context (`mode`, `signed_in`,
+  `sound_on`, `schema`) and screen times; each area adds an extension with its own
+  state struct (`Telemetry+Runs.swift`, `Telemetry+Reel.swift`).
+- **The engine records, never sends**: `GameEngine.Turn` and the summary's `turns`,
+  `finalMisses`, `playTime`, `retries` are plain run facts, timed on an injected clock.
+- **`Analytics.swift`** is the sink and the only PostHog code: `EventName`, the
+  `Analytics` protocol (`NoAnalytics` by default; `PostHogAnalytics` at the root, skipped
+  in test hosts and previews), and `DeviceID`, the anonymous id.
 
 ## Game loop at a glance
 

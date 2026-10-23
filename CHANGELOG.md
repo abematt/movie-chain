@@ -34,6 +34,30 @@ Unspool rebrand was inserted as 0.6.0.)
 
 ## [Unreleased]
 
+### Added
+- **Product analytics (PostHog).** Until now there was no way to know where runs end,
+  how long turns take, what people try, or whether anyone comes back. The app sends
+  a few events with rich properties, about 47 a session, so the 1M-event free tier
+  holds roughly 700 daily players:
+  - `run_started`: the seed (TMDB id), dealt or picked, deals before starting, and
+    time on the home and previous game-over screens.
+  - `link_landed`: what was shown, what was typed, the misses before it, think time
+    and how long the turn's answers took to load.
+  - `run_ended`: the outcome, run and play time, average and slowest answer, wrong
+    guesses, retries, the turn it ended on and the near-miss.
+  - `card_viewed` (one per Reel card looked at: which, how long, flipped, dragged)
+    and `reel_closed` (the visit: time, cards, flips, filters).
+  - `turn_load_failed`, `share_tapped`, and PostHog's app opened/installed/updated.
+
+  Screen times ride on the event that ends the screen, so there are no screen
+  events. Typed text is cut to 60 characters. Nothing else is captured: no
+  autocapture, screen views, replay, surveys or flags. Views call one `Telemetry`
+  object and the engine only records plain facts about each turn, so `GameEngine`
+  stays pure and tests send nothing. Development builds carry `debug_build`.
+- **A stable device id**, made on first launch and used as PostHog's anonymous id, so
+  the events and a future account (0.9.0) agree on who the player was.
+- **"Share usage data" in Settings**, on by default, which stops all sending when off.
+
 ## [0.6.0] — 2026-10-23
 
 Movie Chain becomes **Unspool**: a new name, a two-circle icon and wordmark, and a home
