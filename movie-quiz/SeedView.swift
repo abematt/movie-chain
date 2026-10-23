@@ -133,7 +133,7 @@ struct SeedView: View {
             }
         }
         .sheet(isPresented: $showReel) {
-            CollectionView(store: collection, bestChain: engine.bestChain)
+            CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .home)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -265,10 +265,7 @@ struct SeedView: View {
     // served TMDB-powered dealt seeds — must be able to open it before logging any
     // chain. The count only appears once there's something to count.
     private var reelButton: some View {
-        Button {
-            showReel = true
-            telemetry?.reelOpened(from: .home)
-        } label: {
+        Button { showReel = true } label: {
             HStack(spacing: 6) {
                 Image(systemName: "film.stack")
                     .font(Theme.Font.bodyStrong)
@@ -387,9 +384,7 @@ struct SeedView: View {
             Spacer(minLength: Theme.Spacing.sm)
 
             // The swap animates through its transitions (`modeSwap`).
-            Button {
-                searching = true
-            } label: {
+            Button { searching = true } label: {
                 Label("Pick your own", systemImage: "magnifyingglass")
             }
         }

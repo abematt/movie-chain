@@ -55,6 +55,8 @@ final class Telemetry {
 
     /// Long enough for any real title or name; caps whatever else gets typed.
     static let typedLimit = 60
+    /// The Settings opt-out, read at launch and written by the toggle.
+    static let enabledKey = "analyticsEnabled"
 
     private let sink: any Analytics
     private let now: () -> Date
@@ -175,7 +177,13 @@ final class Telemetry {
     private var flips = 0
     private var filtersUsed: [String] = []
     /// The card that's out of the grid right now.
-    private var lifted: (entity: CollectedEntity, at: Date, flipped: Bool, dragged: Bool)?
+    private struct LiftedCard {
+        let entity: CollectedEntity
+        let at: Date
+        var flipped = false
+        var dragged = false
+    }
+    private var lifted: LiftedCard?
 
     func reelOpened(from screen: Screen) {
         reelOpenedFrom = screen
@@ -186,7 +194,7 @@ final class Telemetry {
     }
 
     func cardLifted(_ entity: CollectedEntity) {
-        lifted = (entity, now(), false, false)
+        lifted = LiftedCard(entity: entity, at: now())
     }
 
     func cardFlipped() {

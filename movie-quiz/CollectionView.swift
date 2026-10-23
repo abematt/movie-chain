@@ -23,6 +23,8 @@ struct CollectionView: View {
     /// Personal best chain length, surfaced here now that it's off the home
     /// screen. `0` (never played) hides the line.
     var bestChain: Int = 0
+    /// Where the sheet was opened from, for analytics.
+    var openedFrom: Telemetry.Screen = .home
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -129,6 +131,7 @@ struct CollectionView: View {
         .onChange(of: narrow.genre) { _, genre in
             if let genre { telemetry?.reelFiltered("genre:\(genre)") }
         }
+        .onAppear { telemetry?.reelOpened(from: openedFrom) }
         .onDisappear { telemetry?.reelClosed() }
     }
 

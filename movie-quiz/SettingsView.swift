@@ -19,7 +19,7 @@ struct SettingsView: View {
 
     @AppStorage("soundEnabled") private var soundEnabled = true
     /// Read at launch by `movie_quizApp` too, so the choice holds from the first event.
-    @AppStorage("analyticsEnabled") private var analyticsEnabled = true
+    @AppStorage(Telemetry.enabledKey) private var analyticsEnabled = true
     @Environment(\.telemetry) private var telemetry
 
     var body: some View {

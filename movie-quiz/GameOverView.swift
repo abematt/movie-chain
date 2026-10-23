@@ -15,8 +15,8 @@ struct GameOverView: View {
     let summary: GameEngine.Summary
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showReel = false
     @Environment(\.telemetry) private var telemetry
+    @State private var showReel = false
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
     @State private var scorePop = 0
@@ -73,7 +73,7 @@ struct GameOverView: View {
             withAnimation(.spring(duration: 0.55, bounce: 0.3).delay(0.06)) { stickerPressed = true }
         }
         .sheet(isPresented: $showReel) {
-            CollectionView(store: collection, bestChain: engine.bestChain)
+            CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .gameOver)
         }
     }
 
@@ -205,10 +205,7 @@ struct GameOverView: View {
 
     // What this run added to the Reel, one line, tappable into the sheet.
     private var reelCell: some View {
-        Button {
-            showReel = true
-            telemetry?.reelOpened(from: .gameOver)
-        } label: {
+        Button { showReel = true } label: {
             HStack(spacing: Theme.Spacing.xs) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Your Reel").metaLabel(size: .small)

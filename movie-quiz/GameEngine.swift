@@ -195,7 +195,8 @@ final class GameEngine {
     private var generation = 0
 
     // The current turn's record, folded into a `Turn` when it's answered.
-    private let clock = ContinuousClock()
+    /// Injectable so tests can time turns exactly.
+    private let now: () -> ContinuousClock.Instant
     private var turnMisses: [String] = []
     /// When the running clock last started; nil while it's stopped.
     private var turnClockStart: ContinuousClock.Instant?
@@ -211,7 +212,8 @@ final class GameEngine {
     private static let bestPointsKey = "bestPoints"
 
     init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
@@ -219,6 +221,7 @@ final class GameEngine {
         self.provider = provider ?? Config.makeProvider()
         self.collection = collection
         self.defaults = defaults
+        self.now = now
         self.bestChain = defaults.integer(forKey: Self.bestChainKey)
         self.bestPoints = defaults.integer(forKey: Self.bestPointsKey)
     }
@@ -372,9 +375,11 @@ final class GameEngine {
         if let ahead {
             expectedKind = seed.nextKind
             isChecking = true
-            let began = clock.now
+            let began = now()
             let loaded = await ahead.value
-            turnLoadTime += clock.now - began
+            // Counted only if this run still owns the wait; a reset during it
+            // has already moved on to a new run's record.
+            if generation == token { turnLoadTime += now() - began }
             if let loaded, !loaded.isEmpty {
                 guard generation == token else { return }
                 candidates = loaded
@@ -517,9 +522,9 @@ final class GameEngine {
         // these are never stale writes — only the post-fetch writes below can be.
         expectedKind = node.nextKind
         isChecking = true
-        let began = clock.now
+        let began = now()
         // Counted only for a load this run still owns; a superseded one is dropped.
-        defer { if generation == token { turnLoadTime += clock.now - began } }
+        defer { if generation == token { turnLoadTime += now() - began } }
         // Retry a transient failure (a shared-key rate limit or a stalled request —
         // see `Config.makeProvider`'s TODO and `requestTimeout`). The clock is paused
         // across this load, so retries cost the player no time. Without this, one
@@ -589,7 +594,7 @@ final class GameEngine {
         // Bank the time the clock ran. Capped at a turn's length, so the
         // time's-up hold before game over isn't counted as play.
         if let start = turnClockStart {
-            let ran = min(clock.now - start, .seconds(Config.secondsPerTurn))
+            let ran = min(now() - start, .seconds(Config.secondsPerTurn))
             turnClockTime += ran
             playTime += ran
             turnClockStart = nil
@@ -598,7 +603,7 @@ final class GameEngine {
 
     private func startCountdown() {
         stopCountdown()
-        turnClockStart = clock.now
+        turnClockStart = now()
         secondsRemaining = Config.secondsPerTurn
         countdownTask = Task { [weak self] in
             // Tick against fixed deadlines from the turn's start, so each second's

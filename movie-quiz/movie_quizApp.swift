@@ -13,11 +13,16 @@ struct movie_quizApp: App {
     @State private var telemetry: Telemetry
 
     init() {
-        let defaults = UserDefaults.standard
-        let enabled = defaults.object(forKey: "analyticsEnabled") as? Bool ?? true
-        _telemetry = State(initialValue: Telemetry(
-            sink: PostHogAnalytics.start(enabled: enabled, defaults: defaults)))
+        _telemetry = State(initialValue: Telemetry(sink: Self.analytics))
     }
+
+    /// The SDK starts exactly once, however often SwiftUI builds this struct
+    /// (a `static let` is initialised once, on first use).
+    private static let analytics: any Analytics = {
+        let defaults = UserDefaults.standard
+        let enabled = defaults.object(forKey: Telemetry.enabledKey) as? Bool ?? true
+        return PostHogAnalytics.start(enabled: enabled, defaults: defaults)
+    }()
 
     var body: some Scene {
         WindowGroup {
