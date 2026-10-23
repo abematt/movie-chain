@@ -5,7 +5,7 @@
 //  Locks what `Telemetry` sends. Event and property names are what dashboards
 //  query, so a rename silently breaks them; durations ride on the event that ends
 //  a screen, so the clock bookkeeping is the part most worth pinning down. Also
-//  the device id's one promise: stable.
+//  keeps docs/ANALYTICS.md honest, and the device id's one promise: stable.
 //
 
 import Foundation
@@ -18,8 +18,11 @@ struct AnalyticsTests {
     @MainActor
     final class Recorder: Analytics {
         private(set) var events: [AnalyticsEvent] = []
+        private(set) var account: String?
         func capture(_ event: AnalyticsEvent) { events.append(event) }
         func setEnabled(_ enabled: Bool) {}
+        func identify(_ accountID: String) { account = accountID }
+        func reset() { account = nil }
 
         func last(_ name: String) throws -> [String: AnyHashable] {
             try #require(events.last { $0.name == name }).properties
@@ -161,6 +164,45 @@ struct AnalyticsTests {
 
         #expect(try recorder.last("card_viewed")["duration_s"] == AnyHashable(2.0))
         #expect(try recorder.last("reel_closed")["cards_viewed"] == AnyHashable(1))
+    }
+
+    // MARK: Shared context and identity
+
+    @Test mutating func everyEventCarriesTheSharedContext() throws {
+        telemetry.context.soundOn = false
+        telemetry.shared(from: .reel)
+        let shared = try recorder.last("share_tapped")
+        #expect(shared["mode"] == AnyHashable("endless"))
+        #expect(shared["signed_in"] == AnyHashable(false))
+        #expect(shared["sound_on"] == AnyHashable(false))
+        #expect(shared["schema"] == AnyHashable(Telemetry.schema))
+        #expect(shared["from"] == AnyHashable("reel"), "an event's own properties survive the merge")
+    }
+
+    @Test mutating func signingInTiesEventsToTheAccountUntilSignOut() throws {
+        telemetry.signedIn(accountID: "acct-1")
+        #expect(recorder.account == "acct-1")
+        telemetry.shared(from: .reel)
+        #expect(try recorder.last("share_tapped")["signed_in"] == AnyHashable(true))
+
+        telemetry.signedOut()
+        #expect(recorder.account == nil)
+        telemetry.shared(from: .reel)
+        #expect(try recorder.last("share_tapped")["signed_in"] == AnyHashable(false))
+    }
+
+    // MARK: The tracking plan
+
+    /// docs/ANALYTICS.md documents each event under a `### `name`` heading; it
+    /// must list exactly the events the code can send.
+    @Test func theTrackingPlanDocumentsEveryEvent() throws {
+        let plan = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "docs/ANALYTICS.md")
+        let text = try String(contentsOf: plan, encoding: .utf8)
+        let documented = Set(text.matches(of: /^### `(\w+)`/.anchorsMatchLineEndings())
+            .map { String($0.1) })
+        #expect(documented == Set(EventName.allCases.map(\.rawValue)))
     }
 
     // MARK: Device id

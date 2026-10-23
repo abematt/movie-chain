@@ -74,6 +74,8 @@ struct ContentView: View {
             // Every run ends here, and screen times start here.
             telemetry?.phaseChanged(to: phase)
         }
+        // Settings ride on every event as context, never as events of their own.
+        .onChange(of: soundEnabled, initial: true) { _, on in telemetry?.context.soundOn = on }
         .onChange(of: scenePhase) { old, phase in
             // Guarantee the latest collection snapshot is on disk before the app
             // is suspended/killed, not just eventually via the async save.

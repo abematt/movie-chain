@@ -13,7 +13,9 @@ Review the Swift changes on this branch before they merge.
 4. Review for what a script can't see: value vs reference types, enums for exclusive
    state, `some` vs `any`, isolation and actor reentrancy across `await`, unstructured
    tasks that should be structured, cancellation, algorithmic cost, and test coverage
-   for new logic (Swift Testing, parameterized where it's a table).
+   for new logic (Swift Testing, parameterized where it's a table). For a user-facing
+   change, also check it reports through `Telemetry` per docs/ANALYTICS.md (a property
+   before an event, nothing from the engine) and that the plan was updated with it.
 5. Report findings most-severe first, each with a `file:line` link, what's wrong, and
    the fix. Separate "fix before merge" from "worth doing" and say plainly if the
    diff is clean. Don't edit code unless asked.

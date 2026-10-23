@@ -160,7 +160,8 @@ has actually been bitten by, and how they're enforced.
   (all configurations), so a data-race or isolation warning fails the build.
 - **`scripts/swift-check.py`** — the grep-able rules: `XCTestCase`, `Task.detached`,
   `DispatchQueue.main`, `locale: .current`, `print(`, `ObservableObject`/`@Published`,
-  `nonisolated … async` without `@concurrent`, and a `Task` inside `onAppear`. A
+  `nonisolated … async` without `@concurrent`, a `Task` inside `onAppear`, PostHog
+  outside `Analytics.swift`, and telemetry inside `GameEngine`. A
   deliberate exception carries `// swift-check:ignore — <why>` on the line.
   - Runs after every Claude Code edit to a Swift file (`.claude/settings.json`
     PostToolUse hook) — a violation is reported back immediately; fix it.
@@ -168,6 +169,21 @@ has actually been bitten by, and how they're enforced.
     `git config core.hooksPath .githooks`
 - **`/swift-review [base]`** — the judgment pass a script can't do (value vs reference,
   `some`/`any`, reentrancy, structure, test coverage). Run it on a branch before merging.
+
+## Analytics
+
+**Every user-facing feature reports through `Telemetry` (PostHog). Read
+[`docs/ANALYTICS.md`](docs/ANALYTICS.md) before building one, and update it in the same
+change** — a test fails if its event list and `EventName` disagree.
+
+- Views call `Telemetry` (`\.telemetry`); the engine only records plain facts
+  (`GameEngine.Turn`, `Summary`) and never sends. Only `Analytics.swift` touches PostHog.
+- **A property before an event** — the free tier is 1M events/month and the app spends
+  ~47 a session. Screen times ride on the event that ends the screen; settings and the
+  game mode are shared context on every event, not events.
+- A new area or mode gets its own `Telemetry+<Area>.swift` with its own state struct.
+- Durations use the injected clock and are tested with the recording sink.
+- Sign-in (0.9.0) calls `Telemetry.signedIn(accountID:)` / `signedOut()`.
 
 ## Architecture
 
@@ -186,7 +202,9 @@ has actually been bitten by, and how they're enforced.
 > **read it before building anything that picks chain links for the player**;
 > [`docs/GROWTH.md`](docs/GROWTH.md) = growth mechanics as a **build catalog** (share
 > loop, daily chain, challenge links, chain→video), sized and mapped to the code, plus
-> the TMDB request-rate gate that constrains any acquisition push.
+> the TMDB request-rate gate that constrains any acquisition push;
+> [`docs/ANALYTICS.md`](docs/ANALYTICS.md) = the **tracking plan** — every analytics
+> event and property, the rules, and the checklist for adding analytics to a feature.
 
 The game logic is fully decoupled from both the UI and the data source.
 

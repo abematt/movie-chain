@@ -598,26 +598,18 @@ small, bold, uppercase and tracked.
 - The PostHog project token rides in the same plist (key `PostHogProjectToken`); absent
   → analytics is off.
 
-### Analytics — [`Analytics.swift`](../movie-quiz/Analytics.swift)
-- **Few events, rich properties** (~47 a session, sized to PostHog's 1M/month free
-  tier): `run_started`, `link_landed`, `run_ended`, `turn_load_failed`, `share_tapped`,
-  `card_viewed`, `reel_closed`. A screen's time rides on the event that ends it; misses
-  ride on their turn. Add a property before adding an event.
-- **`Telemetry`** (`\.telemetry`, owned by `movie_quizApp`) is the only thing views
-  call. It holds the context events need (run id, when a screen or card appeared, the
-  lifted card) and builds every event, with an injected clock. `ContentView` feeds it
-  phase changes; `run_ended` comes from there.
-- **The engine records, never sends.** `GameEngine.Turn` (prompt, answer, typed text,
-  misses, think time, load time) and the summary's `turns` / `finalMisses` /
-  `playTime` / `retries` are plain run facts; the views pass them to `Telemetry`.
-- **`Analytics`** is the sink: `NoAnalytics` by default, `PostHogAnalytics` at the root
-  (skipped in test hosts and previews). PostHog is measurement only: lifecycle events
-  on; autocapture, screen views, swizzling, replay, surveys and flags off.
-- Ids are TMDB ids; typed text is clipped to 60 characters (declare Other User Content
-  on the privacy label). `DeviceID` is PostHog's anonymous id via `getAnonymousId`.
-  Settings' "Share usage data" (`analyticsEnabled`) opts out.
-- **Not for the server.** Account data (0.9.0) is the player's: Reel, records,
-  results. Behaviour stays here; don't query the account DB for analytics.
+### Analytics — [`Telemetry.swift`](../movie-quiz/Telemetry.swift) + [`Analytics.swift`](../movie-quiz/Analytics.swift)
+The full tracking plan (events, properties, rules, how to add analytics to a feature)
+is [`ANALYTICS.md`](ANALYTICS.md). In short:
+- **`Telemetry`** (`\.telemetry`, owned by `movie_quizApp`) is the only thing views call.
+  The core holds the sink, an injected clock, shared context (`mode`, `signed_in`,
+  `sound_on`, `schema`) and screen times; each area adds an extension with its own
+  state struct (`Telemetry+Runs.swift`, `Telemetry+Reel.swift`).
+- **The engine records, never sends**: `GameEngine.Turn` and the summary's `turns`,
+  `finalMisses`, `playTime`, `retries` are plain run facts, timed on an injected clock.
+- **`Analytics.swift`** is the sink and the only PostHog code: `EventName`, the
+  `Analytics` protocol (`NoAnalytics` by default; `PostHogAnalytics` at the root, skipped
+  in test hosts and previews), and `DeviceID`, the anonymous id.
 
 ## Game loop at a glance
 
