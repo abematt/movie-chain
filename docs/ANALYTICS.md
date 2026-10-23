@@ -106,13 +106,14 @@ A turn's answers couldn't load and the Retry button replaced the answer field.
 ### `deal_failed`
 
 The home couldn't deal a start: the deal pools didn't load after every attempt and
-no saved copy was on the device to fall back on, so "Deal again" became "Try again".
+no saved copy was on the device to fall back on, so the home showed its "Out of film."
+no-connection screen.
 Rare by design (the pools are cached on disk), so it costs almost nothing in volume,
 and it's the one failure that strands a player before any run event fires.
 
 | Property | Meaning |
 |---|---|
-| `retries` | "Try again" taps before this failure (0 on the first) |
+| `retries` | "Reconnect" taps before this failure (0 on the first) |
 | `home_s` | Time on the home screen so far |
 
 ### `run_ended`

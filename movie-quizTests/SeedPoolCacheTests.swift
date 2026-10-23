@@ -113,7 +113,7 @@ struct SeedPoolCacheTests {
         #expect(engine.dealFailed)
 
         provider.offline = false
-        await engine.prepareSeeds()   // the home's "Try again"
+        await engine.prepareSeeds()   // the home's "Reconnect"
         #expect(engine.dealtSeed != nil)
         #expect(!engine.dealFailed)
     }

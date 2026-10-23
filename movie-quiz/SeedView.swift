@@ -35,9 +35,9 @@ struct SeedView: View {
     @State private var results: [ChainNode] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var showReel = false
-    /// "Try again" taps after the deal failed; each one re-runs the deal task.
+    /// "Reconnect" taps after the deal failed; each one re-runs the deal task.
     @State private var dealRetries = 0
-    /// A "Try again" is in flight: the button shows it, and the no-connection
+    /// A "Reconnect" is in flight: the button shows it, and the no-connection
     /// screen stays up rather than flickering back to "Dealing…".
     @State private var dealRetrying = false
     /// Whether the "pick your own start" search flow is showing (vs the deal).
@@ -147,12 +147,12 @@ struct SeedView: View {
             SettingsView()
         }
         // Deal a fresh start on every appearance (cold launch and "Play again"),
-        // and again on each "Try again" after a failed deal.
+        // and again on each "Reconnect" after a failed deal.
         .task(id: dealRetries) {
             await engine.prepareSeeds()
             guard !Task.isCancelled else { return }
             dealRetrying = false
-            // Each failed attempt reports, a repeat failure on "Try again" included.
+            // Each failed attempt reports, a repeat failure on "Reconnect" included.
             if engine.dealFailed { telemetry?.dealFailed(retries: dealRetries) }
         }
         // Each dealt start: warm its art (the avatar, the flight and the start
@@ -371,22 +371,23 @@ struct SeedView: View {
     private var offlineSection: some View {
         VStack(spacing: 0) {
             Spacer(minLength: Theme.Spacing.md)
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            VStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "wifi.slash")
                     .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(Theme.Color.muted)
                     .accessibilityHidden(true)
-                Text("No connection.")
+                Text("Out of film.")
                     .font(Theme.Font.flourish(size: SentenceType.verbSize))
                     .foregroundStyle(Theme.Color.ink)
-                Text("Starts are dealt from the movie database, and it can't be reached right now. Check your signal and try again.")
+                Text("Looks like we unspooled a little too far. Let's thread a new reel.")
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.muted)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 retryDealButton
                     .padding(.top, Theme.Spacing.sm)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
             Spacer(minLength: Theme.Spacing.md)
             bestRun
         }
@@ -405,7 +406,7 @@ struct SeedView: View {
                 } else {
                     Image(systemName: "arrow.clockwise")
                 }
-                Text(dealRetrying ? "Trying…" : "Try again")
+                Text(dealRetrying ? "Reconnecting…" : "Reconnect")
             }
             .frame(maxWidth: .infinity)
         }

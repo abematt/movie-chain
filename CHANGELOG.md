@@ -70,8 +70,8 @@ Unspool rebrand was inserted as 0.6.0.)
 - **The home screen no longer hangs on "Dealing…".** When the pool couldn't load (offline,
   or rate-limited on a cold launch), the first screen a new player saw stayed on
   "Dealing…" with no way forward. It now deals from the last saved pool if there is one,
-  and otherwise shows a proper no-connection screen: what's wrong in a sentence, and one
-  "Try again" button that stays on that screen while it retries.
+  and otherwise shows a no-connection screen in the app's own voice ("Out of film.")
+  with one Reconnect button that stays on that screen while it retries.
 
 ## [0.6.0] — 2026-10-23
 
