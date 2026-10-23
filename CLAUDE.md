@@ -335,7 +335,8 @@ values.
 
 Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall
 every Nth link) all layer on this same engine — keep the engine/provider split clean.
-Accounts arrive at 0.9.0 (Sign in with Apple over a device id); the local
+Accounts arrive at 0.9.0 (Apple, Google or email one-time code via Supabase, over a
+device id); the local
 collection/session data is forward-compatible with that sync. There will be no global
 leaderboard.
 
