@@ -183,6 +183,44 @@ struct GameEngineTests {
         #expect(summary.shareText.hasSuffix("🟦🟨"))
     }
 
+    // MARK: The run's record (read by analytics)
+
+    @Test func eachTurnRecordsWhatWasShownTypedAndMissed() async throws {
+        let engine = makeEngine(SimpleGraphProvider())
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+        await engine.submit("zzzz")
+        await engine.submit("Film 100")
+
+        let turn = try #require(engine.turns.first)
+        #expect(engine.turns.count == 1)
+        #expect(turn.prompt.id == "p1" && turn.answer.id == "m100")
+        #expect(turn.typed == "Film 100")
+        #expect(turn.misses == ["zzzz"])
+        #expect(turn.answerTime >= .zero)
+    }
+
+    @Test func theLastTurnsMissesAndRetriesLandOnTheSummary() async throws {
+        let engine = makeEngine(SimpleGraphProvider())
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+        await engine.submit("Film 100")
+        await engine.submit("Actor 1")      // already in the chain: a miss too
+        engine.quit()
+
+        let summary = try #require(engine.summary)
+        #expect(summary.turns.count == 1)
+        #expect(summary.finalMisses == ["Actor 1"])
+        #expect(summary.retries == 0)
+        #expect(summary.endedByQuit)
+    }
+
+    @Test func aNewRunStartsWithAnEmptyRecord() async {
+        let engine = makeEngine(SimpleGraphProvider())
+        await engine.startGame(with: .actor(Person(id: 1, name: "Actor 1")))
+        await engine.submit("Film 100")
+        engine.reset()
+        #expect(engine.turns.isEmpty)
+    }
+
     // MARK: Candidate prefetch (the home fetches the dealt start's answers)
 
     /// One film per actor ("Film 10N" for actor N), counting filmography fetches.
@@ -309,6 +347,8 @@ struct GameEngineTests {
         #expect(!engine.awaitingRetry)
         await engine.submit("Film 100")
         #expect(engine.score == 1)
+        engine.quit()
+        #expect(engine.summary?.retries == 1)
     }
 
     // MARK: Records

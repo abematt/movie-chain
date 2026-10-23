@@ -599,16 +599,25 @@ small, bold, uppercase and tracked.
   → analytics is off.
 
 ### Analytics — [`Analytics.swift`](../movie-quiz/Analytics.swift)
-- `AnalyticsEvent` is the closed event vocabulary (names are what dashboards query —
-  `AnalyticsTests` locks them). Properties are counts and categories only.
-- `Analytics` is injected through `\.analytics`; the default is `NoAnalytics`, and only
-  `movie_quizApp` installs `PostHogAnalytics` (skipped in test hosts and previews).
-  Events fire from views reacting to engine state, never from `GameEngine` — the same
-  split as haptics and sound. `run_ended` fires once, from `ContentView`'s phase change.
-- PostHog is measurement only: lifecycle events on; autocapture, screen views,
-  swizzling, replay, surveys and flags off. Remote config belongs to the service.
-- `DeviceID` (a UUID in `UserDefaults`) is PostHog's anonymous id via
-  `getAnonymousId`. Settings' "Share usage data" (`analyticsEnabled`) opts out.
+- **Few events, rich properties** (~47 a session, sized to PostHog's 1M/month free
+  tier): `run_started`, `link_landed`, `run_ended`, `turn_load_failed`, `share_tapped`,
+  `card_viewed`, `reel_closed`. A screen's time rides on the event that ends it; misses
+  ride on their turn. Add a property before adding an event.
+- **`Telemetry`** (`\.telemetry`, owned by `movie_quizApp`) is the only thing views
+  call. It holds the context events need (run id, when a screen or card appeared, the
+  lifted card) and builds every event, with an injected clock. `ContentView` feeds it
+  phase changes; `run_ended` comes from there.
+- **The engine records, never sends.** `GameEngine.Turn` (prompt, answer, typed text,
+  misses, think time, load time) and the summary's `turns` / `finalMisses` /
+  `playTime` / `retries` are plain run facts; the views pass them to `Telemetry`.
+- **`Analytics`** is the sink: `NoAnalytics` by default, `PostHogAnalytics` at the root
+  (skipped in test hosts and previews). PostHog is measurement only: lifecycle events
+  on; autocapture, screen views, swizzling, replay, surveys and flags off.
+- Ids are TMDB ids; typed text is clipped to 60 characters (declare Other User Content
+  on the privacy label). `DeviceID` is PostHog's anonymous id via `getAnonymousId`.
+  Settings' "Share usage data" (`analyticsEnabled`) opts out.
+- **Not for the server.** Account data (0.9.0) is the player's: Reel, records,
+  results. Behaviour stays here; don't query the account DB for analytics.
 
 ## Game loop at a glance
 

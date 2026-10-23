@@ -357,6 +357,7 @@ struct ReelCardDetail: View {
     /// The card's live tilt — never under Reduce Motion.
     @State private var tilt: CardTilt?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.telemetry) private var telemetry
 
     /// Turning over: quick enough to flip back and forth, a touch of settle.
     static let flip: Animation = .spring(duration: 0.42, bounce: 0.1)
@@ -433,7 +434,10 @@ struct ReelCardDetail: View {
                     // A drag tips the card (no gyro needed); a tap still flips.
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 4)
-                            .onChanged { value in tilt?.dragChanged(value.translation) }
+                            .onChanged { value in
+                                tilt?.dragChanged(value.translation)
+                                telemetry?.cardDragged()
+                            }
                             .onEnded { value in tilt?.dragEnded(velocity: value.velocity) }
                     )
                     .modifier(CardTiltRotation())

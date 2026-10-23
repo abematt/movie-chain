@@ -26,7 +26,7 @@ struct CollectionView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.analytics) private var analytics
+    @Environment(\.telemetry) private var telemetry
     @State private var filter: Filter = .actors
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
@@ -113,12 +113,23 @@ struct CollectionView: View {
                             Image(systemName: "square.and.arrow.up")
                         }
                         .simultaneousGesture(TapGesture().onEnded {
-                            analytics.capture(.shareTapped(from: .reel))
+                            telemetry?.shared(from: .reel)
                         })
                     }
                 }
             }
         }
+        // What was looked at, and for how long: one `card_viewed` per card put
+        // back, one `reel_closed` for the visit.
+        .onChange(of: flipped) { _, over in if over { telemetry?.cardFlipped() } }
+        .onChange(of: filter) { _, tab in telemetry?.reelFiltered("tab:\(tab.rawValue)") }
+        .onChange(of: narrow.decade) { _, decade in
+            if let decade { telemetry?.reelFiltered("decade:\(decade)") }
+        }
+        .onChange(of: narrow.genre) { _, genre in
+            if let genre { telemetry?.reelFiltered("genre:\(genre)") }
+        }
+        .onDisappear { telemetry?.reelClosed() }
     }
 
     // MARK: Hero — the flex line + best chain
@@ -431,9 +442,13 @@ struct CollectionView: View {
             Haptics.lift()
             flipped = false
             expanded = id
+            if let entity = store.entities[id] {
+                telemetry?.cardLifted(entity)
+            }
             return
         }
         guard expanded != nil, !closing else { return }
+        telemetry?.cardPutDown()
         withAnimation(reduceMotion ? Theme.Motion.reducedFade : Self.homeFlight) {
             closing = true
             flipped = false

@@ -52,7 +52,7 @@ struct SeedView: View {
     @State private var introTask: Task<Void, Never>?
 
     @State private var showSettings = false
-    @Environment(\.analytics) private var analytics
+    @Environment(\.telemetry) private var telemetry
 
     /// The Reel total the player last *saw* on the pill, so growth since then can
     /// be shown rolling up rather than already there.
@@ -267,7 +267,7 @@ struct SeedView: View {
     private var reelButton: some View {
         Button {
             showReel = true
-            analytics.capture(.reelOpened(from: .home))
+            telemetry?.reelOpened(from: .home)
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "film.stack")
@@ -378,7 +378,7 @@ struct SeedView: View {
             Button {
                 Haptics.selection()
                 engine.shuffleSeed()
-                analytics.capture(.dealAgain)
+                telemetry?.dealt()
             } label: {
                 Label("Deal again", systemImage: "shuffle")
             }
@@ -389,7 +389,6 @@ struct SeedView: View {
             // The swap animates through its transitions (`modeSwap`).
             Button {
                 searching = true
-                analytics.capture(.pickYourOwnOpened)
             } label: {
                 Label("Pick your own", systemImage: "magnifyingglass")
             }
@@ -430,7 +429,7 @@ struct SeedView: View {
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         searchTask?.cancel()
-        analytics.capture(.runStarted(seed: seed.kind, source: .dealt))
+        telemetry?.runStarted(seed: seed, source: .dealt)
         Task { await engine.startGame(with: seed) }
     }
 
@@ -597,7 +596,7 @@ struct SeedView: View {
 
     private func start(with node: ChainNode) {
         searchTask?.cancel()
-        analytics.capture(.runStarted(seed: node.kind, source: .picked))
+        telemetry?.runStarted(seed: node, source: .picked)
         Task { await engine.startGame(with: node) }
     }
 

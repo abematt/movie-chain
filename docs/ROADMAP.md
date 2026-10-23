@@ -482,7 +482,8 @@ The shipping checklist, plus the last player-facing pieces.
   this. The argument for keeping it is [`ASSISTED-MODE.md`](ASSISTED-MODE.md): a mode
   survived four commits of refinement and died in one playtest.
 - **App Store requirements:** privacy manifest / nutrition label (note: accounts and the
-  PostHog SDK from 0.7.0 change these answers), **account deletion** since 0.9.0 ships accounts,
+  PostHog SDK from 0.7.0 change these answers: Product Interaction, Other User Content
+  (typed answers), Device ID, all not linked to identity and not used for tracking), **account deletion** since 0.9.0 ships accounts,
   and the **TMDB attribution** already rendered in the Reel sheet — keep it reachable.
   A **privacy policy URL and a support URL** — both required for the listing; host them
   on the 0.8.0 domain.

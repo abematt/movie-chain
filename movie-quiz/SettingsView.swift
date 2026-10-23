@@ -20,7 +20,7 @@ struct SettingsView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
     /// Read at launch by `movie_quizApp` too, so the choice holds from the first event.
     @AppStorage("analyticsEnabled") private var analyticsEnabled = true
-    @Environment(\.analytics) private var analytics
+    @Environment(\.telemetry) private var telemetry
 
     var body: some View {
         NavigationStack {
@@ -81,9 +81,9 @@ struct SettingsView: View {
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
-            .onChange(of: analyticsEnabled) { _, on in analytics.setEnabled(on) }
+            .onChange(of: analyticsEnabled) { _, on in telemetry?.setEnabled(on) }
 
-            Text("How runs go — counts, never names or answers — so the game gets better. Not linked to you.")
+            Text("How you play — your turns, what you type, what you look at in your Reel — so the game gets better. Not linked to who you are.")
                 .font(Theme.Font.flourish(.footnote))
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.top, Theme.Spacing.xs)

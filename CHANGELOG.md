@@ -36,14 +36,24 @@ Unspool rebrand was inserted as 0.6.0.)
 
 ### Added
 - **Product analytics (PostHog).** Until now there was no way to know where runs end,
-  whether the home sentence teaches the rule, or whether anyone comes back. The app now
-  sends a small, closed set of events (`run_started`, `link_landed`, `run_ended`,
-  `turn_load_failed`, `deal_again`, `pick_your_own_opened`, `play_again`,
-  `reel_opened`, `share_tapped`) plus PostHog's app opened/installed/updated, and
-  nothing else: no autocapture, screen views, replay, surveys or flags. Properties are
-  counts and categories, never a name the player typed. Events are fired from the
-  views through an injected `Analytics`, so the engine stays pure and tests send
-  nothing; development builds carry `debug_build` so they can be filtered out.
+  how long turns take, what people try, or whether anyone comes back. The app sends
+  a few events with rich properties, about 47 a session, so the 1M-event free tier
+  holds roughly 700 daily players:
+  - `run_started`: the seed (TMDB id), dealt or picked, deals before starting, and
+    time on the home and previous game-over screens.
+  - `link_landed`: what was shown, what was typed, the misses before it, think time
+    and how long the turn's answers took to load.
+  - `run_ended`: the outcome, run and play time, average and slowest answer, wrong
+    guesses, retries, the turn it ended on and the near-miss.
+  - `card_viewed` (one per Reel card looked at: which, how long, flipped, dragged)
+    and `reel_closed` (the visit: time, cards, flips, filters).
+  - `turn_load_failed`, `share_tapped`, and PostHog's app opened/installed/updated.
+
+  Screen times ride on the event that ends the screen, so there are no screen
+  events. Typed text is cut to 60 characters. Nothing else is captured: no
+  autocapture, screen views, replay, surveys or flags. Views call one `Telemetry`
+  object and the engine only records plain facts about each turn, so `GameEngine`
+  stays pure and tests send nothing. Development builds carry `debug_build`.
 - **A stable device id**, made on first launch and used as PostHog's anonymous id, so
   the events and a future account (0.9.0) agree on who the player was.
 - **"Share usage data" in Settings**, on by default, which stops all sending when off.
