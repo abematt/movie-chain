@@ -91,3 +91,17 @@ struct StubProvider: MovieDataProvider {
             .sorted { $0.title < $1.title }
     }
 }
+
+#if DEBUG
+/// QA: every request fails, as if the phone were offline — `-uiOffline` launches
+/// with it and no saved pool, to show the home's "No connection." state.
+struct OfflineProvider: MovieDataProvider {
+    struct Offline: Error {}
+    func searchActors(_ query: String) async throws -> [Person] { throw Offline() }
+    func searchMovies(_ query: String) async throws -> [Movie] { throw Offline() }
+    func popularActors() async throws -> [Person] { throw Offline() }
+    func popularMovies() async throws -> [Movie] { throw Offline() }
+    func cast(of movie: Movie) async throws -> [Person] { throw Offline() }
+    func filmography(of actor: Person) async throws -> [Movie] { throw Offline() }
+}
+#endif

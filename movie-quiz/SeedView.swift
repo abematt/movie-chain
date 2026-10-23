@@ -37,6 +37,9 @@ struct SeedView: View {
     @State private var showReel = false
     /// "Try again" taps after the deal failed; each one re-runs the deal task.
     @State private var dealRetries = 0
+    /// A "Try again" is in flight: the button shows it, and the no-connection
+    /// screen stays up rather than flickering back to "Dealing…".
+    @State private var dealRetrying = false
     /// Whether the "pick your own start" search flow is showing (vs the deal).
     @State private var searching = false
 
@@ -110,6 +113,9 @@ struct SeedView: View {
                     if searching {
                         searchSection
                             .transition(modeSwap)
+                    } else if engine.dealFailed {
+                        offlineSection
+                            .transition(modeSwap)
                     } else {
                         dealSection
                             .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
@@ -142,9 +148,12 @@ struct SeedView: View {
         }
         // Deal a fresh start on every appearance (cold launch and "Play again"),
         // and again on each "Try again" after a failed deal.
-        .task(id: dealRetries) { await engine.prepareSeeds() }
-        .onChange(of: engine.dealFailed) { _, failed in
-            if failed { telemetry?.dealFailed(retries: dealRetries) }
+        .task(id: dealRetries) {
+            await engine.prepareSeeds()
+            guard !Task.isCancelled else { return }
+            dealRetrying = false
+            // Each failed attempt reports, a repeat failure on "Try again" included.
+            if engine.dealFailed { telemetry?.dealFailed(retries: dealRetries) }
         }
         // Each dealt start: warm its art (the avatar, the flight and the start
         // card all draw it), then, if it's still the one on screen, fetch its
@@ -343,9 +352,7 @@ struct SeedView: View {
                     .id(seed.id)
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
-                // Offline with nothing saved to deal from: say so, and "Deal
-                // again" below becomes "Try again".
-                Text(engine.dealFailed ? "No connection." : "Dealing…")
+                Text("Dealing…")
                     .font(Theme.Font.flourish(size: SentenceType.verbSize))
                     .foregroundStyle(Theme.Color.muted)
                     .transition(.opacity)
@@ -354,6 +361,56 @@ struct SeedView: View {
         .frame(maxWidth: .infinity, minHeight: 250, alignment: .bottomLeading)
         .opacity(handingOff ? 0 : 1)
         .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.dealtSeed)
+    }
+
+    // MARK: No connection — the pools didn't load and nothing was saved
+
+    /// Replaces the whole deal while there's no start to deal: say what's wrong
+    /// in a sentence, and make trying again the one thing to do. The best run
+    /// stays at the foot, where it always sits.
+    private var offlineSection: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: Theme.Spacing.md)
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .accessibilityHidden(true)
+                Text("No connection.")
+                    .font(Theme.Font.flourish(size: SentenceType.verbSize))
+                    .foregroundStyle(Theme.Color.ink)
+                Text("Starts are dealt from the movie database, and it can't be reached right now. Check your signal and try again.")
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                retryDealButton
+                    .padding(.top, Theme.Spacing.sm)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: Theme.Spacing.md)
+            bestRun
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var retryDealButton: some View {
+        Button {
+            Haptics.selection()
+            dealRetrying = true
+            dealRetries += 1
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                if dealRetrying {
+                    ProgressView().tint(Theme.Color.onAccent)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                }
+                Text(dealRetrying ? "Trying…" : "Try again")
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.primary)
+        .disabled(dealRetrying)
     }
 
     // The blank is the start button: tapping it plays.
@@ -372,9 +429,7 @@ struct SeedView: View {
     }
 
     private var blankLabel: String {
-        guard let seed = engine.dealtSeed else {
-            return engine.dealFailed ? "No connection, no start dealt" : "Dealing a start"
-        }
+        guard let seed = engine.dealtSeed else { return "Dealing a start" }
         return seed.kind == .actor
             ? "Start: name a movie \(seed.matchText) was in"
             : "Start: name an actor who starred in \(seed.matchText)"
@@ -382,23 +437,14 @@ struct SeedView: View {
 
     private var dealLinks: some View {
         HStack {
-            if engine.dealFailed {
-                Button {
-                    Haptics.selection()
-                    dealRetries += 1
-                } label: {
-                    Label("Try again", systemImage: "arrow.clockwise")
-                }
-            } else {
-                Button {
-                    Haptics.selection()
-                    engine.shuffleSeed()
-                    telemetry?.dealt()
-                } label: {
-                    Label("Deal again", systemImage: "shuffle")
-                }
-                .disabled(engine.dealtSeed == nil)
+            Button {
+                Haptics.selection()
+                engine.shuffleSeed()
+                telemetry?.dealt()
+            } label: {
+                Label("Deal again", systemImage: "shuffle")
             }
+            .disabled(engine.dealtSeed == nil)
 
             Spacer(minLength: Theme.Spacing.sm)
 

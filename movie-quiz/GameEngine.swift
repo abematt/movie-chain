@@ -277,8 +277,8 @@ final class GameEngine {
         // Retry a transient pool-load failure a few times so a flaky first launch
         // self-heals while the player is still on the home screen. A hard failure
         // sets `dealFailed`, and the home's "Try again" calls this again (a side
-        // stays unloaded until it actually returns entries).
-        dealFailed = false
+        // stays unloaded until it actually returns entries). The flag only changes
+        // once the attempts are over, so a retry doesn't flash "Dealing…".
         for attempt in 0..<3 {
             await loadSeedPoolsIfNeeded()
             if Task.isCancelled { return }
