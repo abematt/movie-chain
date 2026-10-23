@@ -89,9 +89,12 @@ struct ContentView: View {
             // Warm the first screen of Your Reel, so even its first open arrives
             // with art in place instead of each card fading in. Image CDN only
             // (no TMDB API calls), and a no-op from disk after the first time.
+            // Actor cards print their photos in a duotone, so that's the image warmed.
             let leading = collection.sortedActors.prefix(12) + collection.sortedMovies.prefix(12)
-            await ArtCache.shared.warm(leading.compactMap {
-                Config.imageURL(path: $0.imagePath, size: ReelLayout.artSize)
+            await ArtCache.shared.warm(leading.compactMap { entity in
+                Config.imageURL(path: entity.imagePath, size: ReelLayout.artSize).map {
+                    (url: $0, duotone: entity.kind == .actor ? Duotone.forActor(tmdbID: entity.tmdbID) : nil)
+                }
             })
         }
         .onAppear {

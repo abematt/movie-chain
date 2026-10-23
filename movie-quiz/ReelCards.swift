@@ -8,8 +8,11 @@
 //  actor's films, or a movie's actors — a reverse reference with no progress,
 //  since a cast runs to extras and could never be completed.
 //
-//  No numbers are printed on the front: the card's finish is the reward. Cards
-//  and frames are drawn once, at their grid size, and scaled to whatever size
+//  An actor card's front carries only its collector number — the order you
+//  first linked them in, a set number rather than a score — and five dots of
+//  progress toward holo; no counts. Its photo is printed in the actor's own
+//  duotone (`Duotone`), and its face is paper, then that pastel, then holo foil:
+//  the finish is the reward. Cards and frames are drawn once, at their grid size, and scaled to whatever size
 //  they're shown at (`ReelCanvas`) — so lifting one is a pure zoom, the same
 //  picture brought closer, with nothing re-flowing on the way.
 //
@@ -20,25 +23,51 @@ import SwiftUI
 
 /// The finish a card is printed in, lowest first.
 enum ReelFinish: Comparable {
-    case paper, inked, holo
+    case paper, pastel, holo
 
     var label: String {
         switch self {
         case .paper: "Paper"
-        case .inked: "Inked"
+        case .pastel: "Pastel"
         case .holo: "Holo"
         }
     }
 }
 
 enum ReelTier {
-    /// Films linked through an actor before their card is inked, then holo.
-    static let inkedAt = 5
+    /// Films linked through an actor before their card turns pastel, then holo.
+    static let pastelAt = 5
     static let holoAt = 11
+    /// The progress dots on a card's name plate.
+    static let dots = 5
 
     static func finish(links: Int) -> ReelFinish {
         if links >= holoAt { return .holo }
-        return links >= inkedAt ? .inked : .paper
+        return links >= pastelAt ? .pastel : .paper
+    }
+
+    /// Dots filled on the way to holo: one as soon as a film is linked, all five
+    /// only at holo, so a full row always means the top finish.
+    static func filledDots(links: Int) -> Int {
+        guard links > 0 else { return 0 }
+        return min(dots, max(1, links * dots / holoAt))
+    }
+}
+
+/// Collector numbers: an actor's place in the order you first linked them, from
+/// No. 1. Ties (one chain logging several at once) break by TMDB id, so the
+/// numbering is stable. Computed from the whole Reel, never a filtered view.
+enum ReelNumber {
+    static func numbers(for actors: [CollectedEntity]) -> [CollectedEntity.ID: Int] {
+        let ordered = actors.sorted {
+            ($0.firstSeen, $0.tmdbID) < ($1.firstSeen, $1.tmdbID)
+        }
+        return Dictionary(uniqueKeysWithValues: ordered.enumerated().map { ($1.id, $0 + 1) })
+    }
+
+    /// "No. 027" — three digits, as a set number reads.
+    static func label(_ number: Int) -> String {
+        "No. " + String(repeating: "0", count: max(0, 3 - String(number).count)) + String(number)
     }
 }
 
@@ -94,6 +123,8 @@ struct ReelCanvas<Content: View>: View {
 
 struct ReelActorCard: View {
     let entity: CollectedEntity
+    /// Its collector number (`ReelNumber`); `nil` leaves the header blank.
+    var number: Int? = nil
     var isNew = false
     /// Lifted: swap the art for a sharper image once it has loaded.
     var sharpArt = false
@@ -112,64 +143,105 @@ struct ReelActorCard: View {
 
     private var links: Int { entity.links.count }
     private var finish: ReelFinish { ReelTier.finish(links: links) }
-    private var ink: Color { finish == .holo ? Theme.Color.onAccent : Theme.Color.ink }
+    private var duotone: Duotone { Duotone.forActor(tmdbID: entity.tmdbID) }
+    /// Print on the face: ink on paper, the pastel-legible ink on pastel and foil.
+    private var faceInk: Color { finish == .paper ? Theme.Color.ink : Theme.Color.onAccent }
 
     var body: some View {
         VStack(spacing: 5) {
+            header
             ReelParallax {
                 ReelArt(path: entity.imagePath, kind: .actor, name: entity.name,
-                        sharpSize: sharpArt ? ReelLayout.liftedArtSize : nil)
+                        sharpSize: sharpArt ? ReelLayout.liftedArtSize : nil, duotone: duotone)
             }
-                // The photo takes whatever the name and pips leave, so the card
-                // stays 5:7.
+                // The photo takes whatever the header and plate leave, so the
+                // card stays 5:7.
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5)
                     .strokeBorder(Theme.Color.border, lineWidth: 1.5))
-            Text(entity.name)
-                .font(Theme.Font.heading(.caption))
-                .foregroundStyle(ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            if links > 0 { pips }
+                .overlay(alignment: .topTrailing) {
+                    // On the photo's corner, clear of the logo mark above it.
+                    if isNew { NewBadge().rotationEffect(.degrees(8)).offset(x: 4, y: 4) }
+                }
+            namePlate
         }
-        .padding(8)
+        .padding(7)
         .background { face }
-        .overlay(alignment: .topTrailing) { if isNew { NewBadge().padding(4) } }
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
         .overlay {
             if lifted { ReelGlare().clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm)) }
         }
         .neoSurface(radius: Theme.Radius.sm, fill: .clear, shadow: grounded ? Theme.Shadow.small : 0)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(entity.name), \(links) \(links == 1 ? "film" : "films") linked, \(finish.label)")
+        .accessibilityLabel(accessibilityText)
+    }
+
+    /// The set number on the left, the logo mark on the right.
+    private var header: some View {
+        HStack(spacing: 4) {
+            if let number {
+                // Just the number: a holo card shows it's holo, never says so.
+                Text(ReelNumber.label(number))
+                    .font(Theme.Font.cardStamp)
+                    .textCase(.uppercase)
+                    .tracking(Theme.Font.labelSmallTracking)
+                    .foregroundStyle(faceInk)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Image("LogoMark")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 8)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// The name on a paper plate, with the progress dots under it.
+    private var namePlate: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(entity.name)
+                .font(Theme.Font.heading(.caption))
+                .foregroundStyle(Theme.Color.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            dots
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 4).fill(Theme.Color.tile))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.Color.border, lineWidth: 1.5))
     }
 
     @ViewBuilder private var face: some View {
         switch finish {
-        case .paper:
-            Theme.Color.tile
-        case .inked:
-            // A printed frame in the actor blue, inset like a card's border art.
-            Theme.Color.tile.overlay {
-                RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(Theme.Color.actor, lineWidth: 3)
-                    .padding(3)
-            }
-        case .holo:
-            ReelFoil()
+        case .paper: Theme.Color.tile
+        // The face in the photo's own pastel, as if printed in the same ink.
+        case .pastel: duotone.lightColor
+        case .holo: ReelFoil()
         }
     }
 
-    /// One pip per linked film, up to ten.
-    private var pips: some View {
-        HStack(spacing: 1.5) {
-            ForEach(0..<10, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 0.75)
-                    .fill(i < links ? ink : ink.opacity(0.12))
-                    .frame(height: 3)
+    /// Progress toward holo (`ReelTier.filledDots`).
+    private var dots: some View {
+        let filled = ReelTier.filledDots(links: links)
+        return HStack(spacing: 2) {
+            ForEach(0..<ReelTier.dots, id: \.self) { i in
+                Circle()
+                    .strokeBorder(Theme.Color.ink, lineWidth: 0.75)
+                    .background(Circle().fill(i < filled ? Theme.Color.ink : .clear))
+                    .frame(width: 4, height: 4)
             }
         }
+        .accessibilityHidden(true)
+    }
+
+    private var accessibilityText: String {
+        let films = "\(links) \(links == 1 ? "film" : "films") linked, \(finish.label)"
+        guard let number else { return "\(entity.name), \(films)" }
+        return "\(entity.name), number \(number), \(films)"
     }
 }
 
@@ -264,6 +336,8 @@ struct ReelFrameCaption: View {
 /// neighbours, and was rebuilt at every hand-off.)
 struct ReelCardDetail: View {
     let entity: CollectedEntity
+    /// An actor's collector number, printed on the front.
+    let number: Int?
     let linked: [CollectedEntity]
     /// The grid slot this card came from, in global coordinates. `nil` (never
     /// measured) or Reduce Motion: the card fades in place instead of travelling.
@@ -411,7 +485,8 @@ struct ReelCardDetail: View {
     private var front: some View {
         ReelCanvas(aspect: aspect) {
             if isActor {
-                ReelActorCard(entity: entity, sharpArt: true, lifted: true, grounded: !out)
+                ReelActorCard(entity: entity, number: number, sharpArt: true, lifted: true,
+                              grounded: !out)
             } else {
                 ReelFrame(entity: entity, sharpArt: true, lifted: true, grounded: !out)
             }
@@ -638,7 +713,7 @@ private struct ReelGlare: View {
 private struct NewBadge: View {
     var body: some View {
         Text("New")
-            .font(.system(size: 7, weight: .heavy))
+            .font(Theme.Font.cardStamp)
             .textCase(.uppercase)
             .tracking(Theme.Font.labelSmallTracking)
             .foregroundStyle(Theme.Color.onAccent)
@@ -665,6 +740,9 @@ private struct ReelArt: View {
     /// A sharper size to fade in over the base image once it lands (a lifted card).
     var sharpSize: String? = nil
     var monogramSize: CGFloat = 28
+    /// Print the photo in these two inks (an actor card). Baked into the cached
+    /// image when it loads, so it costs nothing to draw.
+    var duotone: Duotone? = nil
 
     @State private var base: Image?
     @State private var sharp: Image?
@@ -673,15 +751,18 @@ private struct ReelArt: View {
     @State private var sharpShown: Bool
     @State private var failed = false
 
-    init(path: String?, kind: NodeKind, name: String, sharpSize: String? = nil, monogramSize: CGFloat = 28) {
+    init(path: String?, kind: NodeKind, name: String, sharpSize: String? = nil,
+         monogramSize: CGFloat = 28, duotone: Duotone? = nil) {
         self.path = path
         self.kind = kind
         self.name = name
         self.sharpSize = sharpSize
         self.monogramSize = monogramSize
+        self.duotone = duotone
         let cache = ArtCache.shared
-        let base = Config.imageURL(path: path, size: ReelLayout.artSize).flatMap(cache.image(for:))
-        let sharp = sharpSize.flatMap { Config.imageURL(path: path, size: $0) }.flatMap(cache.image(for:))
+        let cached = { (url: URL) in cache.image(for: cache.key(url, duotone: duotone)) }
+        let base = Config.imageURL(path: path, size: ReelLayout.artSize).flatMap(cached)
+        let sharp = sharpSize.flatMap { Config.imageURL(path: path, size: $0) }.flatMap(cached)
         _base = State(initialValue: base)
         _sharp = State(initialValue: sharp)
         _baseShown = State(initialValue: base != nil)
@@ -689,7 +770,9 @@ private struct ReelArt: View {
     }
 
     var body: some View {
-        kind.accent
+        // While loading (or with no art): the duotone's shadow ink, so the photo
+        // arrives out of its own colour; otherwise the kind's accent.
+        (duotone?.darkColor ?? kind.accent)
             .overlay {
                 if base == nil, sharp == nil, path == nil || failed { monogram }
             }
@@ -710,7 +793,7 @@ private struct ReelArt: View {
     private func load() async {
         if base == nil, sharp == nil {
             guard let url = Config.imageURL(path: path, size: ReelLayout.artSize) else { return }
-            guard let loaded = await ArtCache.shared.load(url) else {
+            guard let loaded = await ArtCache.shared.load(url, duotone: duotone) else {
                 if !Task.isCancelled { failed = true }
                 return
             }
@@ -722,7 +805,7 @@ private struct ReelArt: View {
         // shows as a pop on a large lifted card.
         guard sharp == nil, let sharpSize,
               let url = Config.imageURL(path: path, size: sharpSize),
-              let loaded = await ArtCache.shared.load(url), !Task.isCancelled
+              let loaded = await ArtCache.shared.load(url, duotone: duotone), !Task.isCancelled
         else { return }
         sharp = loaded
         withAnimation(.easeOut(duration: 0.15)) { sharpShown = true }
@@ -731,7 +814,7 @@ private struct ReelArt: View {
     private var monogram: some View {
         Text(name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined())
             .font(Theme.Font.display(monogramSize))
-            .foregroundStyle(kind.onAccent.opacity(0.7))
+            .foregroundStyle(duotone?.lightColor ?? kind.onAccent.opacity(0.7))
     }
 }
 
@@ -816,9 +899,12 @@ extension CollectionStore {
 
 #Preview("Card and frame") {
     let store = CollectionStore.demo()
+    let numbers = ReelNumber.numbers(for: store.sortedActors)
     HStack(alignment: .top, spacing: Theme.Spacing.sm) {
         ForEach(store.sortedActors.prefix(2)) { actor in
-            ReelCanvas(aspect: ReelActorCard.aspect) { ReelActorCard(entity: actor) }
+            ReelCanvas(aspect: ReelActorCard.aspect) {
+                ReelActorCard(entity: actor, number: numbers[actor.id])
+            }
         }
         if let movie = store.sortedMovies.first {
             VStack(spacing: Theme.Spacing.xs) {

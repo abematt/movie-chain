@@ -1,0 +1,478 @@
+<title>Unspool Dev Diary</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column on the app's cream canvas; charts and galleries break wider.
+   Tokens are Unspool's own asset-catalog colours (Canvas/Ink/Tile/Coral/ActorBlue/MovieYellow/Good). */
+:root {
+  --canvas: #F5F0E8; --ink: #1A1A1A; --tile: #FFFFFF; --shadow: #1A1A1A; --hairline: #E2DDD3;
+  --muted: #6B655C; --coral: #E85D3A; --blue: #3A6BE8; --yellow: #E8B93A; --good: #7BB069;
+  --on-accent: #1A1A1A; --hatch: rgba(26,26,26,.07);
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --measure: 46rem; --wide: 72rem;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --canvas: #24211D; --ink: #F5F0E8; --tile: #332F2A; --shadow: #0B0A09; --hairline: #48423B;
+  --muted: #B3AA9D; --coral: #F07352; --blue: #6B92F2; --yellow: #F0C75A; --good: #8FC27D;
+  --hatch: rgba(245,240,232,.07); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --canvas: #24211D; --ink: #F5F0E8; --tile: #332F2A; --shadow: #0B0A09; --hairline: #48423B;
+  --muted: #B3AA9D; --coral: #F07352; --blue: #6B92F2; --yellow: #F0C75A; --good: #8FC27D;
+  --hatch: rgba(245,240,232,.07); color-scheme: dark }
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
+body { background: var(--canvas); color: var(--ink); font: 16px/1.62 var(--body); }
+.wrap { max-width: var(--wide); margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+a { color: inherit; text-decoration-color: var(--coral); text-underline-offset: 3px }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px }
+h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; text-wrap: balance; font-weight: 600 }
+code, .mono { font-family: var(--mono); font-size: .86em }
+code { background: var(--tile); border: 1px solid var(--hairline); border-radius: 4px; padding: .05em .3em; overflow-wrap: anywhere }
+
+/* Neobrutalist surface, as in the app's .neoSurface: border + hard offset shadow. */
+.neo { background: var(--tile); border: 2px solid var(--ink); border-radius: 14px; box-shadow: 4px 4px 0 var(--shadow) }
+
+/* Hero */
+.hero { padding-block: 3.5rem 1.5rem; display: grid; gap: 1.25rem }
+.mark { display: flex; align-items: center; gap: .9rem }
+.mark svg { width: 64px; height: 40px; flex: none }
+.wordmark { font: 800 clamp(2.8rem, 9vw, 5.2rem)/0.9 var(--display); letter-spacing: -.03em; margin: 0 }
+.hero .sub { font: 400 1.25rem/1.45 var(--display); max-width: 38rem; margin: 0; color: var(--ink) }
+.hero .sub em { color: var(--coral); font-style: italic }
+.eyebrow { font: 600 .74rem/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 }
+
+.stubs { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .75rem; margin-top: .5rem }
+.stub { padding: .8rem 1rem; display: grid; gap: .15rem; position: relative }
+.stub::after { content: ""; position: absolute; right: -2px; top: 50%; width: 10px; height: 18px; margin-top: -9px;
+  background: var(--canvas); border: 2px solid var(--ink); border-right: 0; border-radius: 10px 0 0 10px }
+.stub b { font: 800 1.9rem/1 var(--display); font-variant-numeric: tabular-nums }
+.stub span { font-size: .82rem; color: var(--muted) }
+
+/* Sticky chapter nav */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--canvas) }
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--canvas); border-bottom: 2px solid var(--ink) }
+.nav .wrap { display: flex; gap: .5rem; overflow-x: auto; padding-block: .6rem; scrollbar-width: none }
+.chip { flex: none; font: 600 .8rem/1 var(--body); padding: .45rem .75rem; border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--tile); text-decoration: none; white-space: nowrap }
+.chip::before { content: ""; display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .4rem; background: var(--dot, var(--ink)); vertical-align: .05em }
+.blue { --dot: var(--blue); --accent: var(--blue) } .yellow { --dot: var(--yellow); --accent: var(--yellow) }
+.coral { --dot: var(--coral); --accent: var(--coral) } .good { --dot: var(--good); --accent: var(--good) }
+.chip.plain::before { display: none }
+
+/* Chart cards */
+.section { padding-block: 2.5rem 1rem; display: grid; gap: 1.25rem }
+.section > h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 0 }
+.section > p.lede { margin: 0; max-width: var(--measure); color: var(--muted) }
+.card { padding: 1.1rem 1.1rem .9rem; min-width: 0 }
+.card h3 { font-size: 1.15rem; margin: 0 0 .2rem }
+.card .note { font-size: .85rem; color: var(--muted); margin: .1rem 0 .6rem }
+.chart { width: 100%; overflow-x: auto }
+.chart svg { display: block; width: 100%; height: auto; min-width: 640px }
+.chart.fit svg { min-width: 0 }
+#chart-dec svg { max-width: 640px }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr)); gap: 1.25rem }
+svg text { fill: var(--ink); font-family: var(--body); font-size: 12px }
+svg .muted { fill: var(--muted) } svg .mono { font-family: var(--mono); font-size: 11px }
+svg .axis { stroke: var(--ink); stroke-width: 1.5 } svg .grid { stroke: var(--hairline); stroke-width: 1 }
+svg .bar { fill: var(--ink) } svg .bar.hot { fill: var(--coral) }
+svg .f-blue { fill: var(--blue) } svg .f-coral { fill: var(--coral) } svg .f-yellow { fill: var(--yellow) } svg .f-good { fill: var(--good) }
+svg .f-tile { fill: var(--tile) } svg .f-canvas { fill: var(--canvas) } svg .f-ink { fill: var(--ink) } svg .f-hatch { fill: url(#hatch) }
+svg .s-ink { stroke: var(--ink) } svg .s-coral { stroke: var(--coral) } svg .s-blue { stroke: var(--blue) }
+svg [data-tip] { cursor: default }
+.tip { position: fixed; z-index: 30; pointer-events: none; max-width: 18rem; padding: .45rem .6rem; font-size: .8rem; line-height: 1.35;
+  background: var(--ink); color: var(--canvas); border-radius: 8px; opacity: 0; transition: opacity .12s }
+.tip.on { opacity: 1 }
+.legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .8rem; color: var(--muted); margin-top: .4rem }
+.legend i { display: inline-block; width: .75rem; height: .75rem; border: 1.5px solid var(--ink); border-radius: 3px; margin-right: .35rem; vertical-align: -.1em }
+
+/* Decision explorer */
+.filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center }
+.filters input { flex: 1 1 14rem; min-width: 0; font: inherit; padding: .55rem .8rem; border: 2px solid var(--ink); border-radius: 10px; background: var(--tile); color: var(--ink) }
+.filters button.chip { cursor: pointer; color: var(--ink) }
+.filters button.chip[aria-pressed="false"] { opacity: .45; background: transparent }
+.count { font: 600 .8rem var(--mono); color: var(--muted) }
+.dlist { display: grid; gap: .6rem; max-height: 34rem; overflow-y: auto; padding: .2rem .4rem .4rem .1rem }
+.drow { display: grid; grid-template-columns: 7.5rem 1fr; gap: .25rem 1rem; padding: .7rem .9rem; border: 2px solid var(--ink); border-radius: 10px;
+  background: var(--tile); border-left: 8px solid var(--accent, var(--ink)) }
+.drow .when { font: 600 .78rem/1.4 var(--mono); color: var(--muted) }
+.drow .what { font-weight: 600; min-width: 0 } .drow .why { grid-column: 2; font-size: .9rem; min-width: 0 }
+.drow .src { grid-column: 2; font-size: .78rem; color: var(--muted); min-width: 0; overflow-wrap: anywhere }
+@media (max-width: 34rem) { .drow { grid-template-columns: 1fr } .drow .why, .drow .src { grid-column: 1 } }
+
+/* Chapters */
+.strip { height: 22px; margin-block: 2.5rem; background:
+  radial-gradient(circle at 50% 50%, var(--canvas) 0 3.5px, transparent 4px) 0 0 / 18px 22px repeat-x,
+  var(--ink); }
+.chapter { scroll-margin-top: 4rem }
+.chapter-head { border-left: 10px solid var(--accent); padding-left: 1rem; margin-bottom: 1.5rem; max-width: var(--measure) }
+.chapter-head h2 { font-size: clamp(1.7rem, 4.5vw, 2.5rem); margin: .35rem 0 0 }
+.ver { color: var(--ink) }
+.prose > :not(.gallery) { max-width: var(--measure) }
+.prose h3 { font-size: 1.3rem; margin: 2.2rem 0 .6rem; padding-top: .9rem; border-top: 2px solid var(--ink) }
+.prose h4 { font-size: 1.05rem; margin: 1.6rem 0 .4rem }
+.prose p, .prose li { overflow-wrap: break-word }
+.prose blockquote { margin: 1rem 0; padding: .6rem 1rem; border-left: 4px solid var(--yellow); background: var(--tile); border-radius: 0 10px 10px 0 }
+.prose hr { border: 0; border-top: 2px dashed var(--hairline); margin: 2rem 0 }
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 2px solid var(--ink); border-radius: 10px; background: var(--tile) }
+.table-wrap table { border-collapse: collapse; font-size: .86rem; min-width: 36rem; width: 100% }
+th, td { text-align: left; vertical-align: top; padding: .5rem .65rem; border-bottom: 1px solid var(--hairline) }
+th { font: 600 .74rem var(--mono); text-transform: uppercase; letter-spacing: .05em; background: var(--canvas) }
+details.ref { margin: 2rem 0; border: 2px solid var(--ink); border-radius: 10px; background: var(--tile); padding: .2rem 1rem }
+details.ref > summary { cursor: pointer; font: 600 1rem var(--display); padding: .6rem 0 }
+details.ref[open] > summary { border-bottom: 1px solid var(--hairline); margin-bottom: .6rem }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.5rem), 1fr)); gap: 1rem; margin: 1.4rem 0 }
+.gallery.solo { grid-template-columns: minmax(0, 40rem) }
+figure { margin: 0; display: grid; gap: .5rem; align-content: start; min-width: 0 }
+.zoom { padding: 0; border: 2px solid var(--ink); border-radius: 12px; box-shadow: 3px 3px 0 var(--shadow); background: var(--tile);
+  cursor: zoom-in; overflow: hidden; display: block; transition: transform .15s ease-out, box-shadow .15s ease-out }
+.zoom:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--shadow) }
+.zoom:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow) }
+.zoom img { display: block; width: 100%; height: auto; max-height: 30rem; object-fit: contain; background: var(--canvas) }
+figcaption { font-size: .8rem; line-height: 1.45; color: var(--muted) }
+a.clip, span.clip { display: inline-flex; align-items: center; gap: .35rem; font: 600 .82rem var(--mono); padding: .2rem .55rem;
+  border: 2px solid var(--ink); border-radius: 999px; background: var(--yellow); color: var(--on-accent); text-decoration: none }
+span.clip { background: transparent; color: var(--muted); border-style: dashed }
+
+dialog.lightbox { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 94vh }
+dialog.lightbox::backdrop { background: rgba(10,9,8,.82) }
+dialog.lightbox img { display: block; max-width: 96vw; max-height: 86vh; border: 2px solid var(--ink); border-radius: 12px; background: var(--canvas) }
+dialog.lightbox p { color: #F5F0E8; font-size: .85rem; max-width: 46rem; margin: .6rem 0 0 }
+dialog.lightbox button { position: absolute; top: .5rem; right: .5rem; font: 600 .85rem var(--body); padding: .4rem .7rem; border: 2px solid var(--ink);
+  border-radius: 999px; background: var(--tile); color: var(--ink); cursor: pointer }
+footer { padding-block: 2rem 4rem; color: var(--muted); font-size: .85rem }
+</style>
+
+<header class="wrap hero">
+  <div class="mark">
+    <svg viewBox="0 0 64 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="var(--blue)" stroke="var(--ink)" stroke-width="3"/><circle cx="44" cy="20" r="17" fill="var(--yellow)" stroke="var(--ink)" stroke-width="3" fill-opacity=".92"/></svg>
+    <p class="eyebrow">Dev diary · {{STATS_RANGE}}</p>
+  </div>
+  <h1 class="wordmark">unspool</h1>
+  <p class="sub">Actor → movie → actor, against the clock. It started as <em>Movie Chain</em> on a July evening and became <em>Unspool</em> on October 22. This is everything that happened in between: what got built, what got thrown out, and why.</p>
+  <div class="stubs">
+    <div class="stub neo"><b>{{STATS_COMMITS}}</b><span>commits</span></div>
+    <div class="stub neo"><b>{{STATS_DAYS}}</b><span>days with commits</span></div>
+    <div class="stub neo"><b>{{STATS_VERSIONS}}</b><span>versions tagged, {{STATS_VERSION_SPAN}}</span></div>
+    <div class="stub neo"><b>{{STATS_DECISIONS}}</b><span>decisions logged</span></div>
+    <div class="stub neo"><b>{{STATS_IMAGES}}</b><span>screenshots &amp; photos</span></div>
+    <div class="stub neo"><b>{{STATS_SWIFT}}</b><span>lines of Swift · {{STATS_TESTS}} tests</span></div>
+  </div>
+</header>
+
+<nav class="nav" aria-label="Sections"><div class="wrap">
+  <a href="#timeline" class="chip plain">Timeline</a>
+  <a href="#decisions" class="chip plain">Decisions</a>
+  {{NAV}}
+</div></nav>
+
+<main class="wrap">
+  <section class="section" id="timeline">
+    <h2>The run</h2>
+    <p class="lede">Commits per day since the first commit. The coloured bands under the axis are chapters, and hatched stretches are two weeks or more with no code. Yellow circles mark phone photos of builds.</p>
+    <div class="card neo"><h3>Commits per day</h3><p class="note">Hover a bar for that day's commits. Flags are tagged versions; circles are phone photos and videos of builds.</p>
+      <div class="chart" id="chart-run"></div>
+      <div class="legend"><span><i style="background:var(--coral)"></i>Day a version was tagged</span><span><i style="background:var(--hatch)"></i>No code for 2+ weeks</span><span><i style="background:var(--yellow);border-radius:50%"></i>Photos of a build</span></div>
+    </div>
+    <div class="card neo"><h3>Sessions by day</h3><p class="note">One row per day with a Claude Code session, midnight to midnight. Bars are sessions in their chapter's colour (hatched means not written up yet), ticks are commits and red triangles are version tags. Sessions are recorded from Oct 21 onward.</p>
+      <div class="chart" id="chart-day"></div>
+    </div>
+    <div class="grid2">
+      <div class="card neo"><h3>App code</h3><p class="note">Non-blank Swift lines in the app target, at each commit on main.</p><div class="chart fit" id="chart-app"></div></div>
+      <div class="card neo"><h3>Tests</h3><p class="note">Test cases (<code>@Test</code> / <code>func test…</code>). The dip is Assisted mode's tests leaving with it.</p><div class="chart fit" id="chart-tests"></div></div>
+      <div class="card neo"><h3>Docs</h3><p class="note">Words across CLAUDE.md, CHANGELOG.md and docs/. In August the docs kept growing while the code stood still.</p><div class="chart fit" id="chart-docs"></div></div>
+      <div class="card neo"><h3>Churn</h3><p class="note">Lines added (up) and removed (down) per commit. The big red one is Assisted mode being taken out.</p><div class="chart fit" id="chart-churn"></div></div>
+    </div>
+  </section>
+
+  <section class="section" id="decisions">
+    <h2>Decisions</h2>
+    <p class="lede">Every row from every chapter's decision log in one place. Search across what was decided, why, and the source (a commit SHA, a doc, or a session).</p>
+    <div class="card neo"><h3>Decisions per chapter</h3><div class="chart fit" id="chart-dec"></div></div>
+    <div class="filters">
+      <label for="dq" class="eyebrow" style="flex-basis:100%">Search decisions</label>
+      <input id="dq" type="search" placeholder="Try “matchedGeometryEffect”, “leaderboard”, “0.6.0”">
+      <span id="dchips" style="display:contents"></span>
+      <span class="count" id="dcount"></span>
+    </div>
+    <div class="dlist" id="dlist"></div>
+  </section>
+
+  <div class="strip" aria-hidden="true"></div>
+  {{CHAPTERS}}
+
+  <footer>Built from <code>diary/*.md</code> by <code>diary/build_html.py</code>. The charts come from <code>git</code>. Screenshots are downscaled copies; the originals and the screen recordings are in <code>diary/media/</code>. Anything marked “(inferred)” is a reading of the evidence, not something a source states.</footer>
+</main>
+
+<dialog class="lightbox" id="lb"><button type="button" id="lbclose">Close</button><img id="lbimg" alt=""><p id="lbcap"></p></dialog>
+<div class="tip" id="tip" role="status"></div>
+
+<script type="application/json" id="data">{{DATA}}</script>
+<script>
+(function () {
+  const D = JSON.parse(document.getElementById('data').textContent);
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+  const txt = (parent, x, y, s, attrs = {}) => { const t = el('text', { x, y, ...attrs }, parent); t.textContent = s; return t; };
+  const svg = (id, w, h) => {
+    const s = el('svg', { viewBox: `0 0 ${w} ${h}`, role: 'img' });
+    const defs = el('defs', {}, s);
+    const p = el('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 6, height: 6, class: 'f-canvas' }, p);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, class: 's-ink', 'stroke-width': 1.2, 'stroke-opacity': .22 }, p);
+    document.getElementById(id).appendChild(s);
+    return s;
+  };
+  const T = s => new Date(s + (s.length === 10 ? 'T00:00' : '') + ':00');
+  const DAY = 864e5;
+  const fmtDay = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  // Shared tooltip for anything with data-tip.
+  const tip = document.getElementById('tip');
+  document.addEventListener('pointermove', e => {
+    const t = e.target.closest && e.target.closest('[data-tip]');
+    if (!t) { tip.classList.remove('on'); return; }
+    tip.innerHTML = t.getAttribute('data-tip');
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
+    tip.style.left = x + 'px'; tip.style.top = (e.clientY + 16) + 'px';
+    tip.classList.add('on');
+  });
+
+  const fmtShort = s => fmtDay(T(s.slice(0, 10)));
+  const hm = s => s.slice(11, 16);
+  const niceMax = v => { const p = Math.pow(10, Math.floor(Math.log10(v || 1))); return Math.ceil(v / p) * p; };
+
+  // ---- The run: commits per day ----
+  (function () {
+    const W = 1000, H = 250, L = 34, R = 16, top = 46, base = 176;
+    const start = T(D.range[0]), end = T(D.range[1]);
+    const days = Math.round((end - start) / DAY) + 1;
+    const x = d => L + (W - L - R) * ((d - start) / DAY) / days;
+    const bw = (W - L - R) / days;
+    const byDay = {};
+    D.commits.forEach(c => (byDay[c.date.slice(0, 10)] ||= []).push(c));
+    const max = niceMax(Math.max(...Object.values(byDay).map(a => a.length)));
+    const y = v => base - (base - top) * v / max;
+    const s = svg('chart-run', W, H);
+    [0, max / 2, max].forEach(v => {
+      el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'grid' }, s);
+      txt(s, L - 6, y(v) + 4, v, { 'text-anchor': 'end', class: 'muted mono' });
+    });
+    // Chapter bands and quiet stretches under the axis; labels only where they fit.
+    const band = (a, b, cls, label) => {
+      const x0 = x(T(a)), x1 = x(T(b)) + bw;
+      el('rect', { x: x0, y: base + 8, width: Math.max(2, x1 - x0), height: 14, rx: 3, class: cls, stroke: 'var(--ink)', 'stroke-width': 1.5, 'data-tip': esc(label) }, s);
+      if (label && x1 - x0 > label.length * 6.2) txt(s, (x0 + x1) / 2, base + 38, label, { 'text-anchor': 'middle', class: 'muted' });
+    };
+    Object.values(D.eras).filter(e => e.band && e.start && e.end).forEach(e => band(e.start, e.end, 'f-' + e.accent, e.label));
+    D.gaps.forEach(g => band(g.start, g.end, 'f-hatch', `${g.days} days, no code`));
+    const tagDays = new Set(D.tags.map(t => t.date.slice(0, 10)));
+    Object.entries(byDay).forEach(([d, list]) => {
+      const n = list.length, xx = x(T(d));
+      const tipHtml = `<b>${fmtDay(T(d))} · ${n} commit${n > 1 ? 's' : ''}</b><br>` +
+        list.slice(0, 8).map(c => esc(c.subject)).join('<br>') + (n > 8 ? `<br>… and ${n - 8} more` : '');
+      el('rect', { x: xx + bw * .1, y: y(n), width: Math.max(2.5, bw * .8), height: base - y(n), class: 'bar' + (tagDays.has(d) ? ' hot' : ''), 'data-tip': tipHtml }, s);
+      if (n >= max / 4) txt(s, xx + bw / 2, y(n) - 5, n, { 'text-anchor': 'middle', class: 'mono' });
+    });
+    el('line', { x1: L, x2: W - R, y1: base, y2: base, class: 'axis' }, s);
+    const ticks = [D.range[0]];
+    for (let d = new Date(start.getFullYear(), start.getMonth() + 1, 1); d < end; d.setMonth(d.getMonth() + 1))
+      if (x(d) - x(T(ticks[ticks.length - 1])) > 60 && x(end) - x(d) > 60) ticks.push(d.toISOString().slice(0, 10));
+    ticks.push(D.range[1]);
+    ticks.forEach((d, i) => {
+      const xx = x(T(d)) + bw / 2;
+      el('line', { x1: xx, x2: xx, y1: base, y2: base + 5, class: 'axis' }, s);
+      txt(s, xx, H - 4, fmtDay(T(d)), { 'text-anchor': i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle', class: 'muted mono' });
+    });
+    // Version flags, one per day with a tag; flags close together alternate rows.
+    const byTagDay = {};
+    D.tags.forEach(t => (byTagDay[t.date.slice(0, 10)] ||= []).push(t.name));
+    let lastX = -1e9, row = 0;
+    Object.entries(byTagDay).forEach(([d, names]) => {
+      const xx = x(T(d)) + bw / 2;
+      row = xx - lastX < 160 ? 1 - row : 0; lastX = xx;
+      const yy = 14 + row * 15;
+      el('line', { x1: xx, x2: xx, y1: yy, y2: base, class: 's-ink', 'stroke-width': 1, 'stroke-dasharray': '2 3' }, s);
+      txt(s, xx - 4, yy + 4, names.join(' · '), { 'text-anchor': 'end', class: 'mono' });
+    });
+    D.photos.forEach(p => {
+      const d = p.date.slice(0, 10), n = byDay[d] ? byDay[d].length : 0;
+      el('circle', { cx: x(T(d)) + bw / 2, cy: y(n) - 9, r: 6, class: 'f-yellow', stroke: 'var(--ink)', 'stroke-width': 1.5,
+        'data-tip': `${fmtDay(T(d))}, ${hm(p.date)} · phone ${p.kind} of a build` }, s);
+    });
+  })();
+
+  // ---- Sessions by day: one row per day, midnight to midnight ----
+  (function () {
+    const host = document.getElementById('chart-day');
+    if (!D.sessions.length) { host.innerHTML = '<p class="count">No sessions captured yet. They appear here after scripts/diary-capture.py runs.</p>'; return; }
+    const segs = [];
+    D.sessions.forEach(ss => {
+      let a = T(ss.start); const b = T(ss.end);
+      while (a < b) {
+        const midnight = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 1);
+        const e = b < midnight ? b : midnight;
+        segs.push({ day: a.toDateString(), date: new Date(a.getFullYear(), a.getMonth(), a.getDate()), a, b: e, ss });
+        a = midnight;
+      }
+    });
+    const days = [...new Map(segs.map(g => [g.day, g.date])).entries()].sort((p, q) => p[1] - q[1]);
+    const W = 1000, L = 74, R = 14, laneH = 16, pad = 14;
+    const x = (d, day) => L + (W - L - R) * (d - day) / DAY;
+    const rows = days.map(([key, date]) => {
+      const mine = segs.filter(g => g.day === key).sort((p, q) => p.a - q.a), lanes = [];
+      mine.forEach(g => { let l = lanes.findIndex(e => e <= g.a); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = g.b; g.lane = l; });
+      return { date, segs: mine, lanes: Math.max(1, lanes.length) };
+    });
+    let yy = 26;
+    rows.forEach(r => { r.y = yy; yy += r.lanes * laneH + pad + 10; });
+    const H = yy + 14, s = svg('chart-day', W, H);
+    for (let h = 0; h <= 24; h += 3) {
+      const xx = L + (W - L - R) * h / 24;
+      el('line', { x1: xx, x2: xx, y1: 16, y2: H - 18, class: 'grid' }, s);
+      txt(s, xx, 12, String(h % 24).padStart(2, '0') + ':00', { 'text-anchor': h === 0 ? 'start' : h === 24 ? 'end' : 'middle', class: 'muted mono' });
+    }
+    rows.forEach(r => {
+      txt(s, 6, r.y + 12, fmtDay(r.date), { class: 'mono' });
+      r.segs.forEach(g => {
+        const e = g.ss.era && D.eras[g.ss.era], dur = Math.round((T(g.ss.end) - T(g.ss.start)) / 6e4);
+        el('rect', { x: x(g.a, r.date), y: r.y + g.lane * laneH, width: Math.max(3, x(g.b, r.date) - x(g.a, r.date)), height: laneH - 4, rx: 4,
+          class: e ? 'f-' + e.accent : 'f-hatch', stroke: 'var(--ink)', 'stroke-width': 1.3,
+          'data-tip': `<b>${esc(g.ss.prompt)}</b><br>${fmtShort(g.ss.start)} ${hm(g.ss.start)} → ${hm(g.ss.end)} · ${Math.floor(dur / 60)}h ${dur % 60}m · ${g.ss.prompts} prompts<br>${e ? esc(e.label) : 'not written up yet'}` }, s);
+      });
+      const tickY = r.y + r.lanes * laneH + 2;
+      D.commits.filter(c => T(c.date.slice(0, 10)).getTime() === r.date.getTime()).forEach(c => {
+        el('rect', { x: x(T(c.date), r.date) - 1.5, y: tickY, width: 3, height: 9, class: 'f-ink', 'data-tip': `<b>${hm(c.date)} · ${c.sha}</b><br>${esc(c.subject)}` }, s);
+      });
+      D.tags.filter(t => T(t.date.slice(0, 10)).getTime() === r.date.getTime()).forEach(t => {
+        const xx = x(T(t.date), r.date);
+        el('path', { d: `M${xx - 5},${tickY + 18}L${xx + 5},${tickY + 18}L${xx},${tickY + 10}Z`, class: 'f-coral', stroke: 'var(--ink)', 'stroke-width': 1, 'data-tip': `<b>${t.name}</b> tagged ${hm(t.date)}` }, s);
+      });
+    });
+  })();
+
+  // ---- Growth small multiples ----
+  const series = D.series;
+  const idxOnOrAfter = d => { const i = series.findIndex(c => c.date.slice(0, 10) >= d); return i < 0 ? series.length - 1 : i; };
+  const gapIdx = D.gaps.map(g => [Math.max(0, idxOnOrAfter(g.start) - 1), idxOnOrAfter(g.end), g]);
+  const assisted = [series.findIndex(c => c.sha === 'ef2603b'), series.findIndex(c => c.sha === '79f5d88')];
+  function small(id, key, opts = {}) {
+    const W = 460, H = 210, L = 46, R = 46, top = 22, base = 176;
+    const n = series.length;
+    const x = i => L + (W - L - R) * i / (n - 1);
+    const vals = series.map(c => c[key]);
+    const max = niceMax(Math.max(...vals) * 1.05);
+    const y = v => base - (base - top) * v / max;
+    const s = svg(id, W, H);
+    if (assisted[0] >= 0) el('rect', { x: x(assisted[0]), y: top - 6, width: x(assisted[1]) - x(assisted[0]), height: base - top + 6, class: 'f-yellow', 'fill-opacity': .25,
+      'data-tip': 'Assisted mode: built Jul 24, removed Jul 25' }, s);
+    gapIdx.forEach(([a, b, g]) => el('rect', { x: x(a), y: top - 6, width: Math.max(4, x(b) - x(a)), height: base - top + 6, class: 'f-hatch',
+      'data-tip': `${fmtShort(g.start)} → ${fmtShort(g.end)}: ${g.days} days without a commit` }, s));
+    [0, max / 2, max].forEach(v => {
+      el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'grid' }, s);
+      txt(s, L - 6, y(v) + 4, v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k' : v, { 'text-anchor': 'end', class: 'muted mono' });
+    });
+    const pts = vals.map((v, i) => `${x(i)},${y(v)}`);
+    el('path', { d: `M${x(0)},${base}L${pts.join('L')}L${x(n - 1)},${base}Z`, class: opts.fill || 'f-blue', 'fill-opacity': .18 }, s);
+    el('path', { d: 'M' + pts.join('L'), fill: 'none', class: 's-ink', 'stroke-width': 2.2, 'stroke-linejoin': 'round' }, s);
+    series.forEach((c, i) => el('circle', { cx: x(i), cy: y(vals[i]), r: 7, fill: 'transparent',
+      'data-tip': `<b>${c.sha}</b> · ${c.date.slice(0, 10)}<br>${esc(c.subject)}<br><b>${vals[i].toLocaleString()}</b> ${opts.unit}` }, s));
+    el('circle', { cx: x(n - 1), cy: y(vals[n - 1]), r: 4.5, class: 'f-coral', stroke: 'var(--ink)', 'stroke-width': 1.5 }, s);
+    txt(s, x(n - 1) + 7, y(vals[n - 1]) + 4, vals[n - 1].toLocaleString(), { class: 'mono' });
+    el('line', { x1: L, x2: W - R, y1: base, y2: base, class: 'axis' }, s);
+    txt(s, x(0), H - 12, fmtShort(series[0].date), { class: 'muted mono' });
+    txt(s, x(n - 1), H - 12, fmtShort(series[n - 1].date), { 'text-anchor': 'end', class: 'muted mono' });
+  }
+  small('chart-app', 'app', { unit: 'lines of Swift' });
+  small('chart-tests', 'ntest', { unit: 'tests', fill: 'f-good' });
+  small('chart-docs', 'docs', { unit: 'words of docs', fill: 'f-yellow' });
+
+  (function churn() {
+    const W = 460, H = 210, L = 46, R = 16, mid = 100, span = 76;
+    const n = series.length;
+    const x = i => L + (W - L - R) * i / (n - 1);
+    const max = Math.max(...series.map(c => Math.max(c.ins, c.dele)));
+    const s = svg('chart-churn', W, H);
+    [[max, '+' + (max / 1000).toFixed(1) + 'k'], [0, '0'], [-max, '−' + (max / 1000).toFixed(1) + 'k']].forEach(([v, l]) => {
+      const yy = mid - span * v / max;
+      el('line', { x1: L, x2: W - R, y1: yy, y2: yy, class: 'grid' }, s);
+      txt(s, L - 6, yy + 4, l, { 'text-anchor': 'end', class: 'muted mono' });
+    });
+    const bw = (W - L - R) / n * .7;
+    series.forEach((c, i) => {
+      const tipHtml = `<b>${c.sha}</b> · ${c.date.slice(0, 10)}<br>${esc(c.subject)}<br>+${c.ins} / −${c.dele}`;
+      el('rect', { x: x(i) - bw / 2, y: mid - span * c.ins / max, width: bw, height: span * c.ins / max, class: 'f-ink', 'data-tip': tipHtml }, s);
+      el('rect', { x: x(i) - bw / 2, y: mid, width: bw, height: span * c.dele / max, class: c.sha === '79f5d88' ? 'f-coral' : 'f-hatch', stroke: 'var(--ink)', 'stroke-width': .8, 'data-tip': tipHtml }, s);
+    });
+    el('line', { x1: L, x2: W - R, y1: mid, y2: mid, class: 'axis' }, s);
+    txt(s, x(series.findIndex(c => c.sha === '79f5d88')) + 6, mid + span * .55, 'Assisted mode removed', { class: 'muted' });
+    [[0, 'Jul 9', 'start'], [n - 1, 'Oct 22', 'end']].forEach(([i, l, a]) => txt(s, x(i), H - 12, l, { 'text-anchor': a, class: 'muted mono' }));
+  })();
+
+  // ---- Decisions ----
+  const eraIds = Object.keys(D.eras).filter(id => D.decisions.some(r => r.era === id));
+  (function decBars() {
+    const W = 640, rowH = 34, L = 150, R = 40, H = eraIds.length * rowH + 8;
+    const counts = eraIds.map(id => D.decisions.filter(r => r.era === id).length);
+    const max = Math.max(...counts);
+    const s = svg('chart-dec', W, H);
+    eraIds.forEach((id, i) => {
+      const yy = 4 + i * rowH, w = (W - L - R) * counts[i] / max;
+      txt(s, L - 10, yy + 18, D.eras[id].label, { 'text-anchor': 'end' });
+      el('rect', { x: L, y: yy + 3, width: w, height: rowH - 12, rx: 5, class: 'f-' + D.eras[id].accent, stroke: 'var(--ink)', 'stroke-width': 1.5 }, s);
+      txt(s, L + w + 8, yy + 18, counts[i], { class: 'mono' });
+    });
+  })();
+
+  const active = new Set(eraIds);
+  const chips = document.getElementById('dchips');
+  eraIds.forEach(id => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip ' + D.eras[id].accent; b.textContent = D.eras[id].label;
+    b.setAttribute('aria-pressed', 'true');
+    b.onclick = () => { active.has(id) ? active.delete(id) : active.add(id); b.setAttribute('aria-pressed', active.has(id)); renderDec(); };
+    chips.appendChild(b);
+  });
+  const q = document.getElementById('dq'), list = document.getElementById('dlist'), count = document.getElementById('dcount');
+  const strip = h => h.replace(/<[^>]+>/g, '').toLowerCase();
+  function renderDec() {
+    const term = q.value.trim().toLowerCase();
+    const rows = D.decisions.filter(r => active.has(r.era) && (!term || strip(r.decision + r.why + r.src + r.when).includes(term)));
+    count.textContent = `${rows.length} of ${D.decisions.length}`;
+    list.innerHTML = rows.map(r => `<article class="drow ${D.eras[r.era].accent}"><div class="when">${esc(r.when)}<br>${esc(D.eras[r.era].label)}</div>
+      <div class="what">${r.decision}</div><div class="why">${r.why}</div><div class="src">${r.src}</div></article>`).join('')
+      || '<p class="count">No decisions match. Clear the search or turn a chapter back on.</p>';
+  }
+  q.addEventListener('input', renderDec);
+  renderDec();
+
+  // ---- Lightbox ----
+  const lb = document.getElementById('lb'), lbimg = document.getElementById('lbimg'), lbcap = document.getElementById('lbcap');
+  document.querySelectorAll('.zoom').forEach(b => b.addEventListener('click', () => {
+    const img = b.querySelector('img');
+    lbimg.src = img.src; lbimg.alt = img.alt; lbcap.textContent = img.alt;
+    lb.showModal ? lb.showModal() : lb.setAttribute('open', '');
+  }));
+  document.getElementById('lbclose').onclick = () => lb.close();
+  lb.addEventListener('click', e => { if (e.target === lb) lb.close(); });
+
+  // Screen recordings only exist on disk; outside a local copy, label them instead of linking.
+  if (location.protocol !== 'file:') document.querySelectorAll('a[data-clip]').forEach(a => {
+    const s = document.createElement('span'); s.className = 'clip';
+    s.textContent = '▶ ' + a.textContent.replace(/^▶\s*/, '') + ' (recording, on disk)';
+    a.replaceWith(s);
+  });
+})();
+</script>

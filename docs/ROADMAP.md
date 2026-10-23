@@ -193,6 +193,22 @@ rate-limited launch leaves the home screen stuck on "Dealing…" forever. A test
 - **Crash reporting.** Start with Xcode's built-in reports — zero work, no SDK, no
   privacy-label change. Add a real tool (Sentry) at 0.8.0 so app and server errors land
   in one place.
+- **Product analytics — PostHog, decided 2026-10-22.** Logging says what broke; this
+  says what players do. Without it the 1.0 activation event can't be measured, and
+  neither can whether the sentence home teaches the rule, where runs end, or day-1/day-7
+  return. Rules:
+  - **A small, named event set** (~10: `run_started`, `link_landed`,
+    `run_ended{reason, links, hardcore}`, `deal_again`, `reel_opened`, …). Autocapture
+    and session replay off.
+  - **The device id below is the anonymous id**; `identify` on Sign in with Apple at
+    0.9.0. Anonymous first, same as accounts.
+  - **No ATT prompt** — first-party usage analytics isn't cross-app tracking. The privacy
+    label gains Product Interaction + an identifier. An opt-out toggle in Settings.
+  - **Fired from the view/app layer, never `GameEngine`** — the same split as haptics and
+    sound, so the engine stays pure.
+  - **Behind an injected `Analytics` protocol** (like storage), so tests never send events.
+  - **Measurement only.** PostHog's feature flags / remote config are not used — tuning
+    and the kill switch belong to the service (0.8.0, Job 2). One owner for config.
 - **Automated builds → TestFlight.** The release pipeline as a habit rather than an
   event, even though testers come later.
 - **Stable device id.** A random identifier generated on first launch and stored locally;
@@ -304,6 +320,8 @@ Lands with 0.9.0 and 0.11.0 on the same deployment.
   than breaks, and the game keeps its offline character.
 - **Config must never be able to brick the client.** Validate remote values against sane
   bounds locally; a bad number pushed to everyone is the classic remote-config incident.
+- **The service is the only source of remote config.** Not PostHog's flags, even though
+  the SDK is in the app — two config sources is two places to look when a value is wrong.
 
 **Also lands here:** the domain (needed for links later), and Sentry so app and server
 errors share one view.
@@ -352,6 +370,51 @@ share card, the engine changes, and the puzzle-generation job.
   familiarity standard at **every** step, not just the start. This is precisely how the
   removed Assisted mode failed; see [`ASSISTED-MODE.md`](ASSISTED-MODE.md#the-trap-worth-remembering-drift).
 
+### Notifications — built as a system, measured from day one
+
+Added 2026-10-23. A daily game only works if people come back each day, and nothing
+reminds them. Build notifications as one system with one owner, not a scatter of
+one-off calls, because every later layer (friend pushes, replaced-puzzle notices) adds
+another kind of notification.
+
+**The pieces:**
+- **One `Notifications` owner** (injected, like storage and `Analytics`) that knows
+  every kind of notification, schedules and cancels them, and handles opens through
+  `UNUserNotificationCenterDelegate`. Each kind has an id, a Settings toggle and an
+  analytics name.
+- **The permission ask comes after the first completed Daily Chain**, never at launch.
+  The context ("want a nudge when tomorrow's is ready?") is what gets a yes, and iOS
+  only lets you ask once.
+- **Local first, no server needed:**
+  - *Daily ready* — "Today's chain is ready", at a fixed morning time.
+  - *Streak protection* — an evening nudge ("your 12-day streak ends at midnight"),
+    **only** when today isn't played yet. Streaks are stored as a set of completed
+    days (0.7.0 merge rule), so the device can decide this itself; finishing today's
+    chain cancels the pending nudge.
+- **Server push (APNs) arrives with the service** — the message channel's "today's
+  puzzle was replaced" at 0.8.0, friend pushes at 0.11.0. The device token is stored
+  against the device id, then the account.
+- **Every kind can be turned off on its own in Settings**, and a turned-off kind is
+  never sent.
+
+**Metrics (PostHog, from the first build that has it):**
+`notification_permission_prompted` / `_granted` / `_denied`, `notification_scheduled`
+`{kind}`, `notification_opened{kind}`, `notification_kind_disabled{kind}`, and the iOS
+authorization status read on each launch (people turn it off in system Settings without
+telling the app). The questions they answer: what share say yes, which kinds get opened,
+which kinds get turned off (a kind that gets turned off more than opened is spam — cut
+it), and whether players with reminders on come back more.
+
+**Traps:**
+- Local notifications can't report "delivered" — only scheduled and opened. Don't build
+  a metric that assumes delivery.
+- A reminder for a puzzle that failed to fetch is worse than none: schedule *daily
+  ready* only once tomorrow's puzzle is cached.
+- Time zones: the day rolls over at the player's **local midnight**
+  ([`DAILY-CHAIN.md`](DAILY-CHAIN.md#when-the-day-turns-over)). Streak protection fires a
+  few hours before it, in whatever time zone the phone is in at the time — reschedule
+  on a time-zone change, or a traveller gets the nudge at the wrong hour.
+
 ---
 
 ## 0.11.0 — Friend groups
@@ -369,6 +432,9 @@ Server-side re-validation proves the links are real; it cannot prove they were r
 What makes friend-scale work isn't detection, it's **motive** — there's no prize and the
 audience knows you. Design accordingly: no prizes, no ranked tiers, no stakes that would
 reward inflating a number.
+
+**Friend pushes** go through the notification system from 0.10.0 — "Sam beat your chain",
+"Sam sent you a challenge". Each is its own kind with its own toggle and metrics.
 
 **Decide before starting:**
 - ~~What's compared — links, points, or both?~~ **Decided 2026-10-22: links, with
@@ -402,6 +468,10 @@ The shipping checklist, plus the last player-facing pieces.
   a **curated first seed**. Read [`ASSISTED-MODE.md`](ASSISTED-MODE.md) before touching
   this.
 - **The app name**, and the store listing built around it.
+- **Rating prompt** (`requestReview`) after a good moment — a new best, a third completed
+  daily — never after a loss. iOS caps how often it actually shows.
+- **"Send feedback" in Settings** — opens an email with the version and device id filled
+  in, so "it froze" arrives with something to look up in the logs.
 
 **Checklist:**
 - **Real device testing.** Everything so far is simulator-verified. Haptics, audio session
@@ -410,9 +480,11 @@ The shipping checklist, plus the last player-facing pieces.
   was "no release before the App Store", which may or may not have been meant to include
   this. The argument for keeping it is [`ASSISTED-MODE.md`](ASSISTED-MODE.md): a mode
   survived four commits of refinement and died in one playtest.
-- **App Store requirements:** privacy manifest / nutrition label (note: accounts and any
-  analytics SDK change these answers), **account deletion** since 0.9.0 ships accounts,
+- **App Store requirements:** privacy manifest / nutrition label (note: accounts and the
+  PostHog SDK from 0.7.0 change these answers), **account deletion** since 0.9.0 ships accounts,
   and the **TMDB attribution** already rendered in the Reel sheet — keep it reachable.
+  A **privacy policy URL and a support URL** — both required for the listing; host them
+  on the 0.8.0 domain.
 - **Changelog + tag** per the process in `CLAUDE.md`.
 
 ---
@@ -435,6 +507,14 @@ Not scheduled. Ordered by what the players earn.
   because a mode was built before that question was asked.
 - **Chain → video renderer** — a macOS companion target that imports a chain and renders
   it offscreen. Content tooling; see [`GROWTH.md`](GROWTH.md).
+- **Paid streak freeze** — protect a streak through a missed day, as an in-app purchase.
+  Added 2026-10-23; it would be the first thing the app sells, so it opens the
+  monetization question the plan has never asked. **The tension to settle first:** friend
+  groups rest on "no prizes, no stakes that reward inflating a number". If streaks are
+  shown in a group, a bought freeze is paying to protect a number your friends see. Keep
+  streaks private, or make a freeze visible ("12 days, 1 frozen"). The free *streak
+  protection* reminder at 0.10.0 is separate and ships regardless.
+- **Home-screen widget** showing today's two names — a reminder that needs no permission.
 - Genre locks, memory-recall every Nth link.
 
 ---

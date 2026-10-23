@@ -14,3 +14,10 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Dev diary — commit the chapters and the curated web/ images; captures stay local.
+diary/raw/
+diary/media/
+diary/inbox/
+diary/index.html
+diary/.venv/

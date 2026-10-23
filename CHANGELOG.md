@@ -36,6 +36,13 @@ Unspool rebrand was inserted as 0.6.0.)
 
 ### Added
 
+- **Actor cards look like collectible cards.** Each photo is printed in two inks, a
+  deep shade and a pastel from the holo foil, and every actor keeps their own pair. A
+  card's face goes from paper to that pastel (at 5 films linked) to holo foil (at 11),
+  so the colour of the card is the reward. The top carries a collector number, the
+  order you first linked them in, and the name sits on a plate with five dots that are
+  only all full at holo. There are still no counts on the front.
+
 - **A lifted Reel card is a card in your hand.** Pick up an actor or a film and it tips
   with the phone: the photo or poster shifts behind the face, light slides across the
   card's laminate or the frame's glass, and a holo card's foil shimmers. It comes out bigger than before, and without a hard shadow —
@@ -44,6 +51,10 @@ Unspool rebrand was inserted as 0.6.0.)
   on its slot, and Reduce Motion keeps it still with a quiet sheen.
 
 ### Changed
+
+- **The home screen stopped explaining itself.** "Tap the blank to start" is gone: the
+  sentence already reads as the rule, and the blank nudges once for a new player. The
+  best run now sits alone, centred at the bottom.
 
 - **The holo foil is smoother and cheaper.** Stickers and holo cards used to redraw
   their foil gradients on every tilt sample; now the gradients are drawn once and slid,

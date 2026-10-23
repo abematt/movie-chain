@@ -103,6 +103,29 @@ the relevant section before starting one.
   ```
   Bump **minor** when a roadmap milestone lands, **patch** for fixes/polish in
   between. Pre-1.0, breaking internal changes go in a minor bump.
+- **Before tagging, run `/diary`** so the version's chapter is written and
+  committed with the release (see *Dev diary* below).
+
+## Dev diary
+
+`diary/` is a running dev diary: one chapter per release, written from what actually
+happened (sessions, commits, screenshots, phone photos), as raw material for posts.
+`diary/README.md` has the layout.
+
+- **Capture is automatic.** A `SessionEnd` hook (`.claude/settings.json`) runs
+  `scripts/diary-capture.py`, which saves each session's slimmed transcript to
+  `diary/raw/` and copies its scratchpad screenshots and pasted images into
+  `diary/media/<sid8>/`. Transcripts age out of `~/.claude` after 30 days and
+  scratchpads live in `/tmp`, so without this the material is lost.
+- **Writing is `/diary`** (`.claude/skills/diary/`): it backfills captures, writes or
+  extends the chapter for the current version, and rebuilds the page with
+  `python3 diary/build_html.py`.
+- **Phone photos/videos of builds** go in `diary/inbox/`; `/diary` dates and files them.
+- **Git:** chapters (`diary/NN-*.md`) and `diary/web/` (downscaled images the chapters
+  use) are committed; `diary/raw/`, `diary/media/`, `diary/inbox/` and `index.html`
+  stay local. The repo is public, so no secrets or other people's details in a chapter.
+- **Never publish the diary page** (artifact, Drop, anything) without asking which
+  account to use; it has gone to the work account twice.
 
 ## Swift conventions
 
@@ -233,11 +256,17 @@ you". Pure count stats from your own play — no TMDB rarity. `record` also link
 each adjacent pair both ways (`CollectedEntity.links`), so **actors are playing
 cards earned through the films linked through them** and **movies are framed
 posters**; either flips over to the other side of its links (no progress for movies
-— a cast is never completable). No numbers on the fronts; the finish is the reward.
+— a cast is never completable). An actor card's front carries only its collector
+number (`ReelNumber`: the order you first linked them, a set number, not a score) and
+five dots toward holo — **no counts on the fronts**; the finish is the reward. Its
+photo is printed in the actor's own `Duotone` (one of the foil's five pastels, by
+TMDB id), **baked into the cached image off-main by `ArtCache`** — never tint it
+with a mask or blend mode, which would push a tilting card offscreen every frame.
 `ReelCards.swift` draws both. The Reel narrows by decade and genre (`ReelFilter`:
 films match directly, actors through a linked film; genre ids ride along on every
 TMDB movie response, names are a fixed table). An actor card's finish comes from the
-pure, tested `ReelTier`: paper, inked at 5 films linked, holo at 11 — **no TMDB data,
+pure, tested `ReelTier`: paper, pastel at 5 films linked (the face in the
+photo's pastel), holo at 11 — **no TMDB data,
 no extra request; never add a fetch on Reel open**. Cards and frames are drawn once
 at their grid size and scaled (`ReelCanvas`), so a lift is a pure zoom: the lifted
 card flies itself out of its measured grid slot and back onto it, drawn above
@@ -272,7 +301,8 @@ tapping it runs the **handoff** (`Handoff.swift`) — a `HandoffStage` owned by
 the name/chip/avatar/blank flying into the deck's start card and the dock on its own
 `TimelineView` clock, waiting for the answer field's first (main-thread-blocking) focus
 to pass. Seed → play is a cross-fade under it, not a push. "Deal again" deals on
-`.dealSentence`; "Pick your own" opens search; the best run is a footer line. The engine
+`.dealSentence`; "Pick your own" opens search; the best run is a centred footer line (no instruction text — the sentence is the
+rule, and the blank nudges once for a new player). The engine
 prefetches the dealt start's candidates (`prefetchCandidates`) so the first turn is
 ready on arrival. `-uiAutoHandoff` (DEBUG) taps the blank two seconds after a deal, to
 record the transition. The Reel pill is always reachable (count hidden when empty),

@@ -349,11 +349,14 @@ pure-value + observable-store split as the rest of the app:
   genre menus (`ReelFilter`, options drawn from the Reel itself; an actor matches
   through a linked film), and the **deck**: actors as playing cards earned through
   the films linked through them (`links`, recorded from adjacent chain pairs),
-  movies as framed posters. No numbers are printed on the fronts. Tapping either
+  movies as framed posters. An actor's front shows only a collector number
+  (`ReelNumber`, by first-linked order) and five dots toward holo, over a photo
+  printed in the actor's `Duotone`; `ArtCache` bakes the duotone in during its
+  off-main decode and caches it under its own key. Tapping either
   lifts it out and flips it to the other side of its links — an actor's films, a
   movie's actors. Genres come from `genre_ids` on every TMDB movie response
   (`Movie.genreIDs`), named from a fixed table (`ReelGenre`). Finishes (paper /
-  inked at 5 links / holo at 11) come from `ReelTier`, so the Reel costs no TMDB
+  pastel at 5 links / holo at 11) come from `ReelTier`, so the Reel costs no TMDB
   requests. Three across: cards and frames are drawn once at a design width and
   scaled (`ReelCanvas`), which makes the lift a pure zoom. The lifted card makes
   the whole trip itself, drawn above the grid: each grid card records its on-screen
@@ -505,8 +508,9 @@ small, bold, uppercase and tracked.
   overlaid on its trailing edge; the dealt start as the head of a sentence (round
   avatar + kind chip, the name in Fraunces display, "*was in*" for an actor or
   "*starred*" for a movie); the **blank** ("a movie…" / "an actor…" over an ink rule,
-  with a coral arrow); "Deal again" and "Pick your own" links; and a footer line with
-  the best run and "tap the blank to start". The Reel pill is always reachable (count
+  with a coral arrow); "Deal again" and "Pick your own" links; and the best run,
+  centred at the foot of the screen (absent until there is one). No instruction text: the sentence
+  is the rule, and the blank nudges once, ever, for a new player. The Reel pill is always reachable (count
   hidden when empty) because the Reel sheet hosts the TMDB attribution.
   - **The sentence's head** sits in a fixed-height region pinned to its bottom, so the
     blank never moves: a long name grows upward and shrinks to fit three lines. Only
