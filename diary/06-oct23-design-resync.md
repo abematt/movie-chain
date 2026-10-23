@@ -251,7 +251,7 @@ and yes supabase but i'm a little concerned about safety there and then i want t
 ### ~13:23–13:45 — splitting the work, and both PRs merged
 
 - "alright i did some roadmap work also in another tab". That tab had edited the same checkout, so its changes sat uncommitted on the analytics branch.
-- **A surprise:** `origin/feature_posthog-analytics` already existed on GitHub at the first commit, though Claude's own push had been stopped at 12:39. Neither session's capture shows how it got there (cause unknown).
+- **A surprise, and Claude's mistake:** `origin/feature_posthog-analytics` already existed on GitHub at the first commit. Claude said it hadn't pushed and that it "must have been you or the other tab". It was Claude's own 12:39 command (inferred): one command that pushed and then opened the PR. Abraham's stop landed after the second-long push had finished but before the PR step, and the transcript logs the whole command as "rejected". GitHub held exactly the 12:39 commit and no PR, which fits. No harm done; the branch waited there until the PRs were approved.
 - "its done there so yeah do your split thing" → stashed, branched `feature_roadmap-launch-track` from `main`, applied cleanly, and fixed two stale "Sign in with Apple only" lines (`f568ce4`). On the analytics branch, ANALYTICS.md gained "the account id is the Supabase user id — never an email" and how beta players separate from launch players (`$is_testflight` plus `debug_build`) (`5882b30`).
 - "go ahead" → PRs **#14** (analytics) and **#15** (roadmap), opened at ~13:42.
 - "merge in both, and then yeah i'll work on the sentry stuff soon" → merged at 13:45 (`2271bc6`, `d1dd1a4`). `main` builds and passes all 93 tests.
@@ -314,6 +314,7 @@ and yes supabase but i'm a little concerned about safety there and then i want t
 - **A real run, read back from a spreadsheet.** Mark Ruffalo → "Spotlight" in 2.8 seconds, then 30 seconds of "What" and "Batman" before time ran out, with the answer he missed recorded. The analytics work in one row.
 - **The swipe-up kill that sent one event twice.** Same uuid, a different send time. What looked like a bug was the SDK delivering an event it wasn't sure had arrived.
 - **A YouTube video became a roadmap section.** Two Chris Raroque transcripts pasted into a second tab turned into the launch track: Framer, Loops, UserJot, a TestFlight beta, and "launch when they come back after a week".
+- **"Rejected" doesn't mean "didn't run".** Abraham stopped a push-then-open-PR command; the push had already gone through. Claude believed the log, called the branch a mystery and suggested Abraham had pushed it, until the diary write-up made it look again.
 - **Two tabs, one checkout.** The roadmap tab wrote into the same working folder the analytics work was on. It was untangled with a stash and a branch from `main`, and the two PRs merged cleanly within minutes.
 
 ### Media index
