@@ -31,8 +31,10 @@ DIARY = REPO / "diary"
 RAW = DIARY / "raw"
 MEDIA = DIARY / "media"
 MEDIA_EXT = {".png", ".jpg", ".jpeg", ".gif", ".heic", ".mp4", ".mov"}
-SKIP_PARTS = ("/Build/", "/DerivedData/", ".app/", ".xcassets/", "/Unspool-Assets/", "/venv/",
-              "/site-packages/", "/node_modules/", "/thumbs")
+# Directories never walked: Xcode build output, Python/Node environments, asset
+# bundles, and contact-sheet thumbnails made while writing the diary.
+SKIP_DIRS = re.compile(r"^(Build|DerivedData|Index\.noindex|SourcePackages|venv|\.venv|site-packages|"
+                       r"node_modules|Unspool-Assets|thumbs.*)$|\.(app|xcassets|xcarchive)$")
 
 
 def slug(path):
@@ -121,24 +123,30 @@ def copy_scratchpad(project_slug, sid, dest):
     """Copy the session's scratchpad screenshots/recordings and pasted-image files."""
     copied = 0
     for root in glob.glob(f"/private/tmp/claude-*/{project_slug}/{sid}"):
-        for path in Path(root).rglob("*"):
-            p = str(path)
-            if not path.is_file() or path.suffix.lower() not in MEDIA_EXT or any(s in p for s in SKIP_PARTS):
-                continue
-            rel = path.relative_to(root)
-            if rel.parts[0] == "images":
-                name = "pasted-" + path.name
-            elif rel.parts[0] == "scratchpad":
-                name = "_".join(rel.parts[1:])
-            else:
-                name = "_".join(rel.parts)
-            target = dest / name
-            if target.exists() and target.stat().st_size == path.stat().st_size:
-                continue
-            dest.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, target)
-            copied += 1
+        for here, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if not SKIP_DIRS.search(d)]
+            for f in files:
+                path = Path(here) / f
+                if path.suffix.lower() in MEDIA_EXT:
+                    copied += copy_one(path, Path(root), dest)
     return copied
+
+
+def copy_one(path, root, dest):
+    """Copy one scratchpad file into dest under a flat name; 1 if copied."""
+    rel = path.relative_to(root)
+    if rel.parts[0] == "images":
+        name = "pasted-" + path.name
+    elif rel.parts[0] == "scratchpad":
+        name = "_".join(rel.parts[1:])
+    else:
+        name = "_".join(rel.parts)
+    target = dest / name
+    if target.exists() and target.stat().st_size == path.stat().st_size:
+        return 0
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, target)
+    return 1
 
 
 def capture(transcript):
