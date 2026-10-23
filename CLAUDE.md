@@ -103,6 +103,29 @@ the relevant section before starting one.
   ```
   Bump **minor** when a roadmap milestone lands, **patch** for fixes/polish in
   between. Pre-1.0, breaking internal changes go in a minor bump.
+- **Before tagging, run `/diary`** so the version's chapter is written and
+  committed with the release (see *Dev diary* below).
+
+## Dev diary
+
+`diary/` is a running dev diary: one chapter per release, written from what actually
+happened (sessions, commits, screenshots, phone photos), as raw material for posts.
+`diary/README.md` has the layout.
+
+- **Capture is automatic.** A `SessionEnd` hook (`.claude/settings.json`) runs
+  `scripts/diary-capture.py`, which saves each session's slimmed transcript to
+  `diary/raw/` and copies its scratchpad screenshots and pasted images into
+  `diary/media/<sid8>/`. Transcripts age out of `~/.claude` after 30 days and
+  scratchpads live in `/tmp`, so without this the material is lost.
+- **Writing is `/diary`** (`.claude/skills/diary/`): it backfills captures, writes or
+  extends the chapter for the current version, and rebuilds the page with
+  `python3 diary/build_html.py`.
+- **Phone photos/videos of builds** go in `diary/inbox/`; `/diary` dates and files them.
+- **Git:** chapters (`diary/NN-*.md`) and `diary/web/` (downscaled images the chapters
+  use) are committed; `diary/raw/`, `diary/media/`, `diary/inbox/` and `index.html`
+  stay local. The repo is public, so no secrets or other people's details in a chapter.
+- **Never publish the diary page** (artifact, Drop, anything) without asking which
+  account to use; it has gone to the work account twice.
 
 ## Swift conventions
 
