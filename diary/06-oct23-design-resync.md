@@ -1,13 +1,13 @@
 ---
 id: design-resync
 label: Re-sync & analytics
-span: Oct 23 10:35 – 13:49
+span: Oct 23 10:35 – 14:12
 versions: 0.7.0
 accent: yellow
 order: 6
 sessions: bb139731 8aa6b002 4227355d c300b3a3 02d88d55
 start: 2026-10-23
-end: 2026-10-23T13:49
+end: 2026-10-23T14:12
 ---
 
 ## Era: After the cut — housekeeping, then analytics and a launch plan (2026-10-23)
@@ -256,7 +256,14 @@ and yes supabase but i'm a little concerned about safety there and then i want t
 - "go ahead" → PRs **#14** (analytics) and **#15** (roadmap), opened at ~13:42.
 - "merge in both, and then yeah i'll work on the sentry stuff soon" → merged at 13:45 (`2271bc6`, `d1dd1a4`). `main` builds and passes all 93 tests.
 
-### Where things stand (2026-10-23 ~13:49)
+### ~13:49–14:12 — the diary write-up, and a correction it forced
+
+- `/diary` extended this chapter (`e1d1296`). Writing it up meant re-reading the 12:39 stop in the raw capture, and that showed the "mystery" branch was Claude's own push.
+- Claude's first note to Abraham called it an open question ("if you remember doing it, I'll correct that line"). **Abraham (verbatim):** "don't understand". The plain version: one command pushed and then opened the PR; the stop landed between the two; the log calls the whole thing "rejected".
+- The chapter was corrected (`db8e43f`). Claude saved a memory: after a stopped command, check the real state before saying what ran, and don't chain a push with other steps.
+- "go ahead" → pushed, PR #16 opened and merged, each step checked separately this time (`c20124f`, 14:10).
+
+### Where things stand (2026-10-23 ~14:12)
 
 - **On `main`:** PostHog analytics (7 events, shared context, a tracking plan, enforced boundaries) and the device id — two of the 0.7.0 items. The roadmap has a launch track, Supabase, three sign-in options and a TestFlight beta.
 - **Still open for 0.7.0:** OSLog logging, Sentry crash reports (Abraham's next), automated TestFlight builds, the deal-pool disk cache.
@@ -300,6 +307,8 @@ and yes supabase but i'm a little concerned about safety there and then i want t
 | 13:22 | TestFlight beta from the waitlist; launch on week-1 retention | Don't spend the App Store's two-week boost without knowing the app holds anyone | 02d88d55 |
 | 13:40 | Roadmap on its own branch and PR | It has nothing to do with the analytics change | c300b3a3 |
 | 13:40 | The account id is the Supabase user id, never an email | Apple emails may be relays; one person can sign in several ways | c300b3a3 |
+| 14:08 | Correct the diary: the first push was Claude's | The raw capture shows the stop landed after the push and before the PR | c300b3a3 |
+| 14:09 | Push, open the PR and merge as separate, checked steps | A stopped multi-step command can leave its first step done | c300b3a3 |
 
 ### Story material
 
