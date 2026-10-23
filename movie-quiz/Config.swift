@@ -38,6 +38,19 @@ enum Config {
 
     static var hasTMDBToken: Bool { !tmdbToken.isEmpty }
 
+    /// PostHog project token (`phc_…`), from the same secrets plist (key
+    /// `PostHogProjectToken`). It's a write-only key meant to ship in clients, but
+    /// it stays out of this public repo so nobody else's builds report into the
+    /// project. Empty → analytics is off (`NoAnalytics`).
+    static let postHogToken: String = {
+        guard let token = secrets["PostHogProjectToken"] as? String else { return "" }
+        return token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }()
+
+    static var hasPostHogToken: Bool { postHogToken.hasPrefix("phc_") }
+
+    static let postHogHost = "https://us.i.posthog.com"
+
     // MARK: App version
     //
     // Read from the bundle, never hardcoded, so what the app displays can't drift

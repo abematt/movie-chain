@@ -16,6 +16,7 @@ struct GameOverView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showReel = false
+    @Environment(\.analytics) private var analytics
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
     @State private var scorePop = 0
@@ -204,7 +205,10 @@ struct GameOverView: View {
 
     // What this run added to the Reel, one line, tappable into the sheet.
     private var reelCell: some View {
-        Button { showReel = true } label: {
+        Button {
+            showReel = true
+            analytics.capture(.reelOpened(from: .gameOver))
+        } label: {
             HStack(spacing: Theme.Spacing.xs) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Your Reel").metaLabel(size: .small)
@@ -287,6 +291,7 @@ struct GameOverView: View {
         VStack(spacing: Theme.Spacing.sm) {
             Button {
                 engine.reset()
+                analytics.capture(.playAgain)
             } label: {
                 Text("Play again").frame(maxWidth: .infinity)
             }
@@ -296,6 +301,11 @@ struct GameOverView: View {
                 Text("Share").frame(maxWidth: .infinity)
             }
             .buttonStyle(.ghost)
+            // ShareLink has no action of its own; a tap opening the sheet is the
+            // signal (whether they then sent it isn't knowable).
+            .simultaneousGesture(TapGesture().onEnded {
+                analytics.capture(.shareTapped(from: .gameOver))
+            })
         }
     }
 }

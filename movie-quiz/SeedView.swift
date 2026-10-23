@@ -52,6 +52,7 @@ struct SeedView: View {
     @State private var introTask: Task<Void, Never>?
 
     @State private var showSettings = false
+    @Environment(\.analytics) private var analytics
 
     /// The Reel total the player last *saw* on the pill, so growth since then can
     /// be shown rolling up rather than already there.
@@ -264,7 +265,10 @@ struct SeedView: View {
     // served TMDB-powered dealt seeds — must be able to open it before logging any
     // chain. The count only appears once there's something to count.
     private var reelButton: some View {
-        Button { showReel = true } label: {
+        Button {
+            showReel = true
+            analytics.capture(.reelOpened(from: .home))
+        } label: {
             HStack(spacing: 6) {
                 Image(systemName: "film.stack")
                     .font(Theme.Font.bodyStrong)
@@ -374,6 +378,7 @@ struct SeedView: View {
             Button {
                 Haptics.selection()
                 engine.shuffleSeed()
+                analytics.capture(.dealAgain)
             } label: {
                 Label("Deal again", systemImage: "shuffle")
             }
@@ -382,7 +387,10 @@ struct SeedView: View {
             Spacer(minLength: Theme.Spacing.sm)
 
             // The swap animates through its transitions (`modeSwap`).
-            Button { searching = true } label: {
+            Button {
+                searching = true
+                analytics.capture(.pickYourOwnOpened)
+            } label: {
                 Label("Pick your own", systemImage: "magnifyingglass")
             }
         }
@@ -422,6 +430,7 @@ struct SeedView: View {
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         searchTask?.cancel()
+        analytics.capture(.runStarted(seed: seed.kind, source: .dealt))
         Task { await engine.startGame(with: seed) }
     }
 
@@ -588,6 +597,7 @@ struct SeedView: View {
 
     private func start(with node: ChainNode) {
         searchTask?.cancel()
+        analytics.capture(.runStarted(seed: node.kind, source: .picked))
         Task { await engine.startGame(with: node) }
     }
 

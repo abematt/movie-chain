@@ -26,6 +26,7 @@ struct CollectionView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.analytics) private var analytics
     @State private var filter: Filter = .actors
     /// Decade and genre narrowing, shared by both tabs.
     @State private var narrow = ReelFilter()
@@ -111,6 +112,9 @@ struct CollectionView: View {
                         ShareLink(item: store.shareText) {
                             Image(systemName: "square.and.arrow.up")
                         }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            analytics.capture(.shareTapped(from: .reel))
+                        })
                     }
                 }
             }

@@ -42,6 +42,8 @@ final class GameEngine {
         var chain: [ChainNode] = []
         var links = 0
         var points = 0
+        /// The player tapped Quit, rather than the clock running out.
+        var endedByQuit = false
 
         /// Spoiler-free share card: each link as a coloured square, never a name.
         var shareText: String {
@@ -557,7 +559,7 @@ final class GameEngine {
         guard phase == .playing else { return }
         generation += 1                            // drop any in-flight candidate load
         stopCountdown()
-        var summary = Summary(chain: chain, links: score, points: points)
+        var summary = Summary(chain: chain, links: score, points: points, endedByQuit: quit)
 
         // "You were one away": surface a valid answer the player didn't give on
         // the turn that ran out — the sting that drives the next run. Skip it on a

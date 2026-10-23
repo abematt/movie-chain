@@ -34,6 +34,20 @@ Unspool rebrand was inserted as 0.6.0.)
 
 ## [Unreleased]
 
+### Added
+- **Product analytics (PostHog).** Until now there was no way to know where runs end,
+  whether the home sentence teaches the rule, or whether anyone comes back. The app now
+  sends a small, closed set of events (`run_started`, `link_landed`, `run_ended`,
+  `turn_load_failed`, `deal_again`, `pick_your_own_opened`, `play_again`,
+  `reel_opened`, `share_tapped`) plus PostHog's app opened/installed/updated, and
+  nothing else: no autocapture, screen views, replay, surveys or flags. Properties are
+  counts and categories, never a name the player typed. Events are fired from the
+  views through an injected `Analytics`, so the engine stays pure and tests send
+  nothing; development builds carry `debug_build` so they can be filtered out.
+- **A stable device id**, made on first launch and used as PostHog's anonymous id, so
+  the events and a future account (0.9.0) agree on who the player was.
+- **"Share usage data" in Settings**, on by default, which stops all sending when off.
+
 ## [0.6.0] — 2026-10-23
 
 Movie Chain becomes **Unspool**: a new name, a two-circle icon and wordmark, and a home

@@ -24,6 +24,7 @@ struct ContentView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.analytics) private var analytics
 
     init() {
         #if DEBUG
@@ -70,6 +71,13 @@ struct ContentView: View {
         // with it, rather than leaving them over the game-over screen.
         .onChange(of: engine.phase) { _, phase in
             if phase != .playing { handoff.finish() }
+            // Every run ends here, whichever screen it ended on.
+            if case .gameOver(let summary) = phase {
+                analytics.capture(.runEnded(reason: summary.endedByQuit ? .quit : .timeout,
+                                            links: summary.links, points: summary.points,
+                                            newBest: summary.isNewBest,
+                                            reelAdditions: summary.reelAdditions))
+            }
         }
         .onChange(of: scenePhase) { old, phase in
             // Guarantee the latest collection snapshot is on disk before the app
