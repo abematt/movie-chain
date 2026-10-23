@@ -19,7 +19,7 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 |---|---|
 | **0.4.0** | Solo game complete — engine, matching, providers, collection, tests |
 | **0.5.0** | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity: Cream Neobrutalist, Fraunces, the chain as cards (motion re-tuned in 0.5.1) |
-| 0.6.0 | [**Unspool**](docs/ROADMAP.md#060--unspool) — the rebrand: name, two-circle icon, wordmark, a home screen that deals a real card |
+| **0.6.0** | [**Unspool**](docs/ROADMAP.md#060--unspool) — the rebrand: name, two-circle icon, wordmark, the home as the first turn |
 | 0.7.0 | [**Foundations & safety net**](docs/ROADMAP.md#070--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
 | 0.8.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#080--the-service) — takes the shared key out of the app and caches it |
 | 0.9.0 | [**Accounts**](docs/ROADMAP.md#090--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
@@ -33,6 +33,13 @@ already has: the design overhaul landed before Foundations and took 0.5.0, and t
 Unspool rebrand was inserted as 0.6.0.)
 
 ## [Unreleased]
+
+## [0.6.0] — 2026-10-23
+
+Movie Chain becomes **Unspool**: a new name, a two-circle icon and wordmark, and a home
+screen that is the first turn of the game rather than a menu in front of it. The Reel's
+cards became things to pick up — a lifted card tilts with the phone — and actor cards
+got proper collectible fronts.
 
 ### Added
 

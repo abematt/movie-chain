@@ -64,10 +64,10 @@ drive SwiftUI canvas previews.
 ## Versioning & changelog
 
 The app is versioned and every notable change is recorded in
-[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.5.3`;
+[`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog + SemVer). **Currently `0.6.0`;
 `1.0.0` means launch.** Each remaining pre-launch milestone is allocated a minor
 version — design overhaul (0.5.0, **landed**; motion re-tune landed as 0.5.1, the Reel as a collection as 0.5.2, its polish as 0.5.3),
-the Unspool rebrand (0.6.0, in progress), foundations & safety net (0.7.0), the service /
+the Unspool rebrand (0.6.0, **landed**), foundations & safety net (0.7.0), the service /
 TMDB proxy (0.8.0), accounts (0.9.0), the Daily Chain (0.10.0), friend groups (0.11.0);
 share images ship with launch (1.0.0). Global leaderboards are dropped — **check the
 changelog table before choosing a bump**. Each is documented in
@@ -97,9 +97,9 @@ the relevant section before starting one.
   `MARKETING_VERSION` (and `CURRENT_PROJECT_VERSION` for a submitted build), then
   tag it:
   ```bash
-  sed -i '' 's/MARKETING_VERSION = 0.5.3;/MARKETING_VERSION = 0.6.0;/g' \
+  sed -i '' 's/MARKETING_VERSION = 0.6.0;/MARKETING_VERSION = 0.7.0;/g' \
     movie-quiz.xcodeproj/project.pbxproj
-  git tag -a v0.6.0 -m "0.6.0"
+  git tag -a v0.7.0 -m "0.7.0"
   ```
   Bump **minor** when a roadmap milestone lands, **patch** for fixes/polish in
   between. Pre-1.0, breaking internal changes go in a minor bump.

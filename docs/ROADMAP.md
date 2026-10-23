@@ -17,7 +17,7 @@
 | Version | Milestone | Depends on |
 |---|---|---|
 | 0.5.0 | [Design overhaul](#050--design-overhaul) — **landed 2026-10-22** (motion re-tuned in 0.5.1) | — |
-| 0.6.0 | [Unspool — the rebrand](#060--unspool) — name, icon, wordmark, dealt-card home | 0.5.0 |
+| 0.6.0 | [Unspool — the rebrand](#060--unspool) — **landed 2026-10-23** | 0.5.0 |
 | 0.7.0 | [Foundations & safety net](#070--foundations--safety-net) | — |
 | 0.8.0 | [The service — TMDB proxy first](#080--the-service) | — |
 | 0.9.0 | [Accounts](#090--accounts) | 0.7.0 (device id), 0.8.0 (a backend) |
@@ -132,8 +132,9 @@ with a card/poster direction.
 
 ## 0.6.0 — Unspool
 
-> **In progress (2026-10-22), on `feature_unspool`.** Settles the name question the
-> 0.5.0 traps list deferred.
+> **Landed in 0.6.0 (2026-10-23).** Settles the name question the 0.5.0 traps list
+> deferred. The film strip's uses (store screenshots, the share card) and the trademark
+> check on the name belong to 1.0.
 
 **Why now:** the name and icon were the last placeholder in the identity 0.5.0 built,
 and everything after this point (TestFlight, the store listing, share images, the Daily
