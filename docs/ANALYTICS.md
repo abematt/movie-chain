@@ -155,6 +155,15 @@ launch). From 0.9.0, `Telemetry.signedIn(accountID:)` ties events to the account
 PostHog links the device's earlier events to it); `signedOut()` returns to the device
 id. Person profiles are only created for identified players.
 
+**The account id is the Supabase user id — never an email**, whichever way the player
+signed in (Apple, Google or an email code). An Apple email may be a private relay, and
+one person can sign in different ways on different devices; when Supabase links those
+identities into one user, PostHog follows because the id is the same.
+
+**Beta vs launch:** PostHog marks TestFlight installs itself (`$is_testflight`), and
+development builds carry `debug_build`, so the beta's week-1 retention — the launch
+decision — reads cleanly without a property of our own.
+
 ## Privacy
 
 The Settings toggle "Share usage data" (`Telemetry.enabledKey`) stops everything,
