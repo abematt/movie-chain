@@ -1,18 +1,18 @@
 ---
 id: unspool
 label: Becoming Unspool
-span: Oct 22 18:21 – 23:55
+span: Oct 22 18:21 – Oct 23 08:29
 versions: 0.6.0
 accent: coral
 order: 5
-sessions: 4227355d 2b943a7f 628e4dd2 8aa6b002
+sessions: 4227355d 2b943a7f 628e4dd2 8aa6b002 bb139731
 start: 2026-10-22
-end: 2026-10-22T23:55
+end: 2026-10-23T08:29
 ---
 
-## Era: Becoming Unspool — design system, rebrand, the handoff (2026-10-22 evening → now)
+## Era: Becoming Unspool — design system, rebrand, the handoff (2026-10-22 evening → Oct 23 morning)
 
-**Arc.** On the same day 0.5.3 was cut (`4d296ee`, 18:07), Abraham turned the app's existing Cream Neobrutalist code into a **Design System artifact** so he could iterate on the logo and home screen in Claude Design. About ninety minutes later he came back with four exported explorations under a new name, **Unspool**: a two-circle mark, a wordmark, a film strip and a "dealt card" home screen. In one evening the app got renamed, re-iconed and given a new home screen. The roadmap gained a new 0.6.0, which pushed every later milestone down one. The dealt-card home was built, shipped to the simulator, and **thrown away the same night** for a better idea Abraham pasted in: the home screen *is* the first turn, written as a sentence with a blank, and tapping the blank flies the pieces into the play screen (the "handoff"). Three PRs (#6, #7, #8) went to `main` before midnight. They were followed by two animation audits, a `/swift-review` that found a real double-tap bug, and a fix to the "Pick your own" swap. The night ended with a new thread, holographic gyro-tilting Reel cards, and that work is uncommitted on `feature_reel-tilt` right now.
+**Arc.** On the same day 0.5.3 was cut (`4d296ee`, 18:07), Abraham turned the app's existing Cream Neobrutalist code into a **Design System artifact** so he could iterate on the logo and home screen in Claude Design. About ninety minutes later he came back with four exported explorations under a new name, **Unspool**: a two-circle mark, a wordmark, a film strip and a "dealt card" home screen. In one evening the app got renamed, re-iconed and given a new home screen. The roadmap gained a new 0.6.0, which pushed every later milestone down one. The dealt-card home was built, shipped to the simulator, and **thrown away the same night** for a better idea Abraham pasted in: the home screen *is* the first turn, written as a sentence with a blank, and tapping the blank flies the pieces into the play screen (the "handoff"). Three PRs (#6, #7, #8) went to `main` before midnight. They were followed by two animation audits, a `/swift-review` that found a real double-tap bug, and a fix to the "Pick your own" swap. The night ended with a new thread, holographic gyro-tilting Reel cards: tuned on the phone, reviewed, merged as PR #9 after midnight, and followed by collectible card fronts (duotone, paper → pastel → holo, a collector number) and a last home-screen cleanup. In a parallel session the same night, the **dev diary** itself was started, and it now captures every session. 0.6.0 is ready to cut.
 
 All times are local Barcelona time (UTC+2). Transcripts are in UTC, so 16:21 UTC = 18:21 local.
 
@@ -244,44 +244,159 @@ The audit mapped web rules onto SwiftUI ("animate only transform/opacity" become
 
 Abraham: "yes go ahead". **Five plans were written to `plans/` (21:43–21:45 UTC = 23:43–23:45 local).** One sign was fixed in 005 during writing: the release spring's velocity is the drag's velocity itself, not its negative.
 
-Abraham: **"Yeah build all brother"**. Branch `feature_reel-tilt` was created (23:48), and `DisplayLink.swift` and `CardTilt.swift` were written. ReelCards.swift, HoloSticker.swift, Theme.swift and GameOverView.swift were edited, and CollectionView.swift gained a DEBUG `-uiLiftFirst` launch argument to lift the first card for screenshots. The build succeeded with warnings treated as errors, and **69 tests passed**. The 120Hz key **didn't land**: Xcode ignores `INFOPLIST_KEY_CADisableMinimumFrameDurationOnPhone`, as plan 001 anticipated, so it was reverted and **the tilt runs at 60Hz for now**. Simulator screenshots `lift.png`/`tilt.png` were taken but aren't in media. At ~23:54 the session was updating CHANGELOG/CLAUDE.md/ARCHITECTURE docs.
+Abraham: **"Yeah build all brother"**. Branch `feature_reel-tilt` was created (23:48), and `DisplayLink.swift` and `CardTilt.swift` were written. ReelCards.swift, HoloSticker.swift, Theme.swift and GameOverView.swift were edited, and CollectionView.swift gained a DEBUG `-uiLiftFirst` launch argument to lift the first card for screenshots. The build succeeded with warnings treated as errors, and **69 tests passed**. The 120Hz key **didn't land**: Xcode ignores `INFOPLIST_KEY_CADisableMinimumFrameDurationOnPhone`, as plan 001 anticipated, so it was reverted and **the tilt runs at 60Hz for now**. Simulator screenshots `lift.png`/`tilt.png` were taken (embedded in the 23:54 entry below). At ~23:54 the session was updating CHANGELOG/CLAUDE.md/ARCHITECTURE docs.
 
 ### 2026-10-22 ~23:49 — "What are the things in our plan that we want to do"
 
 A short side session. Claude first listed plans 001–005. Abraham: **"i mean tmore high level, like metrics and multipleayer etc etc"**. Claude then summarised the ROADMAP, and the "Where things stand" section below uses it. It also spotted a stale line: ROADMAP 0.5.0 still says the Cards and Tiles styles stay as a setting, but they were removed. Claude offered to fix that.
 
+### 2026-10-22 ~23:54 — "is it on my phone", then "feels too heavy"
+
+The tilt landed as **`9cad818`** "Make a lifted Reel card tilt in 3D with the gyro or a finger" (23:54, on `feature_reel-tilt`; 69 tests, swift-check clean). The simulator has no gyro, so Claude checked a forced tilt with a temporary hack:
+
+![Simulator, 23:53: Keanu Reeves's holo card lifted at rest (240pt wide, hard shadow, rainbow foil border, eleven-dash progress bar). The first check that the lift still looks right with the tilt plumbing in.](media/628e4dd2/lift.png)
+
+![Simulator, 23:53, with a forced tilt: the same card leaning in perspective, a white glare band across the photo and the foil shifted. Taken to prove the leaf views move; the hack was removed afterwards.](media/628e4dd2/tilt.png)
+
+Abraham: **"is it on my phone"**. It wasn't. Claude built a signed build for his iPhone 16 Pro (23:57), installed over the existing app so his saved Reel survived, and launched it with `-uiDemoReel -uiOpenReel -uiLiftFirst` so Keanu's card lifts itself after ~1.5s.
+
+**Device verdict (verbatim, 23:59):** "amount of tilt and lag doens't feel right, feels too heavy / the card could be bigger when opened i think / the shadow is actually no good, looks off / flicking feels nice / closing card miid tilt lands fine"
+
+- **Too heavy:** smoothing lag 93ms → 40ms; gain 3 → 4 (full tilt at ~15° of wrist turn instead of ~20°). The ±8° cap stayed. The stickers in the game share the gyro, so they got snappier too.
+- **Bigger:** lifted width 240 → 300pt (Flip/Close match; posters too).
+- **Shadow, attempt 1:** a tipped card's outline is a trapezoid, so the flat "table shadow" from plan 004 can't match it. Claude redrew it as the card's own outline, tipped the same way and shifted 3pt instead of 5pt.
+- Abraham, a minute later: **"drop the seperate shadow or any shadow"**. So a lifted card has no shadow at all; grid cards keep theirs.
+
+Then, unasked but in the same round, **framed movie posters got the same tilt**: the poster sits behind the mat, and the glare slides across the glass. Commit **`0602213`** (00:03) "Tune the Reel tilt from a device test and extend it to movie frames". Claude kept `docs/ROADMAP.md` and the `diary/` folder out of the commit ("Those changes aren't mine").
+
+**Decision: no shadow on a lifted card.** Why: under a card tipping in 3D, every shadow tried (flat slab, tipped outline) "never looked attached" (CHANGELOG). Rejected: plan 004's table shadow, and the outline shadow.
+
+### 2026-10-23 ~00:04 — Review before merge: "why don't you have /review-animations"
+
+**Ask:** "i want you to /review-animations and look at the /animation-performance before we commit and merge"
+
+Claude's first pass ran `animation-performance` and its own summary of the motion bar. Abraham: **"why don't you have /review-animations"**. The skill was installed, but its frontmatter sets `disable-model-invocation: true`, which hides it from Claude's list; it only runs when typed at the start of a message. Abraham typed `/review-animations on the stuff we did for the holographic reel cards and frame`.
+
+Findings (verdict: **Block**, "all of it is small"):
+1. **Grid cards zoomed 8%.** `ReelParallax` always applied `.scaleEffect(1.08)` to hide the photo's edges while it slides, including on grid cards that never tilt. Claude: "I introduced this… on-device testing wouldn't catch it because it's consistent everywhere." Fix: the overscan grows with tilt intensity (up to 7%).
+2. **The shadow blinked out at take-off and back in at landing.** Fix: the hard shadow slides under the card as it rises and back out as it lands, inside the flight's own transaction; still none while the card is out.
+3. **`StickerWear` redrew every frame during play.** The start sticker's scratches were a `Canvas` that took `tilt`, so it re-rasterised on every frame while the player types, and plan 001 had doubled that rate. Fix: draw scratches once; only the layer's opacity follows the glint.
+4. **The tilt never settled.** Smoothing approaches its target forever and sensor noise nudges it, so every leaf re-rendered at 60Hz with the phone flat on a table. Fix: a dead band (skip writes under ~0.02° of lean).
+5. **`.blendMode(.plusLighter)` on the glare** might force offscreen compositing. Fix: removed; plain white at the same opacity.
+6. A badly wrapped doc comment.
+
+Abraham: **"alright accounting for animation-performance findings and review animations findings, do a complete effort that fixes all the findings"**. One build error on the way ("static stored properties not supported in generic types" in `ReelParallax`). Commit **`caf98e6`** (00:11) "Fix the Reel tilt review findings", pushed as **PR #9**.
+
+![Simulator, 00:11, after the fix: the Reel grid with Keanu (holo), Tom Hanks and Margot Robbie at their original crop. Taken to confirm the 8% grid zoom was gone.](media/628e4dd2/grid.png)
+
+![Simulator, 00:11: the lifted Keanu card at the new 300pt width, with no shadow while it's out.](media/628e4dd2/out.png)
+
+`mid.png` is a second grid capture from the same minute, identical to `grid.png`.
+
+### 2026-10-23 ~00:14 — "we never implemented the paper + holo pastel look"
+
+**Ask (verbatim):** "last thing is , we never implemented the paper + holo pastel look , and then some more ideas for the cards for actors"
+
+![Abraham's mock again, re-pasted: "FRONTS · PAPER → PASTEL → HOLO". Hugh Jackman (paper, green duotone, NO. 027, 1 chain), DiCaprio (purple pastel, 2 chains), Waltz (blue, 3 chains), Gyllenhaal (NO. 019 · HOLO, pink duotone, rainbow border, NEW, 5 chains), and a DiCaprio stats back.](media/628e4dd2/pasted-2.png)
+
+![Three duotone options laid side by side: "1 · Brand trio" (blue/coral/yellow per card), "2 · Holo pastels" (lavender, teal, pink, mint, lemon, one per card), "3 · Blues, varied" (every card a different blue).](media/628e4dd2/pasted-3.png)
+
+Claude asked four questions before building. Abraham's picks:
+
+| Question | Pick | Rejected |
+|---|---|---|
+| Which duotone? | **Holo pastels, per card** (overrode Claude) | "Tier-tinted pastels" (Claude's recommendation), brand trio, blues |
+| Number and count on the front? | **Collector number, no chain count** | The mock's "3 chains" |
+| How much of the mock? | **Fronts only** (the stats back waits) | Fronts + back |
+| PR #9 | **Merge it first** | Stack the fronts on the tilt branch |
+
+PR #9 merged as **`c5c2990`** (00:17), and `feature_card-fronts` was branched from `main`.
+
+Note that the per-card pastel pick sets aside the 23:27 call to "tint by tier, not per card" (to protect blue = actor). The tier now shows in the card's *face* instead: paper, then that actor's pastel at 5 films, then holo at 11.
+
+**What was built** (commit **`61381b2`**, 00:22, "Print actor cards as collectible cards: duotone, pastel tier, set number"):
+- Each actor's photo is baked into a two-ink duotone (one of five pastel pairs from the holo foil, chosen by TMDB id so it never changes) by `ArtCache`, off the main thread, and cached like any other art. No masks or blend modes, so tilting costs the same as before.
+- The tier "inked" is renamed **pastel** everywhere, VoiceOver included.
+- Header: "NO. 027" plus the logo mark. The number is the order you first linked the actor; it holds under any filter, and ties go by TMDB id.
+- A name plate with five dots: the first fills at one film, all five only at holo.
+- The NEW badge moved onto the photo's corner so it stops covering the logo.
+- Tests 69 → **77** (tiers, dots, collector numbers, colour assignment).
+
+![Simulator, 00:21, first pass: the grid with NO. 001 · HOLO Keanu in a sepia duotone, Tom Hanks on a lavender face, Margot Robbie and Florence Pugh in teal, a lemon Uma Thurman and Ryan Gosling. The dark tones read muddy.](media/628e4dd2/fronts.png)
+
+![Simulator, 00:21, after lightening the dark tones: the same grid with clearer colours. Claude: "Lemon lands as a warm sepia, which you can judge on the phone."](media/628e4dd2/fronts2.png)
+
+![Simulator, 00:22: Keanu lifted, "NO. 001 · HOLO" on a rainbow foil face, sepia duotone photo, a white name plate with five full dots.](media/628e4dd2/lift2.png)
+
+Abraham: **"one thing is ,i don't want the card to say holo when its a holo card, it can look holo"**. Commit **`aa78047`** (00:23) "Drop the HOLO label from holo cards; the foil says it".
+
+**Gotcha:** the first commit for that change used `git commit -a`, which swept in Abraham's uncommitted `docs/ROADMAP.md` and `docs/DAILY-CHAIN.md` edits. It was local and unpushed, so Claude soft-reset it and recommitted only `ReelCards.swift`.
+
+### 2026-10-23 ~00:25 — Home cleanup: the best run moves up, then back down
+
+**Ask (verbatim):** "some more clean up , on the main screen, I think best run 14 linksis nice to show, lets show that at the bottom centre  aligned / tap the balnk to start doesn't make sense there, maybe it should be in the gap between the logo row and the game start row as a Choose a movie or actor, name what they were in and keep the link going or something like that?"
+
+![Simulator, 00:25, before: the sentence home (Gary Sinise / was in / a movie…) with the footer "BEST RUN 13 links · tap the blank to start" left-aligned.](media/628e4dd2/home.png)
+
+- Claude dropped "tap the blank to start" without adding a replacement instruction: "the sentence already reads as the rule, and the blank's" one-time nudge shows new players where to tap.
+
+![Simulator, 00:26: "BEST RUN 13 links" alone, centred at the foot (Ian McKellen dealt). This matched the first ask.](media/628e4dd2/home2.png)
+
+![Simulator, 00:26: the best run moved into the gap under the header instead, with the sentence pushed down (Meat Loaf dealt). Committed as a2f9895.](media/628e4dd2/home3.png)
+
+- Commit **`a2f9895`** (00:27) "Move the best run under the header and drop the home's instruction". This put the *best run* into the gap Abraham had offered for an *instruction* (inferred: Claude's reading of the second paragraph).
+- Claude's next message, the same minute: "Okay, putting it back at the bottom, centred. That's your first ask, with 'tap the blank' still gone." Abraham's reply in between isn't in the capture (inferred: he pushed back on the header placement). Commit **`d2ca467`** (00:27) "Put the best run back at the foot of the home, centred". The line doesn't show until a player has a best run.
+
+**Decision: no instruction line on the home at all.** Why: the sentence is the rule, and the blank nudges once for a first-time player. Rejected: Abraham's suggested "Choose a movie or actor, name what they were in…" line in the header gap.
+
+### 2026-10-23 ~00:30 — "can we say we done with 0.5?"
+
+**Abraham (verbatim):** "okAY visually i think im finally ready to say overhaul is done for now and so what is that can we say we done with 0.5?"
+
+Claude: 0.5 was already done (0.5.0–0.5.3 are tagged). Everything since sits under `[Unreleased]`, and that is the **0.6.0 — Unspool** milestone: name, mark and icon done; home as the first turn done "and today's cleanup finishes it"; the film strip's uses belong to later milestones; the "Unspool" trademark check is tied to the 1.0 listing, so it doesn't block. The cut is four steps: merge `feature_card-fronts`, rename `[Unreleased]` to `[0.6.0] — 2026-10-23`, bump `MARKETING_VERSION` and tag `v0.6.0`, update CLAUDE.md and ROADMAP. Claude asked whether to include Abraham's own uncommitted ROADMAP/DAILY-CHAIN edits in the release commit. Abraham pasted this answer into the diary session (below) and asked "how does it all tie together". His edits went in as **`ceaa018`** (00:36) "Docs: plan analytics, notifications and the daily rollover" (PostHog as product analytics from 0.7.0, the service as the only source of remote config, Daily Chain notifications as one system, local-midnight rollover keyed by puzzle number).
+
+### 2026-10-22 ~23:50 — Starting the dev diary (parallel session, runs to 08:29)
+
+**Ask (verbatim):** "I'd like to start keeping dev diaries, there must be screenshots and stuff as welll as decisions that we've taken sinc the inception of this app that you can compile to a comprehensive diary (doesn't need to be pretty) but a reference i can use to write something myself"
+
+Claude surveyed what survived: no screenshots committed, and transcripts only for Oct 21–22, because the July–August conversations had aged out after 30 days. So chapter 01 (Jul 9 → Oct 21) was **rebuilt from git and the docs**. Five agents wrote one era each, in parallel. The six images Abraham pasted on Oct 21 had been deleted from the scratchpad, so Claude **recovered them from the base64 copies inside the session transcript**. Mid-run, Abraham added: "I JUST ALSO put like a bunch videos and photos from past builds and designs in the download,s you'll see a bunch of stuff added at 11:53 pm". WhatsApp had stripped their EXIF, so they were matched to commits by creation time, and **three of the four batches showed work that hadn't been committed yet** (an early Reel with "LOOK HOW MANY YOU KNOW", a "START WITH…" home three days before it landed).
+
+Then: **"can you make it into a nice html diarty with visuslizations"**. Claude built `build_html.py` and a page in Unspool's own palette (commits per day, a session timeline of the long day, code/test/doc growth, a searchable decision explorer: 130 decisions, 132 images).
+
+![The first diary page, dark mode: the "unspool" header, stat tiles (70 commits, 11 days with commits, 5 versions tagged, 130 decisions, 132 screenshots & photos, 7,061 lines of Swift · 69 tests), the commits-per-day chart with its 74-day gap, "The long day" session timeline, small charts for app code, tests, docs and churn, and the decisions explorer.](media/bb139731/shot.png)
+
+It was published as a private artifact, but on the wrong account. Abraham: **"okay first of all this artefact went to my work account so delete it, we'll recreate it later but this is the idea"**. It was deleted, and the rule became: build locally, ask which account before publishing anything for this project.
+
+Three unrelated personal screenshots had been swept into commit `9cad818` by a broad `git add` (the tilt session committed while the diary media sat in the tree), and they reached `main` with PR #9; they were removed from `main` in **PR #10** (`546c916`), and Abraham declined a history rewrite.
+
+**"how do we make sure this grows cumulatively"**: Claude proposed three layers (capture automatically, write on demand, render without editing code). Abraham: **"okay i like /diary idea and the hook"**. The result:
+- A **SessionEnd hook** (`scripts/diary-capture.py`) saves a slimmed transcript to `diary/raw/`, copies the session's scratchpad screenshots and pasted images into `diary/media/<session>/`, and `--backfill` catches sessions killed without ending.
+- The **`/diary` skill** writes **one chapter per release** from whatever isn't covered yet, and CLAUDE.md makes it a step of cutting a version.
+- `build_html.py` finds chapters from their front matter. Only the chapters and downscaled `diary/web/` images are committed; `raw/`, `media/` and `inbox/` are gitignored and stay local (the repo is public).
+- Commits **`6b6b472`** "Add the dev diary: six chapters and a page built from them" and **`507ba6d`** "Capture every session for the diary, and add /diary to write it" (both 06:58; the laptop slept from ~02:00 to 05:30 mid-session), then **`b6ea9ee`** (08:29) "Skip build and environment folders when capturing a session", after the first backfill crawled through a full Xcode build folder. This chapter's extension is that first real `/diary` run.
+
+**Decisions:** capture on SessionEnd rather than relying on memory (raw material is what vanished, not willingness to write); one chapter per release, tied to the version cut; keep raw transcripts out of git, since they can carry personal details.
+
 ---
 
-### Where things stand right now (2026-10-22 ~23:55)
+### Where things stand right now (2026-10-23 ~08:29)
 
-- **`main` = `0e26ec7`** (PR #8). Unspool rebrand, sentence home, handoff, handoff fixes and search swap are all merged. **0.6.0 is not cut**: the CHANGELOG still lists everything under `[Unreleased]` and `MARKETING_VERSION` is still 0.5.3. Claude asked "Should I do that now?" and got no answer.
-- **Branch `feature_reel-tilt`, uncommitted:**
-  - modified: `CollectionView.swift` (+11, the `-uiLiftFirst` hook), `GameOverView.swift` (sticker pauses under the sheet), `HoloSticker.swift` (+/−100, display-clock `TiltMotion`, transform-moved `HoloFoil`), `ReelCards.swift` (+129/−33, leaf-view tilt, table shadow, drag), `Theme.swift` (+10, tilt springs incl. `tiltRelease`)
-  - new: `DisplayLink.swift`, `CardTilt.swift`, `plans/`, `diary/`
-  - 220 insertions / 67 deletions in tracked files. It builds and 69 tests pass on the simulator, but **it hasn't been tried on a real iPhone**, and that's the only place the gyro can be judged.
-- **Plans** (`plans/README.md`; all still marked **TODO** in the files, although the code for them has been written, inferred from the diff and transcript):
-
-| # | Plan | Severity | Depends | State |
-|---|---|---|---|---|
-| 001 | Run the tilt on the display clock (time-based smoothing, sticker pauses under the sheet, 120Hz key) | MED | — | Implemented; the 120Hz key was reverted, so 60Hz |
-| 002 | Move the holo foil by transform (oversized gradient slid with `offset`, `hueRotation` kept) | HIGH | — | Implemented |
-| 003 | The lifted card tilts from leaf views (`CardTilt` via environment; ±8°; outside the flip; flat for flights) | HIGH | 001, 002 | Implemented (inferred) |
-| 004 | Table shadow for the lifted card (doesn't rotate, slides opposite, narrows during the flip) | HIGH | 003 | Implemented (inferred) |
-| 005 | Drag to tilt, spring back with the flick | MED | 001, 003 | Implemented (inferred) |
-
-- The rules the plans encode: only leaf views read the per-frame tilt; per-frame motion moves pixels and never redraws them; one clock; the card flies flat; no `drawingGroup()` up front; verify on a real iPhone.
-- Not decided yet from the mock: the new card front (collector number, name plate, tier duotone) and the stats back. Claude's suggested order was tilt first, then the front, then the back.
-- **The higher-level plan** (from 8aa6b002):
-  - 0.7.0 Foundations: remote backup, `OSLog` in 18 places that swallow errors, crash reports, TestFlight, device id, deal-pool disk cache.
-  - 0.8.0 The service: TMDB proxy first, because the shared key saturates at about 2 cold launches per second; then publishable content; Sentry.
+- **`main` = `546c916`** (PR #10), which includes PR #9 (`c5c2990`, the Reel tilt). **0.6.0 is about to be cut: release pending.** `MARKETING_VERSION` is still 0.5.3 and everything is still under `[Unreleased]`.
+- **Branch `feature_card-fronts`** (not pushed yet as of the transcript; HEAD `b6ea9ee`): the card fronts (`61381b2`, `aa78047`), the home cleanup (`a2f9895`, `d2ca467`), Abraham's ROADMAP/DAILY-CHAIN plans (`ceaa018`) and the diary (`6b6b472`, `507ba6d`, `b6ea9ee`). It doesn't contain PR #10's merge yet, so it needs `main` merged in before its PR (inferred from `git branch --contains`). 77 tests pass.
+- **What 0.6.0 contains** (CHANGELOG `[Unreleased]`): the Unspool name, icon and wordmark; the home as the first turn and the handoff; the first turn prefetched; 🟨 share squares; holo foil moved by transform and the tilt on the display clock; a lifted Reel card or framed poster that tilts with the gyro or a finger; actor cards as collectible cards (duotone, paper → pastel → holo, collector number, five dots, no counts); the home without its instruction line, best run centred at the foot.
+- **Plans 001–005 are resolved.** `plans/README.md` marks all five DONE. 001 shipped without the 120Hz key (it needs a real `Info.plist`; still 60Hz). 004's table shadow was built and then dropped after the device test: a lifted card has no shadow, and the grid shadow slides in and out with the flight.
+- **Still open:**
+  - The card *back* from the mock (stats: chains, best chain, first linked) — deferred by "Fronts only". "Best chain with him" needs a stored field and gender-neutral wording.
+  - 120Hz tilt (needs an `Info.plist` file).
+  - Phone checks Claude listed and nobody answered: the 7% zoom as the tilt comes in, the glare without its blend mode looking milkier, the game-over sticker shimmering at rest with the lighter tuning, the lemon duotone.
+  - From before: the software keyboard rising mid-handoff on a device; the "Unspool" trademark and App Store check; the stale ROADMAP 0.5.0 line about Cards/Tiles.
+  - The diary page isn't republished; it waits for Abraham's personal account.
+- **The higher-level plan** (from 8aa6b002, now with `ceaa018`):
+  - 0.7.0 Foundations: remote backup, `OSLog` in 18 places that swallow errors, crash reports, TestFlight, device id, deal-pool disk cache, and now PostHog product analytics (a small named event set, fired from the view layer behind an injected protocol).
+  - 0.8.0 The service: TMDB proxy first (the shared key saturates at about 2 cold launches per second), publishable content, Sentry; the service becomes the only source of remote config.
   - 0.9.0 Accounts: anonymous play first, Sign in with Apple optional.
-  - 0.10.0 Daily Chain: playtest on paper first.
-  - 0.11.0 Friend groups: the multiplayer piece; invite-only.
-  - 1.0.0 Launch.
-  - Metrics stay deliberately light: OSLog, then Sentry, then App Store Connect campaign links, plus an activation event (first run reaching 3 or more links).
-  - **Global leaderboards are dropped permanently**: "an AI can produce a valid long chain on request". Pass & Play comes after 1.0.
-  - The roadmap estimates 6–9 months to launch at 5–10 hours a week.
-- **Open checks:** the software keyboard rising mid-flight on a device; the trademark and App Store availability of "Unspool"; the stale ROADMAP 0.5.0 line.
+  - 0.10.0 Daily Chain: playtest on paper first; notifications built as one system; the day turns over at local midnight, results keyed by puzzle number.
+  - 0.11.0 Friend groups (invite-only), then 1.0.0 Launch. Global leaderboards stay dropped. The roadmap estimates 6–9 months at 5–10 hours a week.
 
 ### Decision log
 
@@ -309,6 +424,24 @@ A short side session. Claude first listed plans 001–005. Abraham: **"i mean tm
 | 23:27 | Keep the collector number, drop "N chains", tint by tier, not per card | "No numbers on fronts" rule; blue = actor | 628e4dd2 |
 | 23:30 | Audit and plan before building tilt | Abraham: "BEFORE WE BUILD" | 628e4dd2 |
 | 23:52 | Revert the 120Hz Info.plist key; accept 60Hz | Xcode ignores the `INFOPLIST_KEY_` form | 628e4dd2 raw |
+| 23:59 | Lighter tilt: smoothing 93→40ms, gain 3→4; lifted card 240→300pt | Device test: "feels too heavy", "the card could be bigger" | 0602213 |
+| 00:01 | No shadow at all on a lifted card | "drop the seperate shadow or any shadow"; no shadow looked attached to a 3D-tilting card | 0602213 |
+| 00:02 | Framed movie posters tilt too, poster behind glass | One lift behaviour for both kinds of Reel item | 0602213 |
+| 00:07 | Run the real `/review-animations` before merging | Abraham: "why don't you have /review-animations"; the skill is hidden by `disable-model-invocation` | 628e4dd2 |
+| 00:09 | Fix all six review findings (grid zoom, shadow blink, sticker redraw, dead band, no blend mode, comment) | "do a complete effort that fixes all the findings" | caf98e6 |
+| 00:17 | Duotone in holo pastels, one pair per actor | Abraham's pick over Claude's tier-tinted recommendation; the tier now shows in the card face | AskUserQuestion, 61381b2 |
+| 00:17 | Collector number on the front, no chain count | Keeps "no counts on fronts"; a set number reads as collectible | AskUserQuestion |
+| 00:17 | Fronts only; the stats back waits | Keep the round small | AskUserQuestion |
+| 00:17 | Merge PR #9 before starting the fronts | Don't stack new work on an open PR | c5c2990 |
+| 00:23 | No "HOLO" text on holo cards | "it can look holo" | aa78047 |
+| 00:25 | Drop "tap the blank to start", add no replacement line | The sentence is the rule; the blank nudges once for new players | a2f9895 |
+| 00:27 | Best run alone, centred at the foot (after a brief move under the header) | Abraham's first ask | d2ca467 |
+| 00:30 | 0.6.0 is ready to cut; the trademark check doesn't block it | Roadmap ties the trademark check to the 1.0 listing | 628e4dd2 |
+| 23:50 | Start a dev diary; rebuild Jul–Aug from git and docs | Transcripts older than 30 days had aged out | bb139731 |
+| 00:30 | Build the diary page locally; ask which account before publishing | It went to the work account and was deleted | bb139731 |
+| 00:35 | Remove the stray screenshots from `main` (PR #10); no history rewrite | Abraham declined the rewrite | 546c916 |
+| 00:32 | SessionEnd capture hook + `/diary`, one chapter per release, wired into the version cut | Capture can't depend on remembering; releases are natural chapter breaks | 507ba6d |
+| 00:38 | Commit chapters and `diary/web/`; keep `raw/`, `media/`, `inbox/` local | The repo is public; transcripts can carry personal details | 6b6b472 |
 
 ### Story material
 
@@ -323,6 +456,14 @@ A short side session. Claude first listed plans 001–005. Abraham: **"i mean tm
 - **"BEFORE WE BUILD"**: for the tilt work, Abraham insisted on a performance audit and written plans before any code, then said "Yeah build all brother."
 - **Numbers:** 3 PRs merged in 21 minutes (23:18, 23:24, 23:39). Tests went 60 → 62 → 69. The flight went 0.7s → 0.55s. The keyboard-load freeze is ~150ms. The search keyboard delay is 0.3s. ca813f6 was +849/−299 across 13 files. The tilt is ±8° at 60Hz. There are 22 design-system components. Two new DEBUG flags in this era: `-uiAutoHandoff` and `-uiOpenSearch`, plus `-uiLiftFirst` on the tilt branch.
 - **Process loop worth writing about:** design in Claude Design, then a design system artifact as the bridge, then a build, then frame-by-frame ffmpeg contact sheets of simulator recordings, then a phone build, then an Emil-style audit, then implementation. Claude "watches" animations by tiling 20fps frames into one PNG.
+- **"is it on my phone"**: the gyro feature was "done" (69 tests green) before anyone had held it. Abraham's first device test sent back five lines, three of them fixes; the shadow went through three designs in four minutes and ended as no shadow.
+- **The review Claude couldn't see.** `/review-animations` was installed but hidden from Claude by `disable-model-invocation: true`. When Abraham typed it himself, it blocked the merge over an 8% zoom on every grid card that Claude had introduced and that "on-device testing wouldn't catch… because it's consistent everywhere."
+- **Overriding the recommendation, again.** Claude recommended tier-tinted duotones to protect "blue = actor"; Abraham picked one pastel per actor, and the tier moved into the card's face instead.
+- **"it can look holo"**: the label was removed because the foil already says it. Same instinct as dropping "tap the blank to start".
+- **The best run's round trip.** Moved under the header at 00:27 and back to the foot the same minute: two commits, one reversal.
+- **`git commit -a` caught in time.** It swept Abraham's uncommitted ROADMAP edits into a card commit; Claude noticed, soft-reset the unpushed commit and recommitted only the card file.
+- **The diary is about this chapter.** It was started at 23:50, mid-chapter, because July and August had already vanished from the transcripts. The photos turned out to be the only record of three builds that were never committed.
+- **Numbers:** tests 69 → 77; lifted card 240 → 300pt; tilt lag 93 → 40ms; tilt gain 3 → 4; parallax overscan 8% always → up to 7% with tilt; 5 pastel pairs; tiers at 5 and 11 films; 130 decisions and 132 images in the first diary page; the laptop slept ~3.5 hours mid-session.
 
 ### Media index
 
@@ -357,3 +498,18 @@ A short side session. Claude first listed plans 001–005. Abraham: **"i mean tm
 - `media/2b943a7f/swap3.png`: swap after polish (Morena Baccarin).
 - `media/2b943a7f/s.mp4`: search swap recording (final, 23:38).
 - `media/628e4dd2/pasted-1.png`: Abraham's Reel card mock, Paper → Pastel → Holo fronts plus a stats back.
+- `media/628e4dd2/lift.png`: simulator 23:53, lifted Keanu holo card at rest (240pt, hard shadow) on the first tilt build.
+- `media/628e4dd2/tilt.png`: simulator 23:53, the same card with a forced tilt: perspective lean and glare band.
+- `media/628e4dd2/grid.png`: simulator 00:11, Reel grid at its original crop after the review fixes.
+- `media/628e4dd2/mid.png`: simulator 00:11, a second grid capture identical to `grid.png`.
+- `media/628e4dd2/out.png`: simulator 00:11, lifted Keanu card at 300pt with no shadow.
+- `media/628e4dd2/pasted-2.png`: Abraham's Paper → Pastel → Holo fronts mock, re-pasted at 00:14.
+- `media/628e4dd2/pasted-3.png`: three duotone options: brand trio, holo pastels (chosen), blues varied.
+- `media/628e4dd2/fronts.png`: simulator 00:21, first duotone fronts grid (muddy dark tones).
+- `media/628e4dd2/fronts2.png`: simulator 00:21, fronts grid after lightening the dark tones.
+- `media/628e4dd2/lift2.png`: simulator 00:22, lifted Keanu "NO. 001 · HOLO" with sepia duotone and five dots.
+- `media/628e4dd2/home.png`: simulator 00:25, sentence home before cleanup, footer with "tap the blank to start".
+- `media/628e4dd2/home2.png`: simulator 00:26, best run alone and centred at the foot.
+- `media/628e4dd2/home3.png`: simulator 00:26, best run under the header (a2f9895, reverted by d2ca467).
+- `media/bb139731/shot.png`: headless-Chrome screenshot of the first diary page, 00:08.
+- `media/bb139731/m_a.jpg` … `m_e.jpg`: contact sheets of stills pulled from the past-build videos while writing chapter 00 (m_c viewed: an old Movie Chain build with purple/blue chain chips and a "Your Reel 78" screen); working files, not embedded.

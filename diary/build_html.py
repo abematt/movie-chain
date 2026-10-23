@@ -34,7 +34,8 @@ try:
 except ImportError:
     venv = HERE / ".venv"
     py = venv / "bin" / "python"
-    if py.exists() and Path(sys.executable).resolve() == py.resolve():
+    # The venv's python symlinks to the system binary, so compare prefixes.
+    if py.exists() and Path(sys.prefix).resolve() == venv.resolve():
         sys.exit("markdown is missing from diary/.venv — delete diary/.venv and re-run")
     if not py.exists():
         subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
