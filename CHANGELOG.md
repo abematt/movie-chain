@@ -22,7 +22,7 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 | **0.6.0** | [**Unspool**](docs/ROADMAP.md#060--unspool) — the rebrand: name, two-circle icon, wordmark, the home as the first turn |
 | 0.7.0 | [**Foundations & safety net**](docs/ROADMAP.md#070--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
 | 0.8.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#080--the-service) — takes the shared key out of the app and caches it |
-| 0.9.0 | [**Accounts**](docs/ROADMAP.md#090--accounts) — Sign in with Apple over the device id, with a merge that doesn't clobber |
+| 0.9.0 | [**Accounts**](docs/ROADMAP.md#090--accounts) — Apple, Google or email one-time code (Supabase) over the device id, with a merge that doesn't clobber |
 | 0.10.0 | [**The Daily Chain**](docs/ROADMAP.md#0100--the-daily-chain) — one puzzle a day: longest route from A to B ([spec](docs/DAILY-CHAIN.md)) |
 | 0.11.0 | [**Friend groups**](docs/ROADMAP.md#0110--friend-groups) — invite-code groups, no global ranking |
 | 1.0.0 | [**Launch**](docs/ROADMAP.md#100--launch) — share images + links, onboarding demo, store listing |

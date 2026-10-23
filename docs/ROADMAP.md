@@ -32,9 +32,10 @@ Settled 2026-08-08, so they don't get re-litigated mid-build:
 - **Launch scope is the full loop.** Endless game + the Daily Chain + friend groups, all
   before the App Store. The goal is to own the complete cycle — publish, tracking, auth,
   backend, devops — not to get to market fastest.
-- **No release before launch.** No early TestFlight round for practising the pipeline.
-  *(Open: whether the pre-launch TestFlight round in the 1.0 checklist still stands — see
-  [1.0](#100--launch).)*
+- **No public release before launch — but a TestFlight beta, yes** *(revised
+  2026-10-23)*. Nothing goes on the App Store before 1.0, but the waitlist becomes a
+  TestFlight beta well before it, because the launch decision is made from beta
+  retention (see the [launch track](#the-launch-track--runs-alongside-the-milestones)).
 - **Global leaderboards are dropped permanently.** An AI can produce a valid long chain on
   request, and our designed anti-cheat (server-side re-validation) only catches
   *fabricated* chains, not *assisted* ones. A number from a stranger can't be trusted, so
@@ -50,6 +51,56 @@ Every social layer is additive on top of the login-free core, never a gate in fr
 it. *(Note the one qualification this re-cut introduces: the Daily Chain needs
 connectivity to fetch a puzzle. Cache it locally so a round survives losing signal, and
 keep the endless mode as the always-available path.)*
+
+---
+
+## The launch track — runs alongside the milestones
+
+Added 2026-10-23, from a solo builder's launch playbook (Chris Raroque's "how to start an
+app" and "launch framework" videos). The milestones below are the product; this is
+how it reaches people. None of it is versioned and most of it isn't code — it runs in
+parallel, and the early items matter *because* they take months to pay off.
+
+**Now:**
+- **Waitlist page.** One screenshot and an email field, built in **Framer** from a free
+  one-page template (~10 minutes), with **FormSpark** (or Framer's own forms) collecting
+  the address and the list kept in **Loops**. It measures interest, becomes the
+  TestFlight beta pool, and is the first announcement list at launch. It needs no domain
+  of our own yet — move it onto the 0.8.0 domain when that exists.
+- **Reddit and forums.** Participate genuinely in r/movies, r/Letterboxd, r/trivia,
+  r/iosgaming *before* mentioning the app — this channel takes months, and a link drop
+  on launch day gets destroyed.
+- **Build in public.** The dev diary already captures every session; cut it into short
+  posts. A screen recording of a real run is a complete video (timer, deck, shake,
+  near-miss) — see [`GROWTH.md`](GROWTH.md#5-two-plays-that-need-no-build).
+
+**Before the beta:**
+- **A feedback board** — **UserJot** (Canny is the pricier alternative), linked from
+  Settings. Requests and upvotes, so what players ask for is visible rather than guessed.
+  The 1.0 "Send feedback" email stays for bug reports.
+- **The TestFlight beta**, invited from the waitlist (Loops sends the invites). Runs
+  through the rest of the milestones on PostHog.
+
+**Before 1.0:**
+- **App Store screenshots — budget 3–4 days.** They're the first thing a browser judges,
+  and Apple gives a new app roughly two weeks of search boost that doesn't come back.
+  Plus a careful title, subtitle, description and keywords.
+- **Landing page — budget about a week**, Framer again, reusing the screenshot assets.
+  Distinct from the waitlist page: it shows the app and drives downloads. Tweakable
+  after launch, so it doesn't hold launch.
+
+**The launch decision** comes from the beta: if players drop off after a day, wait; if
+they stick around for several days, launch. Judge it on week-1 retention in PostHog.
+
+**Launch week:** start posting a week ahead; on the day, email the waitlist (Loops),
+launch on **Product Hunt**, post to the communities above and the build-in-public
+channels, and ask friends to share. Time it so the boost window gets the best listing
+we have.
+
+**Community email, later.** Once accounts (0.9.0) give us addresses from players who
+opted in, Loops runs sequences too — a welcome, a few "did you know" notes over the
+first two weeks, a feedback ask after a week away. Marketing email is **opt-in**,
+separate from signing in.
 
 ---
 
@@ -201,8 +252,9 @@ rate-limited launch leaves the home screen stuck on "Dealing…" forever. A test
   - **A small, named event set** (~10: `run_started`, `link_landed`,
     `run_ended{reason, links, hardcore}`, `deal_again`, `reel_opened`, …). Autocapture
     and session replay off.
-  - **The device id below is the anonymous id**; `identify` on Sign in with Apple at
-    0.9.0. Anonymous first, same as accounts.
+  - **The device id below is the anonymous id**; `identify` with the Supabase user id
+    (never an email) on sign-in at 0.9.0, whichever provider. Anonymous first, same as
+    accounts.
   - **No ATT prompt** — first-party usage analytics isn't cross-app tracking. The privacy
     label gains Product Interaction + an identifier. An opt-out toggle in Settings.
   - **Fired from the view/app layer, never `GameEngine`** — the same split as haptics and
@@ -251,6 +303,25 @@ rate-limited launch leaves the home screen stuck on "Dealing…" forever. A test
 
 **One deployment, three jobs over its life:** proxy TMDB (now), serve publishable content
 (0.10.0), hold accounts and groups (0.9.0 / 0.11.0). Don't run three things.
+
+**The platform: Supabase** *(decided 2026-10-23)*. Postgres, Auth (Apple, Google and
+email built in), Storage for published puzzles, and Edge Functions for the proxy and
+push — one vendor covers all three jobs. **Check before committing:** how the proxy
+caches responses (Edge Functions have no built-in response cache — a cache table or a
+CDN in front), and the free tier's pausing of idle projects.
+
+**The safety rules — Supabase's real risk is configuration, not the platform.** The
+key the app ships (`anon`) is public by design, so **row-level security is the only
+thing between a table and the internet**; most Supabase leaks are a table left without
+it. So:
+- **RLS on every table, deny by default.** A table without policies doesn't merge.
+- **The `service_role` key never enters the app** or the repo — it lives only in
+  Edge Function secrets, like the TMDB token.
+- **Writes that matter go through Edge Functions**, not straight table inserts — a score
+  is re-validated server-side before it's stored (the anti-cheat already planned for
+  friend groups).
+- **Run Supabase's security advisor** before every schema change ships, and keep a test
+  that tries to read and write each table with only the public key.
 
 **Why it's the first backend:** the proxy job is small, well-defined, genuinely needed,
 and **nobody's data is at risk if it falls over.** It's the right place to learn hosting,
@@ -339,15 +410,26 @@ prerequisite for friend groups (0.11.0).
 
 **Shape — anonymous first, upgradeable:**
 1. The **stable device id** from 0.7.0 is already carrying local data.
-2. **Sign in with Apple** as the upgrade path. Lowest friction on iOS, no password
-   infrastructure, privacy-preserving.
+2. **Three ways to sign in** *(decided 2026-10-23)*, all through Supabase Auth:
+   - **Sign in with Apple** — lowest friction on iOS, and required by App Store rules
+     once Google login is offered.
+   - **Google.**
+   - **Email with a one-time code** (magic link / OTP) — no passwords, so no password
+     storage, resets or breach exposure.
 
 You can play forever without an account; signing in is a migration, never a gate.
+Accounts also give the community email list (see the
+[launch track](#the-launch-track--runs-alongside-the-milestones)) — with **a separate,
+unticked opt-in**, because signing in is not consent to marketing.
 
 **Traps:**
 - **Migration must merge, not clobber** — apply the rule written at 0.7.0.
 - Sign in with Apple gives a **stable but app-specific** user id, and the email may be a
-  private relay — don't use email as the identity key.
+  private relay — don't use email as the identity key. To email relay addresses at all,
+  the sending domain must be registered with Apple's private relay service.
+- **One person, three providers:** someone who signs in with Google on one device and
+  email on another must not get two accounts. Decide the linking rule (Supabase links
+  identities by verified email) before the first real user exists.
 - **Account deletion is an App Store requirement** once you offer accounts, and the
   privacy nutrition label changes.
 
@@ -395,6 +477,10 @@ another kind of notification.
 - **Server push (APNs) arrives with the service** — the message channel's "today's
   puzzle was replaced" at 0.8.0, friend pushes at 0.11.0. The device token is stored
   against the device id, then the account.
+- **Push goes to APNs directly from a Supabase Edge Function — no Firebase**
+  *(decided 2026-10-23)*. On iOS, Firebase Cloud Messaging is a relay in front of APNs;
+  it would add a second vendor and SDK for nothing. One `.p8` key in the function's
+  secrets is enough. Revisit only if Android ever happens.
 - **Every kind can be turned off on its own in Settings**, and a turned-off kind is
   never sent.
 
@@ -477,10 +563,12 @@ The shipping checklist, plus the last player-facing pieces.
 **Checklist:**
 - **Real device testing.** Everything so far is simulator-verified. Haptics, audio session
   behaviour under the silent switch, and thermals/network on cellular need real hardware.
-- **TestFlight round with players who aren't you.** ⚠️ **Open** — the 2026-08-08 decision
-  was "no release before the App Store", which may or may not have been meant to include
-  this. The argument for keeping it is [`ASSISTED-MODE.md`](ASSISTED-MODE.md): a mode
-  survived four commits of refinement and died in one playtest.
+- **TestFlight beta with players who aren't you** — decided 2026-10-23, run from the
+  waitlist well before this milestone (see the
+  [launch track](#the-launch-track--runs-alongside-the-milestones)). Its retention is
+  what says launch is ready. The case for it is [`ASSISTED-MODE.md`](ASSISTED-MODE.md):
+  a mode survived four commits of refinement and died in one playtest.
+- **The launch-track items** — screenshots, landing page, launch week.
 - **App Store requirements:** privacy manifest / nutrition label (note: accounts and the
   PostHog SDK from 0.7.0 change these answers: Product Interaction, Other User Content
   (typed answers), Device ID, all not linked to identity and not used for tracking), **account deletion** since 0.9.0 ships accounts,
