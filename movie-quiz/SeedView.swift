@@ -35,6 +35,8 @@ struct SeedView: View {
     @State private var results: [ChainNode] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var showReel = false
+    /// "Try again" taps after the deal failed; each one re-runs the deal task.
+    @State private var dealRetries = 0
     /// Whether the "pick your own start" search flow is showing (vs the deal).
     @State private var searching = false
 
@@ -138,8 +140,12 @@ struct SeedView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        // Deal a fresh start on every appearance (cold launch and "Play again").
-        .task { await engine.prepareSeeds() }
+        // Deal a fresh start on every appearance (cold launch and "Play again"),
+        // and again on each "Try again" after a failed deal.
+        .task(id: dealRetries) { await engine.prepareSeeds() }
+        .onChange(of: engine.dealFailed) { _, failed in
+            if failed { telemetry?.dealFailed(retries: dealRetries) }
+        }
         // Each dealt start: warm its art (the avatar, the flight and the start
         // card all draw it), then, if it's still the one on screen, fetch its
         // candidates ahead of the tap.
@@ -337,7 +343,9 @@ struct SeedView: View {
                     .id(seed.id)
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
-                Text("Dealing…")
+                // Offline with nothing saved to deal from: say so, and "Deal
+                // again" below becomes "Try again".
+                Text(engine.dealFailed ? "No connection." : "Dealing…")
                     .font(Theme.Font.flourish(size: SentenceType.verbSize))
                     .foregroundStyle(Theme.Color.muted)
                     .transition(.opacity)
@@ -364,7 +372,9 @@ struct SeedView: View {
     }
 
     private var blankLabel: String {
-        guard let seed = engine.dealtSeed else { return "Dealing a start" }
+        guard let seed = engine.dealtSeed else {
+            return engine.dealFailed ? "No connection, no start dealt" : "Dealing a start"
+        }
         return seed.kind == .actor
             ? "Start: name a movie \(seed.matchText) was in"
             : "Start: name an actor who starred in \(seed.matchText)"
@@ -372,14 +382,23 @@ struct SeedView: View {
 
     private var dealLinks: some View {
         HStack {
-            Button {
-                Haptics.selection()
-                engine.shuffleSeed()
-                telemetry?.dealt()
-            } label: {
-                Label("Deal again", systemImage: "shuffle")
+            if engine.dealFailed {
+                Button {
+                    Haptics.selection()
+                    dealRetries += 1
+                } label: {
+                    Label("Try again", systemImage: "arrow.clockwise")
+                }
+            } else {
+                Button {
+                    Haptics.selection()
+                    engine.shuffleSeed()
+                    telemetry?.dealt()
+                } label: {
+                    Label("Deal again", systemImage: "shuffle")
+                }
+                .disabled(engine.dealtSeed == nil)
             }
-            .disabled(engine.dealtSeed == nil)
 
             Spacer(minLength: Theme.Spacing.sm)
 

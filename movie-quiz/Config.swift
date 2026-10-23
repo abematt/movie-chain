@@ -114,6 +114,13 @@ enum Config {
     /// Top-billed cast taken from each source film — the leads, not the long tail.
     static let seedTopBilledPerMovie = 5
 
+    /// How long the deal pools saved on disk are dealt from before a launch
+    /// refetches them (`SeedPoolCache`). A week: the pool is a near-static
+    /// most-watched query, so a longer life costs almost nothing in freshness and
+    /// spares a 24-request burst on most launches. Older copies are still the
+    /// fallback when a refetch fails. `nonisolated` so the off-main cache can read it.
+    nonisolated static let seedPoolMaxAge: TimeInterval = 7 * 24 * 60 * 60
+
     /// Base for TMDB-hosted images (headshots/posters shown in the collection).
     /// Full URL = base + size + path, e.g. `.../t/p/w185/abc.jpg`.
     static let imageBaseURL = "https://image.tmdb.org/t/p/"

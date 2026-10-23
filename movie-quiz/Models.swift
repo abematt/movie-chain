@@ -7,8 +7,10 @@
 
 import Foundation
 
-/// A person (actor) as identified by the data provider.
-struct Person: Identifiable, Hashable, Sendable {
+/// A person (actor) as identified by the data provider. `nonisolated` so its
+/// `Codable` conformance works off the main actor (the deal-pool cache writes in
+/// the background) under the project's MainActor-default isolation.
+nonisolated struct Person: Identifiable, Hashable, Sendable, Codable {
     let id: Int          // TMDB person id (stable, unambiguous)
     let name: String
     /// TMDB popularity, when known. Drives the obscurity scoring bonus — a
@@ -24,8 +26,9 @@ struct Person: Identifiable, Hashable, Sendable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-/// A movie as identified by the data provider.
-struct Movie: Identifiable, Hashable, Sendable {
+/// A movie as identified by the data provider. `nonisolated` for the same reason
+/// as `Person`.
+nonisolated struct Movie: Identifiable, Hashable, Sendable, Codable {
     let id: Int          // TMDB movie id
     let title: String
     let year: Int?       // release year, for disambiguation/display

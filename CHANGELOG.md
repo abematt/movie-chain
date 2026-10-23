@@ -57,6 +57,20 @@ Unspool rebrand was inserted as 0.6.0.)
 - **A stable device id**, made on first launch and used as PostHog's anonymous id, so
   the events and a future account (0.9.0) agree on who the player was.
 - **"Share usage data" in Settings**, on by default, which stops all sending when off.
+- **`deal_failed` analytics**, so a home screen that couldn't deal shows up in PostHog
+  instead of as a player who silently left.
+
+### Changed
+- **The deal pool is saved between launches.** Every cold launch used to fire about 24
+  TMDB requests to rebuild the same most-watched pool. Now a copy less than a week old
+  is dealt from with no requests at all, which spares most launches and keeps a burst
+  of new players further from TMDB's rate limit.
+
+### Fixed
+- **The home screen no longer hangs on "Dealing…".** When the pool couldn't load (offline,
+  or rate-limited on a cold launch), the first screen a new player saw stayed on
+  "Dealing…" with no way forward. It now deals from the last saved pool if there is one,
+  and otherwise says "No connection." with "Try again" in place of "Deal again".
 
 ## [0.6.0] — 2026-10-23
 

@@ -22,6 +22,7 @@ enum EventName: String, CaseIterable {
     case linkLanded = "link_landed"
     case runEnded = "run_ended"
     case turnLoadFailed = "turn_load_failed"
+    case dealFailed = "deal_failed"
     case shareTapped = "share_tapped"
     case cardViewed = "card_viewed"
     case reelClosed = "reel_closed"

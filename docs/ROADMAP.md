@@ -25,6 +25,31 @@
 | 0.11.0 | [Friend groups](#0110--friend-groups) | 0.9.0 |
 | 1.0.0 | [Launch](#100--launch) | all of the above |
 
+## Re-cut 2026-10-24: launch early
+
+**This supersedes the first two decisions below and the milestone table above.** The
+solo game ships to the App Store as soon as it's ready (aiming for early November
+2026) rather than after the full loop. The point moved from "own the whole cycle before
+launch" to learning from real players sooner: the backend gets designed around how
+people actually play rather than guesses.
+
+- **No login at launch.** No accounts, no backend. The device id
+  ([0.7.0](#070--foundations--safety-net)) is the hook a later account claims.
+- **Free at launch, no purchases.** TMDB's terms on commercial use get settled (by email)
+  before anything is charged for. Purchases such as streak saves, when they come, are
+  StoreKit consumables, which need no login.
+- **Competition without accounts, at launch.** Chain sharing (a versioned payload and
+  URL format for a chain, GROWTH.md D1), challenge links (D4), and a daily start for
+  everyone (D5) from a **fixed list** of starts, not derived from each phone's cached
+  pool, which can differ between friends. The A→B Daily Chain
+  ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) stays after launch.
+- **Before launch from 0.7.0:** the "Dealing…" hang fix and the deal-pool disk cache
+  (both landed), plus a TestFlight build to friends. Logging, Sentry and the build
+  pipeline can follow launch; crashes go to Xcode's Organizer for now.
+- **After launch, in order of what players show is needed:** the Daily Chain, accounts
+  (Supabase, anonymous first, then Google and Apple linked to the same user), friend
+  groups, a backend of our own. Version numbers get re-cut when launch scope is final.
+
 ## The decisions this plan rests on
 
 Settled 2026-08-08, so they don't get re-litigated mid-build:
