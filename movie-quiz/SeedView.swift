@@ -35,6 +35,11 @@ struct SeedView: View {
     @State private var results: [ChainNode] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var showReel = false
+    /// "Reconnect" taps after the deal failed; each one re-runs the deal task.
+    @State private var dealRetries = 0
+    /// A "Reconnect" is in flight: the button shows it, and the no-connection
+    /// screen stays up rather than flickering back to "Dealing…".
+    @State private var dealRetrying = false
     /// Whether the "pick your own start" search flow is showing (vs the deal).
     @State private var searching = false
 
@@ -108,6 +113,9 @@ struct SeedView: View {
                     if searching {
                         searchSection
                             .transition(modeSwap)
+                    } else if engine.dealFailed {
+                        offlineSection
+                            .transition(modeSwap)
                     } else {
                         dealSection
                             .allowsHitTesting(!playsIntro || revealedControls == Self.controlSlotCount)
@@ -138,8 +146,15 @@ struct SeedView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        // Deal a fresh start on every appearance (cold launch and "Play again").
-        .task { await engine.prepareSeeds() }
+        // Deal a fresh start on every appearance (cold launch and "Play again"),
+        // and again on each "Reconnect" after a failed deal.
+        .task(id: dealRetries) {
+            await engine.prepareSeeds()
+            guard !Task.isCancelled else { return }
+            dealRetrying = false
+            // Each failed attempt reports, a repeat failure on "Reconnect" included.
+            if engine.dealFailed { telemetry?.dealFailed(retries: dealRetries) }
+        }
         // Each dealt start: warm its art (the avatar, the flight and the start
         // card all draw it), then, if it's still the one on screen, fetch its
         // candidates ahead of the tap.
@@ -346,6 +361,57 @@ struct SeedView: View {
         .frame(maxWidth: .infinity, minHeight: 250, alignment: .bottomLeading)
         .opacity(handingOff ? 0 : 1)
         .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.dealtSeed)
+    }
+
+    // MARK: No connection — the pools didn't load and nothing was saved
+
+    /// Replaces the whole deal while there's no start to deal: say what's wrong
+    /// in a sentence, and make trying again the one thing to do. The best run
+    /// stays at the foot, where it always sits.
+    private var offlineSection: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: Theme.Spacing.md)
+            VStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .accessibilityHidden(true)
+                Text("Out of film.")
+                    .font(Theme.Font.flourish(size: SentenceType.verbSize))
+                    .foregroundStyle(Theme.Color.ink)
+                Text("Looks like we unspooled a little too far. Let's thread a new reel.")
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.muted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                retryDealButton
+                    .padding(.top, Theme.Spacing.sm)
+            }
+            .frame(maxWidth: .infinity)
+            Spacer(minLength: Theme.Spacing.md)
+            bestRun
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var retryDealButton: some View {
+        Button {
+            Haptics.selection()
+            dealRetrying = true
+            dealRetries += 1
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                if dealRetrying {
+                    ProgressView().tint(Theme.Color.onAccent)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                }
+                Text(dealRetrying ? "Reconnecting…" : "Reconnect")
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.primary)
+        .disabled(dealRetrying)
     }
 
     // The blank is the start button: tapping it plays.

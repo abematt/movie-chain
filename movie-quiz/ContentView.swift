@@ -36,7 +36,20 @@ struct ContentView: View {
         let store = CollectionStore()
         #endif
         _collection = State(initialValue: store)
-        let engine = GameEngine(collection: store)
+        // The deal pools persist only for the live provider: the stub's demo graph
+        // must never be saved and dealt from once a real token is added.
+        let poolCache = Config.hasTMDBToken
+            ? SeedPoolCache.defaultFileURL.map { SeedPoolCache(fileURL: $0) } : nil
+        #if DEBUG
+        // QA hook: every request fails and nothing saved is read, to see the
+        // home's "No connection." state.
+        let offline = ProcessInfo.processInfo.arguments.contains("-uiOffline")
+        let engine = offline
+            ? GameEngine(provider: OfflineProvider(), collection: store)
+            : GameEngine(collection: store, poolCache: poolCache)
+        #else
+        let engine = GameEngine(collection: store, poolCache: poolCache)
+        #endif
         // The play screen releases the first turn's clock once the keyboard is up.
         engine.holdsFirstTurnClock = true
         _engine = State(initialValue: engine)

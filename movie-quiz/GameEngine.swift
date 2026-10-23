@@ -146,6 +146,10 @@ final class GameEngine {
     /// `nil` until the popularity pool has loaded and the first deal lands — the
     /// home shows a placeholder until then.
     private(set) var dealtSeed: ChainNode?
+    /// The pools couldn't load after every attempt and there was no saved copy to
+    /// fall back on, so there is no start to deal. The home offers to try again
+    /// instead of sitting on "Dealing…".
+    private(set) var dealFailed = false
 
     // MARK: Private
 
@@ -166,6 +170,15 @@ final class GameEngine {
     /// The pool load in flight, shared by every caller so a Shuffle tap during
     /// the first load awaits it instead of sending the same requests again.
     private var poolLoad: Task<Void, Never>?
+    /// Where the pools persist between launches; `nil` keeps them in memory only
+    /// (tests, previews, and the stub provider, whose demo graph must never be
+    /// saved as the real pool).
+    private let poolCache: SeedPoolCache?
+    /// The disk copy is read once, on the first load.
+    private var poolCacheChecked = false
+    /// A saved copy too old to deal from without refetching, kept for any side
+    /// the refetch fails to load.
+    private var stalePool: SeedPoolSnapshot?
     /// `ChainNode.id`s dealt recently, so repeated shuffles stay fresh. Bounded to
     /// `Config.seedRecentWindow`.
     private var recentSeedIds: [String] = []
@@ -212,7 +225,7 @@ final class GameEngine {
     private static let bestPointsKey = "bestPoints"
 
     init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
-         defaults: UserDefaults = .standard,
+         poolCache: SeedPoolCache? = nil, defaults: UserDefaults = .standard,
          now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
@@ -220,6 +233,7 @@ final class GameEngine {
         // the project's MainActor-default isolation.
         self.provider = provider ?? Config.makeProvider()
         self.collection = collection
+        self.poolCache = poolCache
         self.defaults = defaults
         self.now = now
         self.bestChain = defaults.integer(forKey: Self.bestChainKey)
@@ -262,8 +276,9 @@ final class GameEngine {
     func prepareSeeds() async {
         // Retry a transient pool-load failure a few times so a flaky first launch
         // self-heals while the player is still on the home screen. A hard failure
-        // leaves the hero in its "Dealing…" state; leaving and returning retries
-        // (a side stays unloaded until it actually returns entries).
+        // sets `dealFailed`, and the home's "Reconnect" calls this again (a side
+        // stays unloaded until it actually returns entries). The flag only changes
+        // once the attempts are over, so a retry doesn't flash "Dealing…".
         for attempt in 0..<3 {
             await loadSeedPoolsIfNeeded()
             if Task.isCancelled { return }
@@ -273,6 +288,7 @@ final class GameEngine {
         }
         guard !Task.isCancelled else { return }   // don't deal into an abandoned screen
         deal()
+        dealFailed = !poolReady
     }
 
     /// Deal a new random start on demand (the Shuffle button). Pools are usually
@@ -302,6 +318,7 @@ final class GameEngine {
     /// leaving the seed screen doesn't cancel it: whatever lands is still cached
     /// for the next deal.
     private func loadSeedPoolsIfNeeded() async {
+        readPoolCacheOnce()
         guard !poolComplete else { return }
         if let poolLoad {
             await poolLoad.value
@@ -323,8 +340,40 @@ final class GameEngine {
         async let moviesTask = fetchMoviesIfNeeded()
         let actors = await actorsTask
         let movies = await moviesTask
-        if let actors, !actors.isEmpty { actorPool = actors; actorsLoaded = true }
-        if let movies, !movies.isEmpty { moviePool = movies; moviesLoaded = true }
+        let fetchedActors = actors?.isEmpty == false
+        let fetchedMovies = movies?.isEmpty == false
+        if let actors, fetchedActors { actorPool = actors; actorsLoaded = true }
+        if let movies, fetchedMovies { moviePool = movies; moviesLoaded = true }
+
+        // Save once both sides are in and this fetch brought at least one of them,
+        // so a pool only ever reaches disk whole. A side filled from the stale copy
+        // below isn't fresh, so it doesn't count.
+        if poolComplete, fetchedActors || fetchedMovies {
+            await poolCache?.save(actors: actorPool, movies: moviePool)
+        }
+
+        // A side the network couldn't supply falls back to the stale copy: an old
+        // pool deals as well as a new one, and beats an empty home.
+        if let stalePool {
+            if !actorsLoaded, !stalePool.actors.isEmpty { actorPool = stalePool.actors; actorsLoaded = true }
+            if !moviesLoaded, !stalePool.movies.isEmpty { moviePool = stalePool.movies; moviesLoaded = true }
+        }
+    }
+
+    /// Install the disk copy if it's fresh enough to deal from, so the launch
+    /// makes no pool requests at all; otherwise keep it as the fallback.
+    private func readPoolCacheOnce() {
+        guard !poolCacheChecked else { return }
+        poolCacheChecked = true
+        guard let saved = poolCache?.load() else { return }
+        guard saved.isFresh, !saved.snapshot.actors.isEmpty, !saved.snapshot.movies.isEmpty else {
+            stalePool = saved.snapshot
+            return
+        }
+        actorPool = saved.snapshot.actors
+        moviePool = saved.snapshot.movies
+        actorsLoaded = true
+        moviesLoaded = true
     }
 
     /// `nil` when the side is already loaded (skip) or the fetch failed.

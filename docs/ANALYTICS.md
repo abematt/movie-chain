@@ -15,7 +15,7 @@ query the account database for analytics, and don't put behaviour in it.
 | File | Job |
 |---|---|
 | `Analytics.swift` | The sink: `EventName`, the `Analytics` protocol, `NoAnalytics`, `PostHogAnalytics`, `DeviceID`. **The only file that may import PostHog.** |
-| `Telemetry.swift` | The core views call: sink, clock, shared context, screens, identity, `send`. |
+| `Telemetry.swift` | The core views call: sink, clock, shared context, screens (incl. `deal_failed`), identity, `send`. |
 | `Telemetry+Runs.swift` | `run_started`, `link_landed`, `turn_load_failed`, `run_ended`. |
 | `Telemetry+Reel.swift` | `card_viewed`, `reel_closed`. |
 | `GameEngine.Turn`, `Summary` | Plain facts the engine records (think time, misses, load time). **The engine never calls `Telemetry`.** |
@@ -102,6 +102,19 @@ A correct answer.
 
 A turn's answers couldn't load and the Retry button replaced the answer field.
 `run_id`, `links`.
+
+### `deal_failed`
+
+The home couldn't deal a start: the deal pools didn't load after every attempt and
+no saved copy was on the device to fall back on, so the home showed its "Out of film."
+no-connection screen.
+Rare by design (the pools are cached on disk), so it costs almost nothing in volume,
+and it's the one failure that strands a player before any run event fires.
+
+| Property | Meaning |
+|---|---|
+| `retries` | "Reconnect" taps before this failure (0 on the first) |
+| `home_s` | Time on the home screen so far |
 
 ### `run_ended`
 

@@ -111,6 +111,12 @@ final class Telemetry {
 
     func dealt() { screen.dealsSinceHome += 1 }
 
+    /// The home couldn't deal a start (the pools didn't load and nothing was
+    /// saved to fall back on). `retries` counts "Reconnect" taps before this one.
+    func dealFailed(retries: Int) {
+        send(.dealFailed, ["retries": retries, "home_s": seconds(since: screen.since)])
+    }
+
     func shared(from screen: Screen) {
         send(.shareTapped, ["from": screen.rawValue])
     }
