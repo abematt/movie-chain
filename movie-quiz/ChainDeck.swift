@@ -30,9 +30,13 @@ struct ChainDeck: View {
     private static let maxBehind = 8
     /// A named peek shows the card's whole header row: its height at full scale.
     /// Scales with the chip's text, so a large text size can't clip the row.
-    @ScaledMetric(relativeTo: .caption2) private var namedPeek: CGFloat = 30
+    /// Grows with large text but never shrinks below Large: the art is a fixed
+    /// size, so a smaller card ran it through the bottom edge.
+    @ScaledMetric(relativeTo: .caption2) private var scaledNamedPeek: CGFloat = 30
     /// The card's height, scaled with its name (`DeckCard.baseHeight` at Large).
-    @ScaledMetric(relativeTo: .title2) private var cardHeight: CGFloat = 122
+    @ScaledMetric(relativeTo: .title2) private var scaledCardHeight: CGFloat = DeckCard.baseHeight
+    private var namedPeek: CGFloat { max(scaledNamedPeek, 30) }
+    private var cardHeight: CGFloat { max(scaledCardHeight, DeckCard.baseHeight) }
     /// An edge peek shows just the card's top border — pile thickness.
     private static let edgePeek: CGFloat = 6
     private static let maxEdges = 4

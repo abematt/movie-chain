@@ -112,6 +112,10 @@ Unspool rebrand was inserted as 0.6.0.)
   screen. It now uses the buttons' 6pt side and sinks to the small one as it goes back
   into the pile. A uniform 4pt side was tried and lost the pile's depth: the front
   card's bottom read as a doubled outline, as if it were cut off.
+- **The deck's cards keep their size at small text sizes.** Their height scaled with
+  the text both ways, so below the default size the card shrank while the art didn't,
+  and the art ran through the card's bottom edge. They now grow with large text but
+  never shrink below their default.
 - **The Reel's caption reads like the home's best run**: "LOGGED ACROSS / 36 CHAINS /
   BEST RUN 13 LINKS" in condensed caps with the figures in ink, instead of the app's
   only lowercase sentence broken over three lines.
