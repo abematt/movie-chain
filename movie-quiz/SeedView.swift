@@ -390,33 +390,42 @@ struct SeedView: View {
 
     // MARK: No connection — the pools didn't load and nothing was saved
 
-    /// Replaces the whole deal while there's no start to deal: say what's wrong
-    /// in a sentence, and make trying again the one thing to do. The best run
-    /// stays at the foot, where it always sits.
+    /// Replaces the whole deal while there's no start to deal: an empty spool,
+    /// what's wrong in a sentence where the start's name would be, and trying
+    /// again as the one thing to do, in a night dock where the colour would be.
     private var offlineSection: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: Theme.Spacing.md)
-            VStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "wifi.slash")
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                EmptySpool()
+                    .frame(width: 96, height: 96)
+                    .padding(.bottom, Theme.Spacing.sm)
                 Text("Out of film.")
-                    .font(Theme.Font.sentence(size: SentenceType.verbSize))
+                    .font(Theme.Font.name(size: SentenceType.nameSize))
+                    .tracking(-1.5)
                     .foregroundStyle(Theme.Color.ink)
                 Text("Looks like we unspooled a little too far. Let's thread a new reel.")
-                    .font(Theme.Font.body)
+                    .font(Theme.Font.sentence(.title3))
                     .foregroundStyle(Theme.Color.muted)
-                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                retryDealButton
-                    .padding(.top, Theme.Spacing.sm)
             }
+            .padding(.bottom, Theme.Spacing.lg + 4)
+
+            VStack(spacing: Theme.Spacing.md) {
+                retryDealButton
+                Text("Your Reel and best run are safe on this phone.")
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Color(white: 0.74))
+            }
+            .padding(.horizontal, Theme.Spacing.gutter)
+            .padding(.top, Theme.Spacing.lg - 2)
+            .padding(.bottom, Theme.Spacing.md)
             .frame(maxWidth: .infinity)
-            Spacer(minLength: Theme.Spacing.md)
-            bestRun(ink: Theme.Color.ink, muted: Theme.Color.muted)
+            .background { DockGround(color: Theme.Color.night) }
+            .padding(.horizontal, -Theme.Spacing.gutter)
+            .padding(.bottom, -Theme.Spacing.sm)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
     private var retryDealButton: some View {
@@ -427,7 +436,7 @@ struct SeedView: View {
         } label: {
             HStack(spacing: Theme.Spacing.sm) {
                 if dealRetrying {
-                    ProgressView().tint(Theme.Color.onAccent)
+                    ProgressView().tint(Theme.Color.night)
                 } else {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -435,7 +444,7 @@ struct SeedView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.primary)
+        .buttonStyle(SlabButtonStyle(fill: .white, foreground: Theme.Color.night, side: .black))
         .disabled(dealRetrying)
     }
 
@@ -802,6 +811,33 @@ private struct SentenceHead: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A spool with no film on it: the reel's rim and five spoke holes, on paper
+/// with a side. The no-connection screen's picture.
+private struct EmptySpool: View {
+    var body: some View {
+        Canvas { context, size in
+            let r = min(size.width, size.height) / 2
+            let c = CGPoint(x: size.width / 2, y: size.height / 2)
+            let ink = GraphicsContext.Shading.color(Theme.Color.night)
+            func hole(at p: CGPoint, radius: CGFloat) {
+                let rect = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
+                context.fill(Path(ellipseIn: rect), with: ink)
+            }
+            for k in 0..<5 {
+                let angle: Double = (-90 + 72 * Double(k)) * .pi / 180
+                let spoke: CGFloat = 0.52 * r
+                hole(at: CGPoint(x: c.x + spoke * CGFloat(cos(angle)), y: c.y + spoke * CGFloat(sin(angle))),
+                     radius: r * 0.19)
+            }
+            hole(at: c, radius: r * 0.1)
+        }
+        .background(Circle().fill(.white))
+        .overlay(Circle().strokeBorder(Theme.Color.night, lineWidth: 3))
+        .background(Circle().fill(Theme.Color.shadow).offset(y: Theme.Shadow.large))
+        .accessibilityHidden(true)
     }
 }
 
