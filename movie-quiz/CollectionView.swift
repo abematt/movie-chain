@@ -102,7 +102,7 @@ struct CollectionView: View {
             .background(Theme.Color.canvas.ignoresSafeArea())
             .navigationTitle("Your Reel")
             .toolbarTitleDisplayMode(.inline)
-            .neoNavigationBar { SplitHeading(roman: "Your", flourish: "Reel", style: .headline) }
+            .neoNavigationBar { Heading("Your Reel", style: .headline) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: {
@@ -145,7 +145,7 @@ struct CollectionView: View {
         VStack(spacing: Theme.Spacing.md) {
             VStack(spacing: Theme.Spacing.xs) {
                 Text("You have logged")
-                    .font(Theme.Font.flourish(.body))
+                    .font(Theme.Font.sentence(.body))
                     .foregroundStyle(Theme.Color.muted)
                 Text("\(statsIn ? store.total : 0)")
                     .font(Theme.Font.display(64))
@@ -173,7 +173,7 @@ struct CollectionView: View {
     @ViewBuilder private var regulars: some View {
         if store.mostLoggedActor != nil || store.mostLoggedMovie != nil {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                SplitHeading(roman: "Your", flourish: "regulars")
+                Heading("Your regulars")
                 HStack(spacing: Theme.Spacing.sm) {
                     if let a = store.mostLoggedActor { regularCard(a) }
                     if let m = store.mostLoggedMovie { regularCard(m) }
@@ -199,7 +199,7 @@ struct CollectionView: View {
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("in \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .foregroundStyle(Theme.Color.muted)
             }
             Spacer(minLength: 0)
@@ -413,7 +413,7 @@ struct CollectionView: View {
     /// side of a filter that matches no linked film.
     private var nothingMatches: some View {
         Text("Nothing here yet. Try another decade or genre.")
-            .font(Theme.Font.flourish(.subheadline))
+            .font(Theme.Font.sentence(.subheadline))
             .foregroundStyle(Theme.Color.muted)
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.xl)
@@ -470,7 +470,7 @@ struct CollectionView: View {
                 Image(systemName: "film.stack")
                     .font(.system(size: 40))
                     .foregroundStyle(Theme.Color.muted)
-                SplitHeading(roman: "Your reel is", flourish: "empty")
+                Heading("Your reel is empty")
                 Text("Finish a chain and every actor and movie you named lands here.")
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.muted)
@@ -506,7 +506,7 @@ struct TMDBAttribution: View {
                 .frame(height: 14)
                 .accessibilityLabel("The Movie Database (TMDB)")
             Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
-                .font(Theme.Font.flourish(.caption))
+                .font(Theme.Font.sentence(.caption))
                 .foregroundStyle(Theme.Color.muted)
                 .multilineTextAlignment(.center)
         }

@@ -140,7 +140,7 @@ struct GameOverView: View {
                 // The record it beat means more than the label alone.
                 if summary.previousBest > 0 {
                     Text("was \(summary.previousBest)")
-                        .font(Theme.Font.flourish(.footnote))
+                        .font(Theme.Font.sentence(.footnote))
                 }
             }
             .padding(.horizontal, Theme.Spacing.xs)
@@ -165,7 +165,7 @@ struct GameOverView: View {
                     .foregroundStyle(Theme.Color.ink)
                     .contentTransition(.numericText())
                 Text(linkWord)
-                    .font(Theme.Font.flourish(.title2))
+                    .font(Theme.Font.sentence(.title2))
                     .foregroundStyle(Theme.Color.muted)
             }
             // One-shot bounce (up then settle) fired by `scorePop` on a new best.
@@ -244,11 +244,11 @@ struct GameOverView: View {
                 NodeDot(kind: node.kind)
                 NodeName(node: node,
                          font: Theme.Font.heading(.title3),
-                         yearFont: Theme.Font.flourish(.title3))
+                         yearFont: Theme.Font.sentence(.title3))
                     .multilineTextAlignment(.center)
             }
             Text(node.kind == .actor ? "was in the cast" : "was in the filmography")
-                .font(Theme.Font.flourish(.footnote))
+                .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
         }
         .frame(maxWidth: .infinity)

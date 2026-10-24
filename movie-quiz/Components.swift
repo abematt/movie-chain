@@ -46,18 +46,18 @@ extension View {
     }
 }
 
-// MARK: - Primary button (coral, hard shadow)
+// MARK: - Primary button (an ink slab)
 //
-// The one prominent call-to-action per screen ("Play again", "Retry"). Coral
-// fill, ink border, 4pt hard shadow; pressing darkens it to the pressed coral,
-// collapses the shadow and shifts it 1pt into the page. Under Reduce Motion the
-// shift and collapse are dropped and only the colour change remains.
+// The one prominent call-to-action per screen ("Play again", "Retry"). Ink
+// fill with a hard side; pressing collapses the side and sinks it into the
+// page. Under Reduce Motion nothing moves; the press still registers through
+// the system's own highlight.
 
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         NeoButtonBody(configuration: configuration,
-                      fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
-                      foreground: .white,
+                      fill: Theme.Color.primary,
+                      foreground: Theme.Color.onInk,
                       shadow: Theme.Shadow.large)
     }
 }
@@ -97,7 +97,7 @@ private struct NeoButtonBody: View {
             // fill, secondary text, no shadow — the border stays solid.
             .foregroundStyle(isEnabled ? foreground : Theme.Color.muted)
             .modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: Theme.Radius.md),
-                                 fill: isEnabled ? fill : Theme.Color.hairline,
+                                 fill: isEnabled ? fill : Theme.Color.socket,
                                  shadow: isEnabled ? shadow : 0,
                                  pressed: configuration.isPressed && !reduceMotion))
             .animation(Theme.Motion.press, value: configuration.isPressed)
@@ -125,14 +125,14 @@ extension View {
 
 // MARK: - Node name
 //
-// A node's name with the movie year as an italic flourish ("Les Misérables
-// *2012*") instead of a parenthetical. One definition so every row, card and
+// A node's name with the movie year as a quiet sentence-weight figure
+// ("Les Misérables 2012") instead of a parenthetical. One definition so every row, card and
 // recap shows years the same way.
 
 struct NodeName: View {
     let node: ChainNode
     var font: Font = Theme.Font.bodyStrong
-    var yearFont: Font = Theme.Font.flourish(.subheadline)
+    var yearFont: Font = Theme.Font.sentence(.subheadline)
 
     var body: some View {
         if case .movie(let m) = node, let year = m.year {
@@ -143,19 +143,22 @@ struct NodeName: View {
     }
 }
 
-// MARK: - Split heading
+// MARK: - Heading
 //
-// The spec's heading recipe: a bold roman phrase followed by an italic
-// flourish word ("Your *regulars*", "Movie *Chain*").
+// A title in one voice: Archivo semibold, ink. Emphasis is size, never a
+// second face.
 
-struct SplitHeading: View {
-    let roman: String
-    let flourish: String
+struct Heading: View {
+    let text: String
     var style: Font.TextStyle = .title3
 
+    init(_ text: String, style: Font.TextStyle = .title3) {
+        self.text = text
+        self.style = style
+    }
+
     var body: some View {
-        Text("\(Text(roman).font(Theme.Font.heading(style))) \(Text(flourish).font(Theme.Font.flourish(style)))")
-            .foregroundStyle(Theme.Color.ink)
+        Text(text).font(Theme.Font.heading(style)).foregroundStyle(Theme.Color.ink)
     }
 }
 

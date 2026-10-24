@@ -84,7 +84,7 @@ struct SettingsView: View {
             .onChange(of: analyticsEnabled) { _, on in telemetry?.setEnabled(on) }
 
             Text("How you play — your turns, what you type, what you look at in your Reel — so the game gets better. Not linked to who you are.")
-                .font(Theme.Font.flourish(.footnote))
+                .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.top, Theme.Spacing.xs)
         }
@@ -104,7 +104,7 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.Color.ink)
                 Spacer()
                 Text(Config.versionString)
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .monospacedDigit()
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -115,9 +115,9 @@ struct SettingsView: View {
             .accessibilityLabel("Unspool version \(Config.appVersion), build \(Config.buildNumber)")
 
             // The SIL Open Font License asks that the license travel with the
-            // font; the full text ships in the bundle as Fonts/Fraunces-OFL.txt.
-            Text("Set in Fraunces by Undercase Type, used under the SIL Open Font License 1.1.")
-                .font(Theme.Font.flourish(.footnote))
+            // fonts; the full texts ship in the bundle as Fonts/*-OFL.txt.
+            Text("Set in Archivo by Omnibus-Type and JetBrains Mono by JetBrains, used under the SIL Open Font License 1.1.")
+                .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.top, Theme.Spacing.xs)
         }

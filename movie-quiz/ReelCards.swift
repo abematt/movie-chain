@@ -309,7 +309,7 @@ struct ReelFrameCaption: View {
                 .minimumScaleFactor(0.75)
             if let year = entity.year {
                 Text(String(year))
-                    .font(Theme.Font.flourish(.caption))
+                    .font(Theme.Font.sentence(.caption))
                     .foregroundStyle(Theme.Color.muted)
             }
         }
@@ -511,7 +511,7 @@ struct ReelCardDetail: View {
 
             if linked.isEmpty {
                 Text("Links are counted from your next chain with \(isActor ? "them" : "it").")
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .foregroundStyle(Theme.Color.muted)
             } else {
                 ScrollView {
@@ -554,7 +554,7 @@ struct ReelCardDetail: View {
             Spacer(minLength: 4)
             if let year = other.year {
                 Text(String(year))
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .foregroundStyle(Theme.Color.muted)
             }
         }
@@ -568,7 +568,7 @@ struct ReelCardDetail: View {
                 .font(Theme.Font.numeral(.subheadline))
                 .foregroundStyle(Theme.Color.ink)
             Text("In \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
-                .font(Theme.Font.flourish(.footnote))
+                .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
         }
     }

@@ -27,7 +27,7 @@ struct TimerBar: View {
             // The spec's progress bar: 6pt, muted track, full radius, no border
             // and no shadow.
             ZStack(alignment: .leading) {
-                Capsule().fill(Theme.Color.hairline)
+                Capsule().fill(Theme.Color.socket)
                 Capsule()
                     .fill(lowTime ? Theme.Color.danger : Theme.Color.ink)
                     .frame(width: shown * geo.size.width)

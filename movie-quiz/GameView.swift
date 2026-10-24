@@ -203,7 +203,7 @@ struct GameView: View {
                     .contentTransition(.numericText())
                     .foregroundStyle(beatingBest ? Theme.Color.good : Theme.Color.ink)
                 Text(engine.score == 1 ? "link" : "links")
-                    .font(Theme.Font.flourish(.title3))
+                    .font(Theme.Font.sentence(.title3))
                     .foregroundStyle(Theme.Color.muted)
             }
             // The "+N" rises off the end of the whole figure, clear of the unit.
@@ -241,7 +241,7 @@ struct GameView: View {
     // Past the record, the points line adds "new best" for the rest of the run.
     @ViewBuilder private var pointsLine: some View {
         if beatingBest {
-            Text("\(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("new best").font(Theme.Font.flourish(.body)).foregroundStyle(Theme.Color.good))")
+            Text("\(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("new best").font(Theme.Font.sentence(.body)).foregroundStyle(Theme.Color.good))")
                 .contentTransition(.numericText())
         } else {
             Text("\(engine.points) pts")

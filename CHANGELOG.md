@@ -61,6 +61,13 @@ Unspool rebrand was inserted as 0.6.0.)
   instead of as a player who silently left.
 
 ### Changed
+- **Ground & Object begins: new type and colour foundations.** Cream Neobrutalist read
+  as generic and sat too close to Claude's own ivory, serif and clay. The app is now set
+  in Archivo (names and sentences, with condensed black for numbers and actions) and
+  JetBrains Mono caps for chips, with no serif and no italics; the cream ground becomes
+  paper, coral is gone (the call to action is an ink slab), and dark mode is a dim room
+  rather than a black one, so edges and sides keep their weight. The screens are redrawn
+  one at a time on top of this.
 - **The deal pool is saved between launches.** Every cold launch used to fire about 24
   TMDB requests to rebuild the same most-watched pool. Now a copy less than a week old
   is dealt from with no requests at all, which spares most launches and keeps a burst

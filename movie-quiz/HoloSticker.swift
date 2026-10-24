@@ -386,7 +386,7 @@ final class TiltMotion {
         HoloSticker(rotation: .degrees(-8), peel: 0.22, wearSeed: 21) {
             VStack(spacing: 0) {
                 Text("New best!").font(Theme.Font.heading(.title3))
-                Text("was 7").font(Theme.Font.flourish(.footnote))
+                Text("was 7").font(Theme.Font.sentence(.footnote))
             }
             .padding(.horizontal, 4)
         }

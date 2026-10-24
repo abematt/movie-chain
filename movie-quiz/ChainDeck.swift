@@ -156,7 +156,7 @@ struct DeckCard: View {
                         .handoffTarget(.name, isHandoffTarget ? stage : nil)
                     if case .movie(let m) = node, let year = m.year {
                         Text(String(year))
-                            .font(Theme.Font.flourish(.subheadline))
+                            .font(Theme.Font.sentence(.subheadline))
                             .foregroundStyle(Theme.Color.muted)
                     }
                 }

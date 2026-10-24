@@ -407,12 +407,12 @@ struct SentenceVerb: View {
 
     var body: some View {
         Text(node.kind == .actor ? "was in" : "starred")
-            .font(Theme.Font.flourish(size: SentenceType.verbSize))
+            .font(Theme.Font.sentence(size: SentenceType.verbSize))
             .foregroundStyle(Theme.Color.muted)
     }
 }
 
-/// The blank: the next link's placeholder over an ink rule, with the coral arrow.
+/// The blank: the next link's placeholder over an ink rule, with the ink start arrow.
 /// Presses through `\.blankPressed` (set by the home's button style). `nudge`
 /// bumps to play the first-run hint once: the arrow nudges toward the play
 /// screen and the placeholder brightens (only the brightening under Reduce
@@ -427,7 +427,7 @@ struct SentenceBlank: View {
         VStack(spacing: Theme.Spacing.sm) {
             HStack(alignment: .center) {
                 Text(kind == .movie ? "a movie…" : "an actor…")
-                    .font(Theme.Font.flourish(size: SentenceType.blankSize))
+                    .font(Theme.Font.sentence(size: SentenceType.blankSize))
                     .foregroundStyle(Theme.Color.muted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -442,7 +442,7 @@ struct SentenceBlank: View {
                 Spacer(minLength: Theme.Spacing.sm)
                 Image(systemName: "arrow.right")
                     .font(.headline.weight(.bold))
-                    .foregroundStyle(Theme.Color.ink)
+                    .foregroundStyle(Theme.Color.onInk)
                     .keyframeAnimator(initialValue: 0.0, trigger: nudge) { [reduceMotion] view, x in
                         view.offset(x: reduceMotion ? 0 : x)
                     } keyframes: { _ in
@@ -453,7 +453,7 @@ struct SentenceBlank: View {
                     }
                     .frame(width: 48, height: 48)
                     .neoSurface(radius: Theme.Radius.md,
-                                fill: pressed ? Theme.Color.primaryPressed : Theme.Color.primary,
+                                fill: Theme.Color.primary,
                                 shadow: Theme.Shadow.small,
                                 pressed: pressed && !reduceMotion)
                     .animation(Theme.Motion.press, value: pressed)

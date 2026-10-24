@@ -353,7 +353,7 @@ struct SeedView: View {
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
                 Text("Dealing…")
-                    .font(Theme.Font.flourish(size: SentenceType.verbSize))
+                    .font(Theme.Font.sentence(size: SentenceType.verbSize))
                     .foregroundStyle(Theme.Color.muted)
                     .transition(.opacity)
             }
@@ -377,7 +377,7 @@ struct SeedView: View {
                     .foregroundStyle(Theme.Color.muted)
                     .accessibilityHidden(true)
                 Text("Out of film.")
-                    .font(Theme.Font.flourish(size: SentenceType.verbSize))
+                    .font(Theme.Font.sentence(size: SentenceType.verbSize))
                     .foregroundStyle(Theme.Color.ink)
                 Text("Looks like we unspooled a little too far. Let's thread a new reel.")
                     .font(Theme.Font.body)
@@ -468,7 +468,7 @@ struct SeedView: View {
         if engine.bestChain > 0 {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
                 Text("Best run").metaLabel()
-                Text("\(Text("\(engine.bestChain)").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink)) \(Text(engine.bestChain == 1 ? "link" : "links").font(Theme.Font.flourish(.body)))")
+                Text("\(Text("\(engine.bestChain)").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink)) \(Text(engine.bestChain == 1 ? "link" : "links").font(Theme.Font.sentence(.body)))")
                     .foregroundStyle(Theme.Color.muted)
                     .lineLimit(1)
             }
@@ -625,8 +625,7 @@ struct SeedView: View {
 
     private var emptyState: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            SplitHeading(roman: query.isEmpty ? "Pick your" : "No",
-                         flourish: query.isEmpty ? "start" : "matches")
+            Heading(query.isEmpty ? "Pick your start" : "No matches")
             Text(query.isEmpty
                  ? "Search an \(engine.seedKind == .actor ? "actor" : "movie") to begin your chain."
                  : "Try a different spelling.")
