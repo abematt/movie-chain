@@ -114,6 +114,10 @@ enum Theme {
         static func display(_ size: CGFloat) -> SwiftUI.Font {
             custom("ArchivoCondensed-Black", fixed: size)
         }
+        /// A name at a fixed size: the home sentence's dealt start.
+        static func name(size: CGFloat) -> SwiftUI.Font {
+            custom("Archivo-SemiBold", fixed: size)
+        }
         /// A sentence at a fixed size, beside a fixed display size.
         static func sentence(size: CGFloat) -> SwiftUI.Font {
             custom("Archivo-Regular", fixed: size)
@@ -187,6 +191,10 @@ enum Theme {
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
         static let card: CGFloat = 16
+        /// Fields and the slab buttons beside them.
+        static let field: CGFloat = 14
+        /// The answer dock's top corners.
+        static let dock: CGFloat = 26
         static let pill: CGFloat = 999
     }
 

@@ -104,6 +104,27 @@ private struct NeoButtonBody: View {
     }
 }
 
+// MARK: - Dock ground
+//
+// The panel the colour lives in: a slab across the bottom of the screen, its top
+// corners rounded and edged in ink, filled with the kind you name next (yellow for
+// a movie, blue for an actor). It runs under the home indicator.
+
+struct DockGround: View {
+    var color: Color
+
+    var body: some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: Theme.Radius.dock,
+                                           topTrailingRadius: Theme.Radius.dock)
+        shape.fill(color)
+            .overlay(shape.stroke(Theme.Color.border, lineWidth: Theme.Border.width))
+            // Only the top edge shows: the sides and bottom sit just off screen.
+            .padding(.horizontal, -Theme.Border.width)
+            .padding(.bottom, -Theme.Border.width)
+            .ignoresSafeArea(edges: .bottom)
+    }
+}
+
 // MARK: - Meta label
 //
 // The one uppercase-label recipe. Every "ACTOR", "TIME'S UP", "YOUR CHAIN" and
