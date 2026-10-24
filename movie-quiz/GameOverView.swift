@@ -2,9 +2,12 @@
 //  GameOverView.swift
 //  movie-quiz
 //
-//  End-of-run summary: final score, a quiet "new best" mark, the near-miss that
-//  ended the run, the full chain revealed (as compact cards, or as category
-//  tiles under the Tiles chain style), a share card, and a play-again.
+//  End-of-run summary, on Night — or, when the run beat the record, on the holo
+//  sky: a new best isn't a screen of its own, it's this one with the foil laid
+//  flat as the ground. The first screenful is the result: how it ended, the link
+//  count huge, and the chain as a coin stack. Scrolling down gives the recap:
+//  the answer you were one away from, and every link by name. Play again stays
+//  pinned at the foot.
 //
 
 import SwiftUI
@@ -20,265 +23,213 @@ struct GameOverView: View {
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
     @State private var scorePop = 0
-    /// The new-best sticker, in two beats: `stickerPlaced` lands it on the card
-    /// (fast), `stickerPressed` smooths it down from a big peel to a slight one.
-    @State private var stickerPlaced = false
-    @State private var stickerPressed = false
+
+    private var best: Bool { summary.isNewBest }
+    /// Type on the ground: white on Night, ink on the holo sky.
+    private var fg: Color { best ? Theme.Color.night : .white }
+    private var sub: Color { best ? Theme.Color.night.opacity(0.72) : Color(white: 0.74) }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            summaryCard
-
-            if let missed = summary.missedAnswer {
-                oneAway(missed)
-                    // First beat of the deal-in, ahead of the chain cards, so
-                    // nothing on this screen arrives unannounced.
-                    .appear(0, animation: Theme.Motion.cascade, offset: 14,
-                            after: Theme.Motion.screenSettle)
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    result
+                        // The first screenful is the result alone; the recap waits below.
+                        .frame(height: max(420, geo.size.height - Theme.Spacing.md))
+                    recap
+                }
+                .padding(.horizontal, Theme.Spacing.gutter)
             }
-
-            recapSection
-
-            actions
+            .scrollIndicators(.hidden)
         }
-        .padding(.horizontal, Theme.Spacing.gutter)
-        .padding(.vertical, Theme.Spacing.md)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Color.canvas.ignoresSafeArea())
+        // The ground stops where the actions begin, so the sky's last colour
+        // meets their solid band without a seam.
+        .background(ground.ignoresSafeArea(edges: .top))
+        .safeAreaInset(edge: .bottom, spacing: 0) { actions }
         // The play screen lowers its keyboard before handing over; should one
         // still be on its way down, it slides off over this screen instead of
         // re-laying it out as it goes.
         .ignoresSafeArea(.keyboard)
         .task {
-            guard summary.isNewBest else { return }
+            guard best else { return }
             // Reduce Motion: the celebratory haptic still fires, but no visual pop.
-            if reduceMotion {
-                stickerPlaced = true
-                stickerPressed = true
-                Haptics.celebrate()
-                return
-            }
-            // Wait out the screen-push carousel (Theme.Motion.screen, ~0.45s)
-            // so the bounce reads as a landing beat rather than overlapping the
-            // horizontal push. Haptic + pop fire together, after the settle.
+            if reduceMotion { Haptics.celebrate(); return }
+            // Wait out the screen push so the bounce reads as a landing beat.
             // `.task` is cancelled if the screen leaves first (a fast "Play
             // again"); `try?` swallows that, so check before firing.
             try? await Task.sleep(for: .milliseconds(450))
             guard !Task.isCancelled else { return }
             Haptics.celebrate()
             scorePop += 1
-            // Slapped on, then pressed flat from the stuck edge outward — the
-            // big peel springs down to a slight lift at the corner.
-            withAnimation(.easeOut(duration: 0.16)) { stickerPlaced = true }
-            withAnimation(.spring(duration: 0.55, bounce: 0.3).delay(0.06)) { stickerPressed = true }
         }
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .gameOver)
         }
     }
 
-    // MARK: Summary card — this run first, then best and Reel, quieter
+    @ViewBuilder private var ground: some View {
+        if best {
+            LinearGradient(colors: Theme.Holo.sky, startPoint: .top, endPoint: .bottom)
+        } else {
+            Theme.Color.night
+        }
+    }
+
+    // MARK: Result — how it ended, the count, the stack
     //
-    // One card answers "how did I do?". The top half is this run, emphasised:
-    // the link count as the hero numeral and the points beside its unit. Below a
-    // rule sit two quiet cells: the personal best (hidden on a new best, where
-    // it would just repeat this run) and the Reel, tappable. Terminology is
-    // fixed app-wide: a *chain* is a whole run, a *link* is one correct answer
-    // (the score counts links), and the dealt start is not a link.
-
-    private var summaryCard: some View {
-        VStack(spacing: 0) {
-            runHero
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.md)
-                // A little headroom so the sticker in the corner clears the score.
-                .padding(.top, summary.isNewBest ? Theme.Spacing.sm : 0)
-                .padding(.horizontal, Theme.Spacing.md)
-
-            if showsBest || showsReel {
-                Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
-                HStack(spacing: 0) {
-                    if showsBest { bestCell }
-                    if showsBest && showsReel {
-                        Rectangle().fill(Theme.Color.border).frame(width: Theme.Border.width)
-                    }
-                    if showsReel { reelCell }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .neoSurface(radius: Theme.Radius.card)
-        // Stuck flat in the card's top-trailing corner, inside its edges (hanging
-        // off the border read as floating). It sits in the empty corner above
-        // "links", clear of the centred score.
-        .overlay(alignment: .topTrailing) {
-            if summary.isNewBest {
-                newBestSticker
-                    .padding(.top, Theme.Spacing.sm + 2)
-                    .padding(.trailing, Theme.Spacing.sm + 2)
-            }
-        }
-    }
-
-    /// The chain cards deal in after the "one away" card when there is one.
-    private var recapStaggerStart: Int { summary.missedAnswer == nil ? 0 : 1 }
-
-    // MARK: New-best sticker
-
-    private var newBestSticker: some View {
-        HoloSticker(rotation: .degrees(-8),
-                    peel: stickerPressed ? 0.22 : 0.7,
-                    // Casts a shadow only while it's still in the air; pressed
-                    // flat, the shadow is gone and it's part of the card.
-                    shadow: stickerPressed ? 0 : Theme.Shadow.large * 2,
-                    wearSeed: 21,
-                    // The Reel sheet covers it without making it disappear.
-                    active: !showReel) {
-            VStack(spacing: 0) {
-                Text("New best!")
-                    .font(Theme.Font.heading(.title3))
-                // The record it beat means more than the label alone.
-                if summary.previousBest > 0 {
-                    Text("was \(summary.previousBest)")
-                        .font(Theme.Font.sentence(.footnote))
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.xs)
-        }
-        .scaleEffect(stickerPlaced ? 1 : 1.25)
-        .opacity(stickerPlaced ? 1 : 0)
-        .accessibilityHidden(true)   // the hero's label already says "a new best"
-    }
-
-    private var showsBest: Bool { !summary.isNewBest && engine.bestChain > 0 }
-    private var showsReel: Bool { collection.total > 0 }
+    // Terminology is fixed app-wide: a *chain* is a whole run, a *link* is one
+    // correct answer (the score counts links), and the dealt start is not a link.
 
     private var linkWord: String { summary.links == 1 ? "link" : "links" }
 
-    private var runHero: some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            // The unit sits on the numeral's baseline so "2 links" reads as one
-            // figure; points get their own line beneath it.
-            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                Text("\(summary.links)")
-                    .font(Theme.Font.display(72))
-                    .foregroundStyle(Theme.Color.ink)
-                    .contentTransition(.numericText())
-                Text(linkWord)
-                    .font(Theme.Font.sentence(.title2))
-                    .foregroundStyle(Theme.Color.muted)
+    private var result: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(summary.endedByQuit ? "You stopped" : "Time’s up")
+                    .metaLabel(sub)
+                Spacer()
+                if best { newBestTag }
             }
-            // One-shot bounce (up then settle) fired by `scorePop` on a new best.
-            // Resting scale is 1, so it can never get stuck oversized.
-            .keyframeAnimator(initialValue: 1.0, trigger: scorePop) { view, scale in
-                view.scaleEffect(scale)
-            } keyframes: { _ in
-                KeyframeTrack {
-                    CubicKeyframe(1.12, duration: 0.18)
-                    SpringKeyframe(1.0, duration: 0.42, spring: .bouncy)
-                }
-            }
+            .padding(.top, Theme.Spacing.md)
 
-            Text("\(summary.points) pts")
-                .font(Theme.Font.numeral(.title3))
-                .foregroundStyle(Theme.Color.ink)
+            HStack(alignment: .bottom, spacing: Theme.Spacing.md - 4) {
+                Text("\(summary.links)")
+                    .font(Theme.Font.display(150))
+                    .foregroundStyle(fg)
+                    .contentTransition(.numericText())
+                    .padding(.bottom, -24)
+                    // One-shot bounce fired by `scorePop` on a new best.
+                    .keyframeAnimator(initialValue: 1.0, trigger: scorePop) { view, scale in
+                        view.scaleEffect(scale, anchor: .bottomLeading)
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            CubicKeyframe(1.08, duration: 0.18)
+                            SpringKeyframe(1.0, duration: 0.42, spring: .bouncy)
+                        }
+                    }
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs + 2) {
+                    Text(linkWord)
+                        .font(Theme.Font.display(30))
+                        .textCase(.uppercase)
+                        .tracking(Theme.Font.buttonTracking)
+                        .foregroundStyle(fg)
+                    Text(pointsLine)
+                        .font(Theme.Font.body)
+                        .foregroundStyle(sub)
+                }
+                .padding(.bottom, Theme.Spacing.sm)
+            }
+            .padding(.top, Theme.Spacing.sm)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(summary.links) \(linkWord), \(summary.points) points\(best ? ", a new best" : "")")
+
+            CoinStack(chain: summary.chain, labelColor: fg)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, Theme.Spacing.lg)
+                .padding(.bottom, Theme.Spacing.md)
+                .appear(0, animation: Theme.Motion.cascade, offset: 14, after: Theme.Motion.screenSettle)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(summary.links) \(linkWord), \(summary.points) points\(summary.isNewBest ? ", a new best" : "")")
     }
 
-    // The personal best, deliberately quiet: small label, small muted figures.
-    private var bestCell: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Best").metaLabel(size: .small)
-            Text("\(engine.bestChain) links · \(engine.bestPoints) pts")
-                .font(Theme.Font.numeral(.footnote))
+    private var pointsLine: String {
+        var line = "\(summary.points) pts"
+        if best, summary.previousBest > 0 { line += " · was \(summary.previousBest)" }
+        return line
+    }
+
+    private var newBestTag: some View {
+        Text("New best")
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
+            .foregroundStyle(.white)
+            .padding(.horizontal, Theme.Spacing.sm + 2)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(RoundedRectangle(cornerRadius: Theme.Radius.sm).fill(Theme.Color.night))
+            .accessibilityHidden(true)   // the count's label already says "a new best"
+    }
+
+    // MARK: Recap — one away, then every link
+
+    private var recap: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+            if let missed = summary.missedAnswer { oneAway(missed) }
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text("Your chain · \(summary.links) \(linkWord) · \(summary.points) pts").metaLabel(sub)
+                ForEach(Array(summary.chain.enumerated()), id: \.element.id) { i, node in
+                    recapRow(node, index: i)
+                }
+            }
+            if showsBest || showsReel { footnotes }
+        }
+        .padding(.top, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.xl)
+    }
+
+    // The answer that would have kept the run going: a paper card, the one
+    // object on this ground.
+    private func oneAway(_ node: ChainNode) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs + 2) {
+            Text("You were one away").metaLabel()
+            HStack(spacing: Theme.Spacing.sm) {
+                NodeDot(kind: node.kind)
+                NodeName(node: node, font: Theme.Font.heading(.title2), yearFont: Theme.Font.sentence(.title3))
+            }
+            Text(node.kind == .actor ? "was in the cast" : "was in the filmography")
+                .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm + 2)
+        .padding(Theme.Spacing.md + 2)
+        .neoSurface(radius: Theme.Radius.card, fill: .white, shadow: Theme.Shadow.large, side: .black)
+        .environment(\.colorScheme, .light)
+    }
+
+    private func recapRow(_ node: ChainNode, index: Int) -> some View {
+        HStack(spacing: Theme.Spacing.md - 4) {
+            Text(index == 0 ? "ST" : String(format: "%02d", index))
+                .font(Theme.Font.labelSmall)
+                .foregroundStyle(sub)
+                .frame(width: 22, alignment: .leading)
+            NodeDot(kind: node.kind)
+            Text(node.matchText)
+                .font(Theme.Font.bodyStrong)
+                .foregroundStyle(fg)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if case .movie(let m) = node, let year = m.year {
+                Text(String(year)).font(Theme.Font.small).foregroundStyle(sub)
+            }
+        }
+        .padding(.vertical, Theme.Spacing.sm)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(fg.opacity(0.14)).frame(height: 1.5)
+        }
         .accessibilityElement(children: .combine)
     }
 
-    // What this run added to the Reel, one line, tappable into the sheet.
-    private var reelCell: some View {
-        Button { showReel = true } label: {
-            HStack(spacing: Theme.Spacing.xs) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Your Reel").metaLabel(size: .small)
-                    Text(reelMessage)
-                        .font(Theme.Font.numeral(.footnote))
-                        .foregroundStyle(Theme.Color.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(Theme.Font.labelSmall)
-                    .foregroundStyle(Theme.Color.muted)
+    private var showsBest: Bool { !best && engine.bestChain > 0 }
+    private var showsReel: Bool { collection.total > 0 }
+
+    // Best and the Reel, quiet, under the recap.
+    private var footnotes: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            if showsBest {
+                Text("Best · \(engine.bestChain) links · \(engine.bestPoints) pts")
+                    .font(Theme.Font.body)
+                    .foregroundStyle(sub)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.sm + 2)
-            .contentShape(Rectangle())
+            if showsReel {
+                Text(reelMessage).font(Theme.Font.body).foregroundStyle(sub)
+            }
         }
-        .buttonStyle(.pressScale)
     }
 
     private var reelMessage: String {
         if summary.reelAdditions > 0 {
-            return "+\(summary.reelAdditions) new · \(collection.total) total"
+            return "Your Reel · +\(summary.reelAdditions) new · \(collection.total) total"
         }
-        return "\(collection.total) logged"
-    }
-
-    // MARK: One-away near-miss
-
-    private func oneAway(_ node: ChainNode) -> some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            Text("You were one away").metaLabel()
-            HStack(spacing: Theme.Spacing.sm) {
-                NodeDot(kind: node.kind)
-                NodeName(node: node,
-                         font: Theme.Font.heading(.title3),
-                         yearFont: Theme.Font.sentence(.title3))
-                    .multilineTextAlignment(.center)
-            }
-            Text(node.kind == .actor ? "was in the cast" : "was in the filmography")
-                .font(Theme.Font.sentence(.footnote))
-                .foregroundStyle(Theme.Color.muted)
-        }
-        .frame(maxWidth: .infinity)
-        .card()
-    }
-
-    // MARK: Chain recap
-
-    private var recapSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Your chain").metaLabel()
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xs + 2) {
-                    ForEach(Array(summary.chain.enumerated()), id: \.element.id) { i, node in
-                        // The start isn't a link: it gets a flag, and the
-                        // links count from 1, so the last number matches
-                        // the score above.
-                        CompactChainCard(node: node, position: i == 0 ? nil : i,
-                                         isStart: i == 0)
-                            // Starts as the push settles, so the cascade
-                            // isn't spent underneath the slide.
-                            .appear(i + recapStaggerStart, animation: Theme.Motion.cascade,
-                                    offset: 14, after: Theme.Motion.screenSettle)
-                    }
-                }
-                // Room for the sides, which draw below each card.
-                .padding(.bottom, Theme.Spacing.sm)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        return "Your Reel · \(collection.total) logged"
     }
 
     // MARK: Actions
@@ -292,24 +243,47 @@ struct GameOverView: View {
         return shared.url(base: base)
     }
 
+    // Play again is the one slab: Go lime with a white side on Night, a night
+    // slab on the holo sky. Share and the Reel are quiet words beneath it.
     private var actions: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(spacing: Theme.Spacing.md + 2) {
             Button {
                 engine.reset()
             } label: {
                 Text("Play again").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.primary)
+            .buttonStyle(best
+                ? SlabButtonStyle(fill: Theme.Color.night, foreground: .white, side: .black)
+                : SlabButtonStyle(fill: Theme.Color.go, foreground: Theme.Color.night, side: .white))
 
-            ShareLink(item: summary.shareText(link: shareLink)) {
-                Text("Share").frame(maxWidth: .infinity)
+            HStack {
+                ShareLink(item: summary.shareText(link: shareLink)) {
+                    Text("Share").frame(maxWidth: .infinity)
+                }
+                // ShareLink has no action of its own; a tap opening the sheet is
+                // the signal (whether they then sent it isn't knowable).
+                .simultaneousGesture(TapGesture().onEnded {
+                    telemetry?.shared(from: .gameOver)
+                })
+                Button { showReel = true } label: {
+                    Text("Your Reel").frame(maxWidth: .infinity)
+                }
             }
-            .buttonStyle(.ghost)
-            // ShareLink has no action of its own; a tap opening the sheet is the
-            // signal (whether they then sent it isn't knowable).
-            .simultaneousGesture(TapGesture().onEnded {
-                telemetry?.shared(from: .gameOver)
-            })
+            .buttonStyle(.pressScale)
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
+            .foregroundStyle(fg)
+        }
+        .padding(.horizontal, Theme.Spacing.gutter)
+        .padding(.top, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.sm)
+        .background {
+            // Solid behind the actions so the recap scrolls under them, not through.
+            Group {
+                if best { Theme.Holo.sky.last ?? .clear } else { Theme.Color.night }
+            }
+            .ignoresSafeArea()
         }
     }
 }

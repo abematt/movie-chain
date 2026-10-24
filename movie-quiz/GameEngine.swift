@@ -749,10 +749,17 @@ final class GameEngine {
         phase = .playing
     }
 
-    /// Same sample chain, but jump straight to the game-over summary.
-    func loadDemoGameOver() {
+    /// Same sample chain, but jump straight to the game-over summary — a new
+    /// best by default, or an ordinary run (`-uiDemoNoBest`), which also ends on
+    /// a movie so the film spool shows.
+    func loadDemoGameOver(newBest: Bool = true) {
         loadDemoChain()
-        phase = .gameOver(Summary(isNewBest: true, previousBest: 2, missedAnswer: candidates.first,
+        if !newBest {
+            chain.append(.movie(Movie(id: 1003, title: "Inception", year: 2010)))
+            score = chain.count - 1
+            points = score * 24
+        }
+        phase = .gameOver(Summary(isNewBest: newBest, previousBest: 2, missedAnswer: candidates.first,
                                   chain: chain, links: score, points: points))
     }
     #endif

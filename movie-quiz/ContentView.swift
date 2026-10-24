@@ -120,7 +120,7 @@ struct ContentView: View {
             #if DEBUG
             let args = ProcessInfo.processInfo.arguments
             if args.contains("-uiDemoGameOver") {
-                engine.loadDemoGameOver()
+                engine.loadDemoGameOver(newBest: !args.contains("-uiDemoNoBest"))
             } else if args.contains("-uiDemoChain") {
                 engine.loadDemoChain()
             }

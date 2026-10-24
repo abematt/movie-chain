@@ -205,6 +205,15 @@ enum Theme {
     // colour, so it doesn't invert — text on it uses `Color.onAccent`, which is
     // legible on pastels in both themes.
     enum Holo {
+        /// The new-best sky: the foil laid flat as a ground, lilac at the top to
+        /// lemon at the foot. Used once, on the game over that beats a record.
+        static let sky: [SwiftUI.Color] = [
+            SwiftUI.Color(red: 0.73, green: 0.66, blue: 1.00),
+            SwiftUI.Color(red: 0.89, green: 0.71, blue: 1.00),
+            SwiftUI.Color(red: 1.00, green: 0.71, blue: 0.90),
+            SwiftUI.Color(red: 1.00, green: 0.89, blue: 0.72),
+            SwiftUI.Color(red: 1.00, green: 0.95, blue: 0.66),
+        ]
         static let colors: [SwiftUI.Color] = [
             SwiftUI.Color(red: 1.00, green: 0.71, blue: 0.90),  // pink
             SwiftUI.Color(red: 0.79, green: 0.72, blue: 1.00),  // lilac

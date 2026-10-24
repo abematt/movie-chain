@@ -23,6 +23,9 @@ struct NeoSurface<S: InsettableShape>: ViewModifier {
     var fill: Color = Theme.Color.tile
     var shadow: CGFloat = Theme.Shadow.large
     var pressed = false
+    /// The side's colour. Ink everywhere, except on Night, where an ink side
+    /// would vanish into the ground and white takes its place.
+    var side: Color = Theme.Color.shadow
 
     func body(content: Content) -> some View {
         let depth = pressed ? 0 : shadow
@@ -30,7 +33,7 @@ struct NeoSurface<S: InsettableShape>: ViewModifier {
         content
             .background(shape.fill(fill))
             .overlay(shape.strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .background(shape.fill(Theme.Color.shadow).offset(y: depth))
+            .background(shape.fill(side).offset(y: depth))
             .offset(y: sink)
     }
 }
@@ -40,9 +43,10 @@ extension View {
     func neoSurface(radius: CGFloat = Theme.Radius.md,
                     fill: Color = Theme.Color.tile,
                     shadow: CGFloat = Theme.Shadow.large,
-                    pressed: Bool = false) -> some View {
+                    pressed: Bool = false,
+                    side: Color = Theme.Color.shadow) -> some View {
         modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: radius),
-                            fill: fill, shadow: shadow, pressed: pressed))
+                            fill: fill, shadow: shadow, pressed: pressed, side: side))
     }
 }
 
@@ -71,15 +75,17 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SlabButtonStyle: ButtonStyle {
     var fill: Color = Theme.Color.night
     var foreground: Color
+    var side: Color = Theme.Color.shadow
 
     func makeBody(configuration: Configuration) -> some View {
-        SlabBody(configuration: configuration, fill: fill, foreground: foreground)
+        SlabBody(configuration: configuration, fill: fill, foreground: foreground, side: side)
     }
 
     private struct SlabBody: View {
         let configuration: ButtonStyleConfiguration
         let fill: Color
         let foreground: Color
+        let side: Color
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @Environment(\.isEnabled) private var isEnabled
 
@@ -93,7 +99,8 @@ struct SlabButtonStyle: ButtonStyle {
                 .frame(minWidth: 52, minHeight: 52)
                 .neoSurface(radius: Theme.Radius.field, fill: fill,
                             shadow: Theme.Shadow.large,
-                            pressed: configuration.isPressed && !reduceMotion)
+                            pressed: configuration.isPressed && !reduceMotion,
+                            side: side)
                 .animation(Theme.Motion.press, value: configuration.isPressed)
         }
     }
@@ -318,28 +325,10 @@ extension ButtonStyle where Self == GhostButtonStyle {
     static var ghost: GhostButtonStyle { .init() }
 }
 
-// MARK: - Card container
-//
-// Wraps content in a padded neo surface — the standard way to visually cluster
-// related content (the game-over near-miss uses it).
-
-struct CardModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(Theme.Spacing.md)
-            .neoSurface(radius: Theme.Radius.card)
-    }
-}
-
-extension View {
-    /// Usage: `someView.card()`
-    func card() -> some View { modifier(CardModifier()) }
-}
-
 // MARK: - Node dot
 //
 // A small category chip (blue = actor, yellow = movie) used where a full tile
-// would be too heavy — seed results, the "what comes next" hint.
+// would be too heavy — seed results, the game-over recap.
 
 struct NodeDot: View {
     let kind: NodeKind
