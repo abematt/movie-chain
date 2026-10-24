@@ -150,18 +150,18 @@ private struct NeoButtonBody: View {
 
 // MARK: - Dock ground
 //
-// The panel the colour lives in: a slab across the bottom of the screen, its top
-// corners rounded and edged in ink, filled with the kind you name next (yellow for
-// a movie, blue for an actor). It runs under the home indicator.
+// The panel the colour lives in: a square band across the bottom of the screen,
+// its top edged in ink, filled with the kind you name next (yellow for a movie,
+// blue for an actor). It runs under the home indicator. The dock is ground, not
+// an object, so it has no rounded corners: those read as the one soft curve in a
+// screen of hard edges.
 
 struct DockGround: View {
     var color: Color
 
     var body: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: Theme.Radius.dock,
-                                           topTrailingRadius: Theme.Radius.dock)
-        shape.fill(color)
-            .overlay(shape.stroke(Theme.Color.border, lineWidth: Theme.Border.width))
+        Rectangle().fill(color)
+            .overlay(Rectangle().stroke(Theme.Color.border, lineWidth: Theme.Border.width))
             // Only the top edge shows: the sides and bottom sit just off screen.
             .padding(.horizontal, -Theme.Border.width)
             .padding(.bottom, -Theme.Border.width)

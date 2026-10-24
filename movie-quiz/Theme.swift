@@ -218,8 +218,6 @@ enum Theme {
         static let card: CGFloat = 16
         /// Fields and the slab buttons beside them.
         static let field: CGFloat = 14
-        /// The answer dock's top corners.
-        static let dock: CGFloat = 26
         static let pill: CGFloat = 999
     }
 

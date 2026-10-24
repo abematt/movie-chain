@@ -113,6 +113,9 @@ Unspool rebrand was inserted as 0.6.0.)
 - **The Reel's caption reads like the home's best run**: "LOGGED ACROSS / 36 CHAINS /
   BEST RUN 13 LINKS" in condensed caps with the figures in ink, instead of the app's
   only lowercase sentence broken over three lines.
+- **The dock is a square band.** Its rounded top corners were the one soft curve in a
+  design of hard-edged objects; the dock is ground, so it now runs edge to edge under a
+  straight ink rule, on the home, the play screen and the offline notice alike.
 - **Touch and polish:** 44pt targets on the home's links, the search's back link and
   its clear button; bold icons beside the heavy caps; the search's empty state on the
   same leading edge as the rest; the Reel's dim now covers its header too, so Done
