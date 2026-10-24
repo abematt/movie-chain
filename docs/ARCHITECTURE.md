@@ -796,7 +796,11 @@ of the login-free core, never a gate in front of it.
   a mid-game `playing` state with a sample chain, or `-uiDemoGameOver` for the
   game-over summary — no typing required to inspect those screens. Wired in
   `ContentView.onAppear` to `GameEngine.loadDemoChain()`/`loadDemoGameOver()`
-  (also used by the `#Preview`s); compiled out of release builds.
+  (also used by the `#Preview`s); compiled out of release builds. Add
+  `-uiWorstCase` to either for the worst-case fixture: the longest real names and
+  titles the deal can serve, ending on a two-line title with a year, and a four-digit
+  score. Run it at a large text size on an SE before changing the deck, the dock or
+  the recap.
 - Command line (see `CLAUDE.md` for full `xcodebuild` invocations):
   ```bash
   xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \

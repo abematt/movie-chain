@@ -5,9 +5,9 @@
 //  End-of-run summary, on Night — or, when the run beat the record, on the holo
 //  sky: a new best isn't a screen of its own, it's this one with the foil laid
 //  flat as the ground. The first screenful is the result: how it ended, the link
-//  count huge, and the chain as a coin stack. Scrolling down gives the recap:
-//  the answer you were one away from, and every link by name. Play again stays
-//  pinned at the foot.
+//  count huge, and the chain as a coin stack, which names every link. Scrolling
+//  down gives the answer you were one away from, and the best and the Reel.
+//  Play again stays pinned at the foot.
 //
 
 import SwiftUI
@@ -27,17 +27,22 @@ struct GameOverView: View {
     @State private var shareImage: Image?
 
     private var best: Bool { summary.isNewBest }
+    /// How much of the recap shows above the actions on the first screen.
+    private static let recapPeek: CGFloat = 52
     /// Type on the ground: white on Night, ink on the holo sky.
     private var fg: Color { best ? Theme.Color.night : .white }
-    private var sub: Color { best ? Theme.Color.night.opacity(0.72) : Color(white: 0.74) }
+    private var sub: Color { best ? Theme.Color.night.opacity(0.72) : Theme.Color.quietOnNight }
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     result
-                        // The first screenful is the result alone; the recap waits below.
-                        .frame(height: max(420, geo.size.height - Theme.Spacing.md))
+                        // The first screenful is the result. The one-away card's top
+                        // edge peeks above the actions, so it reads as more below;
+                        // with no card, the quiet lines under it stay below the fold.
+                        .frame(height: max(420, geo.size.height
+                                            - (summary.missedAnswer == nil ? Theme.Spacing.md : Self.recapPeek)))
                     recap
                 }
                 .padding(.horizontal, Theme.Spacing.gutter)
@@ -52,9 +57,12 @@ struct GameOverView: View {
         // still be on its way down, it slides off over this screen instead of
         // re-laying it out as it goes.
         .ignoresSafeArea(.keyboard)
+        // Applied before the Reel sheet, so the sheet still follows the reader's size.
+        .dynamicTypeSize(...Theme.Font.gameTypeCap)
         .task {
-            // After the push, so drawing the card can't catch the slide.
-            try? await Task.sleep(for: .milliseconds(500))
+            // Once the screen has settled — after the push, the coin stack's rise
+            // and a new best's bounce — so drawing the card can't hitch any of them.
+            try? await Task.sleep(for: .milliseconds(1200))
             guard !Task.isCancelled else { return }
             shareImage = ShareCard.image(chain: summary.chain, links: summary.links)
         }
@@ -141,7 +149,7 @@ struct GameOverView: View {
     }
 
     private var pointsLine: String {
-        var line = "\(summary.points) pts"
+        var line = "\(summary.points.formatted()) pts"
         if best, summary.previousBest > 0 { line += " · was \(summary.previousBest)" }
         return line
     }
@@ -158,17 +166,13 @@ struct GameOverView: View {
             .accessibilityHidden(true)   // the count's label already says "a new best"
     }
 
-    // MARK: Recap — one away, then every link
+    // MARK: Recap — one away, then the best and the Reel
+    //
+    // No list of the links: the coin stack already names each one in order.
 
     private var recap: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
             if let missed = summary.missedAnswer { oneAway(missed) }
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Your chain · \(summary.links) \(linkWord) · \(summary.points) pts").metaLabel(sub)
-                ForEach(Array(summary.chain.enumerated()), id: \.element.id) { i, node in
-                    recapRow(node, index: i)
-                }
-            }
             if showsBest || showsReel { footnotes }
         }
         .padding(.top, Theme.Spacing.md)
@@ -192,29 +196,6 @@ struct GameOverView: View {
         .padding(Theme.Spacing.md + 2)
         .neoSurface(radius: Theme.Radius.card, fill: .white, shadow: Theme.Shadow.large, side: .black)
         .environment(\.colorScheme, .light)
-    }
-
-    private func recapRow(_ node: ChainNode, index: Int) -> some View {
-        HStack(spacing: Theme.Spacing.md - 4) {
-            Text(index == 0 ? "ST" : String(format: "%02d", index))
-                .font(Theme.Font.labelSmall)
-                .foregroundStyle(sub)
-                .frame(width: 22, alignment: .leading)
-            NodeDot(kind: node.kind)
-            Text(node.matchText)
-                .font(Theme.Font.bodyStrong)
-                .foregroundStyle(fg)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if case .movie(let m) = node, let year = m.year {
-                Text(String(year)).font(Theme.Font.small).foregroundStyle(sub)
-            }
-        }
-        .padding(.vertical, Theme.Spacing.sm)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(fg.opacity(0.14)).frame(height: 1.5)
-        }
-        .accessibilityElement(children: .combine)
     }
 
     private var showsBest: Bool { !best && engine.bestChain > 0 }
@@ -277,6 +258,8 @@ struct GameOverView: View {
                 }
             }
             .buttonStyle(OutlineButtonStyle(color: fg))
+            // The pair stays one height when one label wraps and the other doesn't.
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.md)
@@ -324,12 +307,12 @@ private struct OutlineButtonStyle: ButtonStyle {
             .textCase(.uppercase)
             .tracking(Theme.Font.buttonTracking)
             .foregroundStyle(color)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: 48, maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.Radius.field)
                 .fill(color.opacity(configuration.isPressed ? 0.12 : 0)))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.field)
                 .strokeBorder(color, lineWidth: Theme.Border.width))
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? Theme.Motion.pressScale : 1)
             .animation(Theme.Motion.press, value: configuration.isPressed)
     }
 }

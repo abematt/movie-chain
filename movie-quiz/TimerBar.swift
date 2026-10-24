@@ -28,9 +28,13 @@ struct TimerBar: View {
             // and no shadow.
             ZStack(alignment: .leading) {
                 Capsule().fill(Theme.Color.socket)
+                // Full width, slid left out of the track rather than resized: an
+                // offset moves pixels already drawn, where an animated width
+                // redrew the capsule every frame of the whole turn. The track's
+                // clip rounds the fill's leading edge, so it looks the same.
                 Capsule()
                     .fill(lowTime ? Theme.Color.danger : Theme.Color.ink)
-                    .frame(width: shown * geo.size.width)
+                    .offset(x: -(1 - shown) * geo.size.width)
             }
             .clipShape(Capsule())
         }

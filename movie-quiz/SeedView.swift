@@ -140,6 +140,8 @@ struct SeedView: View {
                     .accessibilityAddTraits(.isButton)
             }
         }
+        // Applied before the sheets, so the Reel and Settings follow the reader's size.
+        .dynamicTypeSize(...Theme.Font.gameTypeCap)
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .home)
         }
@@ -353,7 +355,8 @@ struct SeedView: View {
         // Out to the screen's edges, past the body's gutter and bottom inset.
         .padding(.horizontal, -Theme.Spacing.gutter)
         .padding(.bottom, -Theme.Spacing.sm)
-        .animation(Theme.Motion.standard, value: dockColor)
+        // The colour swaps at once on a new deal: blue → yellow tweened through
+        // a flat grey.
     }
 
     /// Deal ⇄ search: the leaving layout fades out fast, the arriving one fades
@@ -415,7 +418,7 @@ struct SeedView: View {
                 retryDealButton
                 Text("Your Reel and best run are safe on this phone.")
                     .font(Theme.Font.body)
-                    .foregroundStyle(Color(white: 0.74))
+                    .foregroundStyle(Theme.Color.quietOnNight)
             }
             .padding(.horizontal, Theme.Spacing.gutter)
             .padding(.top, Theme.Spacing.lg - 2)
@@ -459,7 +462,6 @@ struct SeedView: View {
         .disabled(engine.dealtSeed == nil || handingOff)
         .handoffSource(.blank, stage)
         .opacity(handingOff ? 0 : 1)
-        .animation(Theme.Motion.standard, value: engine.dealtSeed?.nextKind)
         .accessibilityLabel(blankLabel)
     }
 
@@ -470,22 +472,18 @@ struct SeedView: View {
             : "Start: name an actor who starred in \(seed.matchText)"
     }
 
+    // Side by side; stacked when a large text size won't fit them on one line
+    // (side by side, they broke mid-word: "DEA L…").
     private var dealLinks: some View {
-        HStack {
-            Button {
-                Haptics.selection()
-                engine.shuffleSeed()
-                telemetry?.dealt()
-            } label: {
-                Label("Deal again", systemImage: "shuffle")
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                dealAgainLink
+                Spacer(minLength: Theme.Spacing.sm)
+                pickYourOwnLink
             }
-            .disabled(engine.dealtSeed == nil)
-
-            Spacer(minLength: Theme.Spacing.sm)
-
-            // The swap animates through its transitions (`modeSwap`).
-            Button { searching = true } label: {
-                Label("Pick your own", systemImage: "magnifyingglass")
+            VStack(alignment: .leading, spacing: 0) {
+                dealAgainLink
+                pickYourOwnLink
             }
         }
         .buttonStyle(.pressScale)
@@ -494,6 +492,24 @@ struct SeedView: View {
         .textCase(.uppercase)
         .tracking(Theme.Font.buttonTracking)
         .foregroundStyle(dockInk)
+    }
+
+    private var dealAgainLink: some View {
+        Button {
+            Haptics.selection()
+            engine.shuffleSeed()
+            telemetry?.dealt()
+        } label: {
+            Label("Deal again", systemImage: "shuffle")
+        }
+        .disabled(engine.dealtSeed == nil)
+    }
+
+    // The swap animates through its transitions (`modeSwap`).
+    private var pickYourOwnLink: some View {
+        Button { searching = true } label: {
+            Label("Pick your own", systemImage: "magnifyingglass")
+        }
     }
 
     // The best run, centred at the foot of the screen — and nothing before
@@ -549,6 +565,7 @@ struct SeedView: View {
                     }
                     .font(Theme.Font.bodyStrong)
                     .foregroundStyle(Theme.Color.muted)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.pressScale)
@@ -605,8 +622,12 @@ struct SeedView: View {
             if !query.isEmpty {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.Color.muted)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                // The target overhangs the field's padding rather than widening it.
+                .padding(.trailing, -Theme.Spacing.md + 4)
             }
         }
         .padding(.horizontal, Theme.Spacing.md)
@@ -665,20 +686,20 @@ struct SeedView: View {
         .padding(.bottom, Theme.Shadow.small)
     }
 
+    // On the flow's leading edge, like everything above it.
     private var emptyState: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Heading(query.isEmpty ? "Pick your start" : "No matches")
             Text(query.isEmpty
                  ? "Search an \(engine.seedKind == .actor ? "actor" : "movie") to begin your chain."
                  : "Try a different spelling.")
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.muted)
-                .multilineTextAlignment(.center)
         }
         // Pinned to the top, not centred: centred, the keyboard coming up just
         // after the search lands slid it up a second time.
-        .padding(.top, Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, Theme.Spacing.lg)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: Search plumbing
@@ -724,7 +745,7 @@ struct SeedView: View {
         if Task.isCancelled { return }
         for slot in 0..<Self.controlSlotCount {                      // 3. the rest deals in
             withAnimation(Theme.Motion.cascade) { revealedControls = slot + 1 }
-            try? await Task.sleep(for: .milliseconds(100))
+            try? await Task.sleep(for: .milliseconds(60))
             if Task.isCancelled { return }
         }
         introDone = true                                             // (re-inits the view — last)
@@ -877,10 +898,12 @@ private struct BlankButtonStyle: ButtonStyle {
 private struct LinkLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
-            configuration.icon
+            // A custom font doesn't carry its weight to the symbol, which drew
+            // hairline strokes beside the heavy caps.
+            configuration.icon.fontWeight(.bold)
             configuration.title
         }
-        .padding(.vertical, Theme.Spacing.xs)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 }
@@ -925,6 +948,7 @@ private extension AnyTransition {
 private struct SegmentButtonStyle: ButtonStyle {
     let kind: NodeKind
     let selected: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -938,9 +962,9 @@ private struct SegmentButtonStyle: ButtonStyle {
                         .strokeBorder(selected ? Theme.Color.border : .clear, lineWidth: Theme.Border.width))
             }
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? Theme.Motion.pressScale : 1)
             .animation(Theme.Motion.press, value: configuration.isPressed)
-            .animation(Theme.Motion.emphasized, value: selected)
+            .animation(Theme.Motion.colorChange, value: selected)
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

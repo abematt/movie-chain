@@ -77,7 +77,8 @@ struct ContentView: View {
             }
         }
         .animation(Theme.Motion.screen, value: engine.phase)
-        .overlay { HandoffFlight() }
+        // Capped like the screens it flies between, so its copies match them.
+        .overlay { HandoffFlight().dynamicTypeSize(...Theme.Font.gameTypeCap) }
         .coordinateSpace(.named(HandoffStage.space))
         .environment(handoff)
         // A run that ends mid-flight (Quit is live during it) takes the copies
@@ -119,10 +120,11 @@ struct ContentView: View {
         .onAppear {
             #if DEBUG
             let args = ProcessInfo.processInfo.arguments
+            let worstCase = args.contains("-uiWorstCase")
             if args.contains("-uiDemoGameOver") {
-                engine.loadDemoGameOver(newBest: !args.contains("-uiDemoNoBest"))
+                engine.loadDemoGameOver(newBest: !args.contains("-uiDemoNoBest"), worstCase: worstCase)
             } else if args.contains("-uiDemoChain") {
-                engine.loadDemoChain()
+                engine.loadDemoChain(worstCase: worstCase)
             }
             #endif
         }

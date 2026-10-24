@@ -7,8 +7,8 @@
 //  with its bottom-trailing corner slightly peeled up to show the paper backing.
 //  Only the light moves; the sticker itself stays stuck where it is.
 //
-//  Used for the dealt start's flag on the chain cards and the "new best" stamp on
-//  game over. Reduce Motion, or no gyro (the simulator): the foil holds still.
+//  Used for the dealt start's flag on the chain cards, where it holds still (see
+//  `StartSticker`). Reduce Motion, or no gyro (the simulator): the foil holds still.
 //
 
 import SwiftUI
@@ -279,10 +279,13 @@ private struct PeelFlap: View {
 
 // MARK: - The dealt start's flag
 
-/// The small holographic "START" flag stuck on the dealt start's card.
+/// The small holographic "START" flag stuck on the dealt start's card. Its foil
+/// holds still: the card sits on the play screen for the whole run, and a live
+/// foil kept the gyro and a 120Hz frame loop running on the main thread while
+/// the player typed — for a sticker nobody looks at against the clock.
 struct StartSticker: View {
     var body: some View {
-        HoloSticker(rotation: .degrees(-5), wearSeed: 7) {
+        HoloSticker(rotation: .degrees(-5), wearSeed: 7, active: false) {
             HStack(spacing: 4) {
                 Image(systemName: "flag.checkered")
                 Text("Start")

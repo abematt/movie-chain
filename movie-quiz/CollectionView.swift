@@ -84,7 +84,6 @@ struct CollectionView: View {
                             else { withAnimation(Theme.Motion.emphasized) { statsIn = true } }
                         }
                     }
-                    .overlay { detail }
                     #if DEBUG
                     // QA hook: lift the first actor card a moment after opening,
                     // to watch the lift and the tilt without tapping.
@@ -115,6 +114,9 @@ struct CollectionView: View {
                     })
                 }
             }
+            // Over the header too: the dark room is the whole sheet, so Done and
+            // Share don't stay lit (and live) while a card is out.
+            .overlay { detail }
         }
         // What was looked at, and for how long: one `card_viewed` per card put
         // back, one `reel_closed` for the visit.
@@ -146,19 +148,34 @@ struct CollectionView: View {
                 .contentTransition(.numericText(value: Double(store.total)))
                 .foregroundStyle(Theme.Color.ink)
                 .padding(.bottom, -18)
+            // Set like the home's best run: condensed caps, the figures in ink.
             VStack(alignment: .leading, spacing: 2) {
-                Text("logged across")
-                Text("\(store.chainsLogged) \(store.chainsLogged == 1 ? "chain" : "chains")")
+                Text("Logged across")
+                stat(store.chainsLogged, store.chainsLogged == 1 ? "chain" : "chains")
                 if bestChain > 0 {
-                    Text("best \(bestChain) links")
+                    stat(bestChain, bestChain == 1 ? "link" : "links", lead: "Best run")
                 }
             }
-            .font(Theme.Font.body)
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
             .foregroundStyle(Theme.Color.muted)
+            .lineLimit(1)
             .padding(.bottom, Theme.Spacing.xs)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    /// "Best run 13 links": the figure in ink numerals between quiet caps.
+    private func stat(_ value: Int, _ unit: String, lead: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm - 2) {
+            if let lead { Text(lead) }
+            Text("\(value)")
+                .font(Theme.Font.numeral(.title3))
+                .foregroundStyle(Theme.Color.ink)
+            Text(unit)
+        }
     }
 
     // MARK: Regulars — most-logged actor + movie
@@ -425,7 +442,7 @@ struct CollectionView: View {
     }
 
     /// Flying home: quick and unbouncy — the system putting the card back.
-    private static let homeFlight: Animation = .spring(duration: 0.38, bounce: 0)
+    private static let homeFlight: Animation = .spring(duration: 0.28, bounce: 0)
 
     /// Lift a card out (`id`), or send the one that's out home (`nil`). Picking
     /// a card up is the deliberate moment and the detail runs its own open;

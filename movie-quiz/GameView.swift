@@ -89,6 +89,7 @@ struct GameView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) { answerDock }
+        .dynamicTypeSize(...Theme.Font.gameTypeCap)
         .task {
             // Feedback warm-up (haptics + audio) happens on the seed screen, off
             // this transition — `AVAudioEngine.start()` briefly blocks the main
@@ -161,21 +162,24 @@ struct GameView: View {
                 withAnimation(Theme.Motion.standard) { soundEnabled.toggle() }
             } label: {
                 Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.Color.muted)
                     .contentTransition(.symbolEffect(.replace))
                     // Fixed slot: the two speaker glyphs differ in width, so let the
                     // symbol swap inside a stable box rather than nudging the header.
                     .frame(width: 24)
+                    .headerTarget(.leading)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressScale)
 
             Spacer()
 
             Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
                 .font(Theme.Font.numeral(.title3))
                 .monospacedDigit()
-                .foregroundStyle(lowTime ? Theme.Color.danger : Theme.Color.muted)
+                // The clock is what matters mid-turn, so it carries the header's
+                // weight; Quit stays quiet.
+                .foregroundStyle(lowTime ? Theme.Color.danger : Theme.Color.ink)
                 .contentTransition(.numericText(countsDown: true))
                 // A content transition only plays inside an animation.
                 .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: engine.secondsRemaining)
@@ -187,9 +191,10 @@ struct GameView: View {
                     .font(Theme.Font.button)
                     .textCase(.uppercase)
                     .tracking(Theme.Font.buttonTracking)
-                    .foregroundStyle(Theme.Color.ink)
+                    .foregroundStyle(Theme.Color.muted)
+                    .headerTarget(.trailing)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressScale)
         }
     }
 
@@ -233,7 +238,7 @@ struct GameView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, Theme.Spacing.sm)
         .animation(.snappy, value: engine.score)
-        .animation(Theme.Motion.emphasized, value: beatingBest)
+        .animation(Theme.Motion.colorChange, value: beatingBest)
     }
 
     // "links · 41 pts"; past the record it adds "new best" for the rest of the run.
@@ -280,18 +285,15 @@ struct GameView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // The hint changes as the new link lands, so it arrives on the same beat.
-        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.chain.count)
+        // The hint changes as the new link lands: a plain cross-fade, since text
+        // can't take the deal's bounce.
+        .animation(Theme.Motion.reducedFade, value: engine.chain.count)
         .animation(Theme.Motion.reducedFade, value: visibleFeedback)
     }
 
-    private var hintText: String {
-        guard let current = engine.current else { return engine.expectedKind.prompt }
-        switch engine.expectedKind {
-        case .actor: return "Name an actor from \(current.matchText)"
-        case .movie: return "Name a movie \(current.matchText) was in"
-        }
-    }
+    // The front card already names the link, so the prompt points at it rather
+    // than repeating it — a long title truncated mid-word on this one line.
+    private var hintText: String { engine.expectedKind.prompt }
 
     // MARK: Answer dock (pinned above the keyboard)
 
@@ -305,7 +307,7 @@ struct GameView: View {
                 HStack(spacing: Theme.Spacing.sm + 2) {
                     // Paper in both modes: it sits on the dock's colour.
                     TextField(text: $answer) {
-                        Text(engine.expectedKind.placeholder).foregroundStyle(SentenceBlank.fieldText)
+                        Text(engine.expectedKind.placeholder).foregroundStyle(Theme.Color.fieldPlaceholder)
                     }
                         .textFieldStyle(.plain)
                         .font(Theme.Font.sentence(.body))
@@ -356,15 +358,13 @@ struct GameView: View {
         .opacity(engine.timeUp ? 0.5 : 1)
         .animation(.easeOut(duration: 0.2), value: engine.timeUp)
         .animation(.easeOut(duration: 0.2), value: engine.awaitingRetry)
-        // The prompt changes as the new link lands, so it arrives on the same beat.
-        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.chain.count)
-        .animation(Theme.Motion.reducedFade, value: visibleFeedback)
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.md)
         .padding(.bottom, Theme.Spacing.md)
+        // The colour swaps at once: it changes on every link, and blue → yellow
+        // tweened through a flat grey.
         .background { DockGround(color: engine.expectedKind.accent) }
         .padding(.top, Theme.Spacing.md)
-        .animation(Theme.Motion.standard, value: engine.expectedKind)
     }
 
     /// The input row ⇄ Retry swap after a failed load: a quick cross-fade with a
@@ -442,6 +442,17 @@ struct GameView: View {
         answer = ""
         fieldFocused = true
         Task { await engine.submit(text) }
+    }
+}
+
+/// A header control's touch target: 44pt square from its leading or trailing
+/// edge (so the glyph stays on the gutter), without growing the header — the
+/// play screen's height is spoken for by the keyboard.
+private extension View {
+    func headerTarget(_ edge: HorizontalAlignment) -> some View {
+        frame(minWidth: 44, minHeight: 44, alignment: Alignment(horizontal: edge, vertical: .center))
+            .contentShape(Rectangle())
+            .padding(.vertical, -10)
     }
 }
 

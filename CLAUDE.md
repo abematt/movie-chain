@@ -342,8 +342,12 @@ each light+dark; dark is a dim room where black stays the side). The chain is th
 its whole life — a new one is dealt in from below and pushes the last back into a pile
 that peeks out above it, sized to the room above the keyboard); `ChainCards.swift`
 holds the pieces it shares with the handoff (`KindChip`, `ChainArt`). The dealt
-start wears a holographic sticker (`HoloSticker.swift`, gyro-lit foil) instead of a
-number. The play screen docks the answer dock (coloured for the kind you name next,
+start wears a holographic sticker (`HoloSticker.swift`) instead of a number; its
+foil holds still on the deck — **don't make it gyro-live during play**, which kept a
+120Hz main-thread loop running while the player typed. The game screens cap Dynamic
+Type at `Theme.Font.gameTypeCap` (the sheets don't), and the deck's card height and
+peeks scale with it (`@ScaledMetric`); check `-uiDemoChain -uiWorstCase` at a large
+text size on an SE after touching either. The play screen docks the answer dock (coloured for the kind you name next,
 carrying the prompt) via `.safeAreaInset(.bottom)` above the
 **always-present keyboard** (with `TimerBar.swift` as a slim linear countdown), and
 swaps the field for a **Retry** slab if a candidate load failed

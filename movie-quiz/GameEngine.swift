@@ -726,12 +726,22 @@ final class GameEngine {
     // play screen (and its design-system components) can be inspected without
     // typing. Triggered by the `-uiDemoChain` launch argument in `ContentView`;
     // guarded by `#if DEBUG` so it is never compiled into release builds.
-    func loadDemoChain() {
+    // `worstCase` (`-uiWorstCase`) swaps in the longest real names and titles the
+    // deal can serve, ending on a two-line title with a year, and a four-digit
+    // score — the regression fixture for the deck, the prompt and the recap.
+    func loadDemoChain(worstCase: Bool = false) {
         func actor(_ id: Int, _ name: String) -> ChainNode { .actor(Person(id: id, name: name)) }
         func movie(_ id: Int, _ title: String, _ year: Int) -> ChainNode {
             .movie(Movie(id: id, title: title, year: year))
         }
-        chain = [
+        chain = worstCase ? [
+            actor(1, "Jean-Claude Van Damme"),
+            movie(1001, "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb", 1964),
+            actor(2, "Mary Elizabeth Mastrantonio"),
+            movie(1002, "Borat: Cultural Learnings of America for Make Benefit Glorious Nation of Kazakhstan", 2006),
+            actor(3, "Chiwetel Ejiofor"),
+            movie(1004, "Pirates of the Caribbean: The Curse of the Black Pearl", 2003),
+        ] : [
             actor(1, "Brad Pitt"),
             movie(1001, "Ocean's Eleven", 2001),
             actor(2, "Matt Damon"),
@@ -740,10 +750,12 @@ final class GameEngine {
         ]
         usedIds = Set(chain.map(\.id))
         score = chain.count - 1
-        points = score * 24
+        points = worstCase ? 1284 : score * 24
         lastGain = 24
         expectedKind = chain.last?.nextKind ?? .movie
-        candidates = [.movie(Movie(id: 1003, title: "Inception", year: 2010))]
+        candidates = worstCase
+            ? [.actor(Person(id: 4, name: "Keisha Castle-Hughes"))]
+            : [.movie(Movie(id: 1003, title: "Inception", year: 2010))]
         feedback = nil
         secondsRemaining = 18
         phase = .playing
@@ -752,9 +764,9 @@ final class GameEngine {
     /// Same sample chain, but jump straight to the game-over summary — a new
     /// best by default, or an ordinary run (`-uiDemoNoBest`), which also ends on
     /// a movie so the film spool shows.
-    func loadDemoGameOver(newBest: Bool = true) {
-        loadDemoChain()
-        if !newBest {
+    func loadDemoGameOver(newBest: Bool = true, worstCase: Bool = false) {
+        loadDemoChain(worstCase: worstCase)
+        if !newBest, !worstCase {
             chain.append(.movie(Movie(id: 1003, title: "Inception", year: 2010)))
             score = chain.count - 1
             points = score * 24

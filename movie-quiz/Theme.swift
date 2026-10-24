@@ -22,6 +22,7 @@
 //
 
 import SwiftUI
+import UIKit
 import CoreText
 
 enum Theme {
@@ -65,6 +66,17 @@ enum Theme {
         /// Text/glyphs on an ink-filled control — inverts with the theme, which
         /// is exactly what `canvas` does (white on light, near-black on dark).
         static let onInk = canvas
+
+        // Fixed greys for surfaces that don't change with the mode (Night, the
+        // paper field in the dock), so they live here rather than in the catalog.
+        /// Secondary text on Night: game over's quiet lines, the offline dock.
+        static let quietOnNight = SwiftUI.Color(white: 0.74)
+        /// A disabled slab's label (the dock's Go before anything is typed).
+        static let disabledSlabText = SwiftUI.Color(white: 0.55)
+        /// The placeholder in the dock's paper field, in both modes.
+        static let fieldPlaceholder = SwiftUI.Color(white: 0.42)
+        /// The share card's hairline rules on Night.
+        static let ruleOnNight = SwiftUI.Color(white: 0.35)
     }
 
     // MARK: Spacing — an 8-pt rhythm (Apple's implicit grid)
@@ -83,8 +95,8 @@ enum Theme {
     //
     // Every object has one edge weight and a hard ink side straight below it —
     // thickness, never a blur or a lean. The deeper the side, the heavier the
-    // object: `small` for pills, chips and inputs, `large` for buttons, `card`
-    // for the cards that hold the game.
+    // object: `small` for pills, chips, inputs and the cards in the pile, `large`
+    // for buttons and the deck's front card.
     enum Border {
         static let width: CGFloat = 2
     }
@@ -92,7 +104,6 @@ enum Theme {
     enum Shadow {
         static let small: CGFloat = 4
         static let large: CGFloat = 6
-        static let card: CGFloat = 10
     }
 
     // MARK: Type roles
@@ -150,6 +161,20 @@ enum Theme {
         /// Button labels: condensed extra-bold caps.
         static let button: SwiftUI.Font = custom("ArchivoCondensed-ExtraBold", style: .title3)
         static let buttonTracking: CGFloat = 1
+        /// The deck card's name tracking: a touch tight at title2, as the home
+        /// sentence's name is at its 50pt (−1.5).
+        static let deckNameTracking: CGFloat = -0.3
+        /// The coin stack's labels. Fixed: the stack is a picture with its own
+        /// accessibility label, and scaled labels truncated to "Le…" at large sizes.
+        static let coinLabel: SwiftUI.Font = custom("Archivo-Regular", fixed: 13)
+
+        /// The largest text size the game screens (home, play, game over) follow.
+        /// Their geometry is fixed — the deck's cards and peeks, the dock, the hero
+        /// numerals — and at accessibility sizes the play screen clipped the name
+        /// you were naming from. The Reel and Settings sheets aren't capped.
+        static let gameTypeCap: DynamicTypeSize = .xxxLarge
+        /// `gameTypeCap` in UIKit terms, for type sized with `UIFontMetrics`.
+        static let gameTypeCapCategory: UIContentSizeCategory = .extraExtraExtraLarge
 
         // MARK: Plumbing
 
@@ -193,8 +218,6 @@ enum Theme {
         static let card: CGFloat = 16
         /// Fields and the slab buttons beside them.
         static let field: CGFloat = 14
-        /// The answer dock's top corners.
-        static let dock: CGFloat = 26
         static let pill: CGFloat = 999
     }
 
@@ -230,8 +253,16 @@ enum Theme {
     // `drop` is the spring a new chain tile falls in on — the Tetris "landing"
     // that replaced the old flame leap.
     enum Motion {
-        static let standard: Animation = .snappy
+        /// The default UI change. Explicitly short: the bare `.snappy` is a 0.5s
+        /// spring, past the 300ms a UI change should take.
+        static let standard: Animation = .snappy(duration: 0.25)
+        /// Movement with a little life in it. Never for a colour or a selection
+        /// fill — a colour can't bounce; use `colorChange`.
         static let emphasized: Animation = .bouncy(duration: 0.4)
+        /// A colour or fill changing in place.
+        static let colorChange: Animation = .easeOut(duration: 0.2)
+        /// How far a pressed control shrinks — one value, so presses agree.
+        static let pressScale: CGFloat = 0.97
         /// Seen on every correct link, so the overshoot stays small: enough to
         /// read as a landing, not so much that the whole stack wobbles each turn.
         static let drop: Animation = .spring(duration: 0.35, bounce: 0.2)
@@ -271,7 +302,7 @@ enum Theme {
         /// unbouncy. Like the handoff, sampled on its own clock (`CardTilt`), so
         /// the gyro's per-frame writes can't cancel it.
         static let tiltIn = Spring(duration: 0.35, bounce: 0)
-        /// The tilt flattening as the card goes home; done well inside the 0.38s
+        /// The tilt flattening as the card goes home; done inside the 0.28s
         /// flight so the card lands flat on its slot.
         static let tiltOut = Spring(duration: 0.18, bounce: 0)
         /// A dragged card swinging back level when let go — carries the flick,

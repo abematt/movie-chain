@@ -135,8 +135,8 @@ enum NodeKind: String, Sendable, Codable {
 
     var placeholder: String {
         switch self {
-        case .actor: return "Actor name"
-        case .movie: return "Movie title"
+        case .actor: return "an actor…"
+        case .movie: return "a movie…"
         }
     }
 }

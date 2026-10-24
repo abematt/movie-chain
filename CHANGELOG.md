@@ -76,7 +76,8 @@ Unspool rebrand was inserted as 0.6.0.)
 - **Game over is on Night, with the chain as a coin stack.** The run reads as one
   number and one object: every link a coin, actors labelled left and movies right, a
   film spool on top when the run ended on a movie. A new best is the same screen on
-  the holo sky rather than a sticker. The full recap is a scroll away.
+  the holo sky rather than a sticker. The answer you were one away from is a scroll
+  away; the list of every link is gone, since the stack already names them in order.
 - **Share sends a picture.** The text now travels with a 9:16 card: the count, the
   stack with no names on it, and the start to beat it from, so the dare is the image.
 - **A new icon in the new colours**, the mark on paper (night in dark mode), and the
@@ -88,8 +89,53 @@ Unspool rebrand was inserted as 0.6.0.)
   TMDB requests to rebuild the same most-watched pool. Now a copy less than a week old
   is dealt from with no requests at all, which spares most launches and keeps a burst
   of new players further from TMDB's rate limit.
+- **A correct answer is quicker and calmer.** Each link fired five motions at once. The
+  dock's colour now swaps instantly (blue to yellow tweened through a flat grey on every
+  answer), the "+N" drifts off in a third of the time, the prompt cross-fades instead
+  of bouncing, and colour changes ease rather than spring. The default animation is
+  0.25s instead of half a second, and a lifted Reel card goes home faster than it came
+  out.
+- **The play screen lets the phone rest.** The START sticker's foil now holds still: it
+  kept the gyro and a 120Hz frame loop running on the main thread for the whole run,
+  while you typed. The timer bar slides rather than being redrawn every frame, and the
+  share card is drawn once game over has settled instead of on top of the new-best
+  bounce.
+- **The play header leads with the clock.** The time is in ink and Quit is quiet, and
+  sound and Quit have full-size touch targets.
+- **The prompt points at the card instead of repeating it** ("Name an actor in it"): a
+  long title used to be cut off mid-word. The home's blank and the dock's field now say
+  the same thing ("a movie…"), so nothing changes as one flies into the other.
+- **Game over shows there's more below.** The top of the recap (the answer you were one
+  away from) peeks above Play again; before, nothing said the screen scrolled.
+- **The deck's front card stands on a lighter side.** It stood on a 10pt ink slab, the
+  deepest in the app, which read as a heavy black bar across the bottom of the play
+  screen. It now uses the buttons' 6pt side and sinks to the small one as it goes back
+  into the pile. A uniform 4pt side was tried and lost the pile's depth: the front
+  card's bottom read as a doubled outline, as if it were cut off.
+- **The deck's cards keep their size at small text sizes.** Their height scaled with
+  the text both ways, so below the default size the card shrank while the art didn't,
+  and the art ran through the card's bottom edge. They now grow with large text but
+  never shrink below their default.
+- **The Reel's caption reads like the home's best run**: "LOGGED ACROSS / 36 CHAINS /
+  BEST RUN 13 LINKS" in condensed caps with the figures in ink, instead of the app's
+  only lowercase sentence broken over three lines.
+- **The dock is a square band.** Its rounded top corners were the one soft curve in a
+  design of hard-edged objects; the dock is ground, so it now runs edge to edge under a
+  straight ink rule, on the home, the play screen and the offline notice alike.
+- **Touch and polish:** 44pt targets on the home's links, the search's back link and
+  its clear button; bold icons beside the heavy caps; the search's empty state on the
+  same leading edge as the rest; the Reel's dim now covers its header too, so Done
+  isn't lit while a card is out; one press scale everywhere.
 
 ### Fixed
+- **Large text sizes no longer break the game.** At the biggest accessibility sizes the
+  deck clipped the name you were naming from, the prompt cut it off, the home's links
+  broke mid-word ("DEA L…") and the coin stack read "Le…". Home, play and game over now
+  follow the text size up to XXXL (the Reel and Settings still go all the way), the
+  deck's cards and peeks grow with their text, Deal again and Pick your own stack when
+  they don't fit side by side, and the coin stack's labels keep one size.
+- **The Reel no longer says "best 1 links"**, and game over's points carry a thousands
+  separator, as play's already did.
 - **The home screen no longer hangs on "Dealing…".** When the pool couldn't load (offline,
   or rate-limited on a cold launch), the first screen a new player saw stayed on
   "Dealing…" with no way forward. It now deals from the last saved pool if there is one,
