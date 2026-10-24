@@ -22,6 +22,8 @@ struct CoinStack: View {
     var labelColor: Color = .white
     /// Draw the top coin as a film spool when it's a movie.
     var film = true
+    /// Name each coin. Off on the share card, which mustn't spoil the route.
+    var labels = true
 
     /// A coin, in points: its face, and the thickness of its side.
     static let width: CGFloat = 116
@@ -45,9 +47,7 @@ struct CoinStack: View {
         let w = Self.width, h = Self.faceHeight, t = Self.thickness
         let left = (size.width - w) / 2
         let coinHeight = h + t
-        let step = chain.count > 1
-            ? min(Self.maxStep, max(2, (size.height - coinHeight) / CGFloat(chain.count - 1)))
-            : 0
+        let step = Self.step(count: chain.count, height: size.height)
         let bottomTop = size.height - coinHeight
         let every = Int((Self.labelGap / max(step, 1)).rounded(.up))
         let line = Theme.Color.night
@@ -73,12 +73,29 @@ struct CoinStack: View {
             }
 
             // Thin the labels on a tight stack, but always name the start and the top.
-            guard i == 0 || isTop || i % every == 0 else { continue }
+            guard labels, i == 0 || isTop || i % every == 0 else { continue }
             // A coin shows only its bottom sliver under the next one, so its label
             // points at that sliver; the top coin is whole, so it points at its middle.
             let mid = isTop ? top + coinHeight / 2 : top + coinHeight - step / 2
             drawLabel(node, in: &context, left: left, mid: mid, size: size)
         }
+    }
+
+    /// How far apart the coins sit for `count` coins in `height` points.
+    static func step(count: Int, height: CGFloat) -> CGFloat {
+        guard count > 1 else { return 0 }
+        return min(maxStep, max(2, (height - faceHeight - thickness) / CGFloat(count - 1)))
+    }
+
+    /// The vertical middle of the start coin and of the top coin, for a stack of
+    /// `count` coins drawn `height` tall — where a pointer to either should aim.
+    static func ends(count: Int, height: CGFloat) -> (start: CGFloat, top: CGFloat) {
+        let coin = faceHeight + thickness
+        let gap = step(count: count, height: height)
+        let top = height - coin - CGFloat(max(count - 1, 0)) * gap + coin / 2
+        // Under the others, the start shows only its bottom sliver.
+        let start = count > 1 ? height - gap / 2 : top
+        return (start, top)
     }
 
     /// Sprocket holes riding the top coin's visible side, following its curve.

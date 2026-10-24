@@ -23,6 +23,8 @@ struct GameOverView: View {
     /// Bumped once to fire the one-shot score bounce on a new best. The score's
     /// resting scale is always 1, so nothing here can leave it stuck oversized.
     @State private var scorePop = 0
+    /// The share card, drawn once the screen has settled.
+    @State private var shareImage: Image?
 
     private var best: Bool { summary.isNewBest }
     /// Type on the ground: white on Night, ink on the holo sky.
@@ -50,6 +52,12 @@ struct GameOverView: View {
         // still be on its way down, it slides off over this screen instead of
         // re-laying it out as it goes.
         .ignoresSafeArea(.keyboard)
+        .task {
+            // After the push, so drawing the card can't catch the slide.
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            shareImage = ShareCard.image(chain: summary.chain, links: summary.links)
+        }
         .task {
             guard best else { return }
             // Reduce Motion: the celebratory haptic still fires, but no visual pop.
@@ -257,9 +265,7 @@ struct GameOverView: View {
                 : SlabButtonStyle(fill: Theme.Color.go, foreground: Theme.Color.night, side: .white))
 
             HStack {
-                ShareLink(item: summary.shareText(link: shareLink)) {
-                    Text("Share").frame(maxWidth: .infinity)
-                }
+                shareButton
                 // ShareLink has no action of its own; a tap opening the sheet is
                 // the signal (whether they then sent it isn't knowable).
                 .simultaneousGesture(TapGesture().onEnded {
@@ -278,12 +284,33 @@ struct GameOverView: View {
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.md)
         .padding(.bottom, Theme.Spacing.sm)
+        .animation(nil, value: shareImage == nil)
         .background {
             // Solid behind the actions so the recap scrolls under them, not through.
             Group {
                 if best { Theme.Holo.sky.last ?? .clear } else { Theme.Color.night }
             }
             .ignoresSafeArea()
+        }
+    }
+}
+
+// MARK: - Share
+
+private extension GameOverView {
+    /// The card and the spoiler-free text together, once the card is drawn;
+    /// the text alone until then.
+    @ViewBuilder var shareButton: some View {
+        let text = summary.shareText(link: shareLink)
+        if let shareImage {
+            ShareLink(item: shareImage, message: Text(text),
+                      preview: SharePreview("Unspool · \(summary.links) \(linkWord)", image: shareImage)) {
+                Text("Share").frame(maxWidth: .infinity)
+            }
+        } else {
+            ShareLink(item: text) {
+                Text("Share").frame(maxWidth: .infinity)
+            }
         }
     }
 }
