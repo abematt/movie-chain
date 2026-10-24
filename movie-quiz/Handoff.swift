@@ -343,15 +343,16 @@ private struct DockLook: View {
     let kind: NodeKind
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: Theme.Spacing.sm + 2) {
             Text(kind.placeholder)
-                .foregroundStyle(Color(uiColor: .placeholderText))
+                .font(Theme.Font.sentence(.title3))
+                .foregroundStyle(SentenceBlank.fieldText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.Spacing.md)
-                .frame(minHeight: 44)
-                .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+                .frame(minHeight: 52)
+                .neoSurface(radius: Theme.Radius.field, fill: .white, shadow: 0)
             Button("Go") {}
-                .buttonStyle(.primary)
+                .buttonStyle(SlabButtonStyle(foreground: kind.accent))
                 .fixedSize()
                 .disabled(true)
         }

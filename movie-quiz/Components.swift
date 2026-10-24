@@ -62,6 +62,43 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Slab button (in the dock)
+//
+// A square-shouldered slab for the dock, where the colour around it is the
+// kind's: "Go" and the home's start arrow are night slabs lettered in the dock's
+// colour; Retry is a white one. The same in both modes, because the dock is.
+
+struct SlabButtonStyle: ButtonStyle {
+    var fill: Color = Theme.Color.night
+    var foreground: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        SlabBody(configuration: configuration, fill: fill, foreground: foreground)
+    }
+
+    private struct SlabBody: View {
+        let configuration: ButtonStyleConfiguration
+        let fill: Color
+        let foreground: Color
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(Theme.Font.button)
+                .textCase(.uppercase)
+                .tracking(Theme.Font.buttonTracking)
+                .foregroundStyle(isEnabled ? foreground : Color(white: 0.55))
+                .padding(.horizontal, Theme.Spacing.lg - 4)
+                .frame(minWidth: 52, minHeight: 52)
+                .neoSurface(radius: Theme.Radius.field, fill: fill,
+                            shadow: Theme.Shadow.large,
+                            pressed: configuration.isPressed && !reduceMotion)
+                .animation(Theme.Motion.press, value: configuration.isPressed)
+        }
+    }
+}
+
 // MARK: - Ghost button (secondary)
 //
 // The quieter secondary action ("Share", "Shuffle"): white surface, ink text,

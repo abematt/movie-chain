@@ -3,10 +3,11 @@
 //  movie-quiz
 //
 //  The play screen, designed around the one constant of a typing game: the
-//  software keyboard is up the entire time. So the layout is three bands —
-//  compact chrome (sound · timer · score) at the top, the chain building as a
-//  rising Tetris-style stack of category tiles in the middle, and the answer
-//  input docked directly above the keyboard. Every correct link drops a new tile
+//  software keyboard is up the entire time. So the layout is three bands on a
+//  paper ground — compact chrome (sound · timer · quit) and the score at the
+//  top, the chain building as a deck in the middle, and the answer dock above
+//  the keyboard. The colour lives only in the dock: it is filled with the kind
+//  you name next, and it carries the prompt. Every correct link deals a new card
 //  in with a haptic and a chime; a wrong one shakes and buzzes.
 //
 
@@ -82,8 +83,6 @@ struct GameView: View {
                     }
                 }
                 .clipped()
-
-            nextHint
         }
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.xs)
@@ -174,7 +173,7 @@ struct GameView: View {
             Spacer()
 
             Text(String(format: "0:%02d", max(0, engine.secondsRemaining)))
-                .font(Theme.Font.numeral(.subheadline))
+                .font(Theme.Font.numeral(.title3))
                 .monospacedDigit()
                 .foregroundStyle(lowTime ? Theme.Color.danger : Theme.Color.muted)
                 .contentTransition(.numericText(countsDown: true))
@@ -184,7 +183,11 @@ struct GameView: View {
             Spacer()
 
             Button(action: quit) {
-                Text("Quit").metaLabel()
+                Text("Quit")
+                    .font(Theme.Font.button)
+                    .textCase(.uppercase)
+                    .tracking(Theme.Font.buttonTracking)
+                    .foregroundStyle(Theme.Color.ink)
             }
             .buttonStyle(.plain)
         }
@@ -194,26 +197,21 @@ struct GameView: View {
 
     private var scoreHero: some View {
         VStack(spacing: 2) {
-            // Same as the game-over card: the unit on the numeral's baseline so
-            // "4 links" reads as one figure, points on their own line. A chain is
-            // the whole run; a link is one correct answer.
-            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.xs + 2) {
-                Text("\(engine.score)")
-                    .font(Theme.Font.display(60))
-                    .contentTransition(.numericText())
-                    .foregroundStyle(beatingBest ? Theme.Color.good : Theme.Color.ink)
-                Text(engine.score == 1 ? "link" : "links")
-                    .font(Theme.Font.sentence(.title3))
-                    .foregroundStyle(Theme.Color.muted)
-            }
-            // The "+N" rises off the end of the whole figure, clear of the unit.
-            .overlay(alignment: .trailing) {
-                if gainToken > 0 {
-                    FloatingGain(value: engine.lastGain)
-                        .id(gainToken)
-                        .offset(x: 34)
+            // Scale is the drama: one huge condensed figure, and the unit and
+            // points as one quiet line under it. A chain is the whole run; a link
+            // is one correct answer.
+            Text("\(engine.score)")
+                .font(Theme.Font.display(96))
+                .contentTransition(.numericText())
+                .foregroundStyle(beatingBest ? Theme.Color.good : Theme.Color.ink)
+                // The "+N" rises off the figure's shoulder.
+                .overlay(alignment: .topTrailing) {
+                    if gainToken > 0 {
+                        FloatingGain(value: engine.lastGain)
+                            .id(gainToken)
+                            .alignmentGuide(.trailing) { [gap = Theme.Spacing.sm] d in d[.leading] - gap }
+                    }
                 }
-            }
             // The record bounce: on the link that passes the best, the figure
             // swells, dips just under its size, and settles — fired once by
             // `recordPop`. Resting scale is 1, so it can never get stuck large.
@@ -238,17 +236,13 @@ struct GameView: View {
         .animation(Theme.Motion.emphasized, value: beatingBest)
     }
 
-    // Past the record, the points line adds "new best" for the rest of the run.
-    @ViewBuilder private var pointsLine: some View {
-        if beatingBest {
-            Text("\(Text("\(engine.points) pts").font(Theme.Font.numeral(.body)).foregroundStyle(Theme.Color.muted)) \(Text("·").foregroundStyle(Theme.Color.muted)) \(Text("new best").font(Theme.Font.sentence(.body)).foregroundStyle(Theme.Color.good))")
-                .contentTransition(.numericText())
-        } else {
-            Text("\(engine.points) pts")
-                .font(Theme.Font.numeral(.body))
-                .foregroundStyle(Theme.Color.muted)
-                .contentTransition(.numericText())
-        }
+    // "links · 41 pts"; past the record it adds "new best" for the rest of the run.
+    private var pointsLine: some View {
+        let unit = engine.score == 1 ? "link" : "links"
+        return Text("\(unit) · \(engine.points) pts\(Text(beatingBest ? " · new best" : "").foregroundStyle(Theme.Color.good))")
+            .font(Theme.Font.body)
+            .foregroundStyle(Theme.Color.muted)
+            .contentTransition(.numericText())
     }
 
     // MARK: Next-up hint (and, after a miss, the error)
@@ -260,33 +254,32 @@ struct GameView: View {
         return feedbackDismissed && !engine.awaitingRetry ? nil : feedback
     }
 
-    // One fixed line that carries either the next-up hint or the error, cross-
-    // fading between them. The error used to be an extra row in the answer dock,
-    // which grew the bottom inset on every miss and squeezed the chain band.
-    private var nextHint: some View {
-        ZStack(alignment: .leading) {
-            HStack(spacing: Theme.Spacing.sm) {
-                NodeDot(kind: engine.expectedKind)
-                Text(hintText)
-                    .font(Theme.Font.body)
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .contentTransition(.opacity)
-            }
-            .opacity(visibleFeedback == nil ? 1 : 0)
+    // The dock's first line: the next-up prompt, or the error in its place,
+    // cross-fading between them. One fixed line, so a miss never grows the dock
+    // and squeezes the chain band. Set in the dock's own ink (white on blue, ink
+    // on yellow); the error is told apart by weight, not a red that would fight
+    // the dock's colour.
+    private var prompt: some View {
+        let ink = engine.expectedKind.onAccent
+        return ZStack(alignment: .leading) {
+            Text(hintText)
+                .font(Theme.Font.body)
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .contentTransition(.opacity)
+                .opacity(visibleFeedback == nil ? 1 : 0)
 
             if let feedback = visibleFeedback {
                 Text(feedback)
-                    .font(Theme.Font.body)
-                    .foregroundStyle(Theme.Color.danger)
+                    .font(Theme.Font.bodyStrong)
+                    .foregroundStyle(ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, Theme.Spacing.xs)
         // The hint changes as the new link lands, so it arrives on the same beat.
         .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.chain.count)
         .animation(Theme.Motion.reducedFade, value: visibleFeedback)
@@ -303,28 +296,35 @@ struct GameView: View {
     // MARK: Answer dock (pinned above the keyboard)
 
     private var answerDock: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm + 2) {
+            prompt
             if engine.awaitingRetry {
                 retryButton
                     .transition(dockSwap)
             } else {
-                HStack(spacing: Theme.Spacing.sm) {
-                    TextField(engine.expectedKind.placeholder, text: $answer)
+                HStack(spacing: Theme.Spacing.sm + 2) {
+                    // Paper in both modes: it sits on the dock's colour.
+                    TextField(text: $answer) {
+                        Text(engine.expectedKind.placeholder).foregroundStyle(SentenceBlank.fieldText)
+                    }
                         .textFieldStyle(.plain)
+                        .font(Theme.Font.sentence(.title3))
+                        .foregroundStyle(Theme.Color.night)
+                        .tint(Theme.Color.night)
                         .autocorrectionDisabled()
                         .focused($fieldFocused)
                         .submitLabel(.go)
                         .onSubmit(submit)
                         .padding(.horizontal, Theme.Spacing.md)
-                        .frame(minHeight: 44)
-                        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+                        .frame(minHeight: 52)
+                        .neoSurface(radius: Theme.Radius.field, fill: .white, shadow: 0)
                         // Reduce Motion's stand-in for the shake: the field's
                         // border flashes red and fades — a rejection you can see
                         // without anything moving.
                         // (The content closure is `@Sendable`, so the theme
                         // values are captured here rather than read inside.)
                         .keyframeAnimator(initialValue: 0.0, trigger: shakeToken) { [reduceMotion,
-                                                                                     radius = Theme.Radius.md,
+                                                                                     radius = Theme.Radius.field,
                                                                                      danger = Theme.Color.danger,
                                                                                      width = Theme.Border.width] view, flash in
                             view.overlay {
@@ -341,7 +341,7 @@ struct GameView: View {
                         }
 
                     Button("Go", action: submit)
-                        .buttonStyle(.primary)
+                        .buttonStyle(SlabButtonStyle(foreground: engine.expectedKind.accent))
                         .fixedSize()
                         .disabled(!canSubmit)
                 }
@@ -356,10 +356,15 @@ struct GameView: View {
         .opacity(engine.timeUp ? 0.5 : 1)
         .animation(.easeOut(duration: 0.2), value: engine.timeUp)
         .animation(.easeOut(duration: 0.2), value: engine.awaitingRetry)
+        // The prompt changes as the new link lands, so it arrives on the same beat.
+        .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: engine.chain.count)
+        .animation(Theme.Motion.reducedFade, value: visibleFeedback)
         .padding(.horizontal, Theme.Spacing.gutter)
-        .padding(.top, Theme.Spacing.sm)
-        .padding(.bottom, Theme.Spacing.sm)
-        .background(Theme.Color.canvas)
+        .padding(.top, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.md)
+        .background { DockGround(color: engine.expectedKind.accent) }
+        .padding(.top, Theme.Spacing.md)
+        .animation(Theme.Motion.standard, value: engine.expectedKind)
     }
 
     /// The input row ⇄ Retry swap after a failed load: a quick cross-fade with a
@@ -375,11 +380,11 @@ struct GameView: View {
         Button { Task { await engine.retryTurn() } } label: {
             HStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: "arrow.clockwise")
-                Text("Retry").frame(maxWidth: .infinity)
+                Text("Retry")
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.primary)
+        .buttonStyle(SlabButtonStyle(fill: .white, foreground: Theme.Color.night))
     }
 
     // MARK: Feedback reactions
