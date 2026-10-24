@@ -264,20 +264,49 @@ struct NeoSegmented<Value: Hashable>: View {
     }
 }
 
-// MARK: - Sheet chrome (the spec's top app bar)
+// MARK: - Sheet header
 //
-// Cream bar, serif title, a 2pt ink rule under it. Applied to a sheet's
-// NavigationStack content so the Reel and Settings sheets match the app
-// instead of showing the stock translucent bar.
+// The Reel's and Settings' top bar, drawn by us rather than the system: a title
+// in the middle, plain-text actions either side, an ink rule beneath. The stock
+// bar's toolbar buttons turn into glass capsules on iOS 26, which no other
+// control in the app looks like.
+
+struct SheetHeader<Leading: View, Trailing: View>: View {
+    let title: String
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 0) {
+            leading.frame(maxWidth: .infinity, alignment: .leading)
+            Heading(title, style: .headline)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+            trailing.frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .font(Theme.Font.bodyStrong)
+        .foregroundStyle(Theme.Color.ink)
+        .buttonStyle(.pressScale)
+        .padding(.horizontal, Theme.Spacing.gutter - 4)
+        .frame(height: 52)
+        .background(Theme.Color.canvas)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+        }
+    }
+}
 
 extension View {
-    func neoNavigationBar<Title: View>(@ViewBuilder title: () -> Title) -> some View {
+    /// Pins a `SheetHeader` to the top and hides the system bar.
+    func sheetHeader<Leading: View, Trailing: View>(
+        _ title: String,
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
         self
-            .toolbarBackground(Theme.Color.canvas, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar { ToolbarItem(placement: .principal) { title() } }
+            .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
-                Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+                SheetHeader(title: title, leading: leading, trailing: trailing)
             }
     }
 }

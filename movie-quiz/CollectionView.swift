@@ -100,24 +100,19 @@ struct CollectionView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.canvas.ignoresSafeArea())
-            .navigationTitle("Your Reel")
-            .toolbarTitleDisplayMode(.inline)
-            .neoNavigationBar { Heading("Your Reel", style: .headline) }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: {
-                        Text("Done").font(Theme.Font.bodyStrong).foregroundStyle(Theme.Color.ink)
+            .sheetHeader("Your Reel") {
+                Button("Done") { dismiss() }
+                    .frame(minHeight: 44)
+            } trailing: {
+                if !store.isEmpty {
+                    ShareLink(item: store.shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(minWidth: 44, minHeight: 44)
                     }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    if !store.isEmpty {
-                        ShareLink(item: store.shareText) {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            telemetry?.shared(from: .reel)
-                        })
-                    }
+                    .accessibilityLabel("Share your Reel")
+                    .simultaneousGesture(TapGesture().onEnded {
+                        telemetry?.shared(from: .reel)
+                    })
                 }
             }
         }

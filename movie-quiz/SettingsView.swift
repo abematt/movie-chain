@@ -35,17 +35,11 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Theme.Color.canvas.ignoresSafeArea())
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .neoNavigationBar {
-                Text("Settings").font(Theme.Font.heading(.headline)).foregroundStyle(Theme.Color.ink)
-            }
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: {
-                        Text("Done").font(Theme.Font.bodyStrong).foregroundStyle(Theme.Color.ink)
-                    }
-                }
+            .sheetHeader("Settings") {
+                EmptyView()
+            } trailing: {
+                Button("Done") { dismiss() }
+                    .frame(minHeight: 44)
             }
         }
     }

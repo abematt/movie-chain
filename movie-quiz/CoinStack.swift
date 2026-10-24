@@ -50,7 +50,8 @@ struct CoinStack: View {
         // Room for the outline's outer half, so the bottom coin isn't clipped.
         let height = size.height - Theme.Border.width
         let step = Self.step(count: chain.count, height: height)
-        let bottomTop = height - coinHeight
+        // A short stack sits in the middle of its space, not on the floor of it.
+        let bottomTop = Self.floor(count: chain.count, height: height) - coinHeight
         let every = Int((Self.labelGap / max(step, 1)).rounded(.up))
         let line = Theme.Color.night
         let lineWidth = Theme.Border.width
@@ -107,6 +108,13 @@ struct CoinStack: View {
         return p
     }
 
+    /// Where the stack's bottom edge sits: centred in `height` when the stack is
+    /// shorter than it, on the floor when it fills it.
+    static func floor(count: Int, height: CGFloat) -> CGFloat {
+        let natural = faceHeight + thickness + CGFloat(max(count - 1, 0)) * step(count: count, height: height)
+        return height - max(0, (height - natural) / 2)
+    }
+
     /// How far apart the coins sit for `count` coins in `height` points.
     static func step(count: Int, height: CGFloat) -> CGFloat {
         guard count > 1 else { return 0 }
@@ -117,10 +125,12 @@ struct CoinStack: View {
     /// `count` coins drawn `height` tall — where a pointer to either should aim.
     static func ends(count: Int, height: CGFloat) -> (start: CGFloat, top: CGFloat) {
         let coin = faceHeight + thickness
+        let height = height - Theme.Border.width
         let gap = step(count: count, height: height)
-        let top = height - coin - CGFloat(max(count - 1, 0)) * gap + coin / 2
+        let bottom = floor(count: count, height: height)
+        let top = bottom - coin - CGFloat(max(count - 1, 0)) * gap + coin / 2
         // Under the others, the start shows only its bottom sliver.
-        let start = count > 1 ? height - gap / 2 : top
+        let start = count > 1 ? bottom - gap / 2 : top
         return (start, top)
     }
 

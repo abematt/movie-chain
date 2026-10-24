@@ -92,13 +92,15 @@ struct GameOverView: View {
 
     private var result: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(summary.endedByQuit ? "You stopped" : "Time’s up")
-                    .metaLabel(sub)
+            HStack(alignment: .firstTextBaseline) {
+                // How it ended, as the sentence the number finishes.
+                Text(summary.endedByQuit ? "You ended on" : "Time’s up at")
+                    .font(Theme.Font.sentence(.title2))
+                    .foregroundStyle(sub)
                 Spacer()
                 if best { newBestTag }
             }
-            .padding(.top, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.xl)
 
             HStack(alignment: .bottom, spacing: Theme.Spacing.md - 4) {
                 Text("\(summary.links)")
@@ -127,7 +129,6 @@ struct GameOverView: View {
                 }
                 .padding(.bottom, Theme.Spacing.sm)
             }
-            .padding(.top, Theme.Spacing.sm)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(summary.links) \(linkWord), \(summary.points) points\(best ? ", a new best" : "")")
 
@@ -264,7 +265,7 @@ struct GameOverView: View {
                 ? SlabButtonStyle(fill: Theme.Color.night, foreground: .white, side: .black)
                 : SlabButtonStyle(fill: Theme.Color.go, foreground: Theme.Color.night, side: .white))
 
-            HStack {
+            HStack(spacing: Theme.Spacing.md - 4) {
                 shareButton
                 // ShareLink has no action of its own; a tap opening the sheet is
                 // the signal (whether they then sent it isn't knowable).
@@ -275,11 +276,7 @@ struct GameOverView: View {
                     Text("Your Reel").frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.pressScale)
-            .font(Theme.Font.button)
-            .textCase(.uppercase)
-            .tracking(Theme.Font.buttonTracking)
-            .foregroundStyle(fg)
+            .buttonStyle(OutlineButtonStyle(color: fg))
         }
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.md)
@@ -312,6 +309,28 @@ private extension GameOverView {
                 Text("Share").frame(maxWidth: .infinity)
             }
         }
+    }
+}
+
+/// The secondary actions on game over: outlined in the ground's ink, no fill and
+/// no side, so they sit under Play again's slab without competing with it.
+private struct OutlineButtonStyle: ButtonStyle {
+    let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(RoundedRectangle(cornerRadius: Theme.Radius.field)
+                .fill(color.opacity(configuration.isPressed ? 0.12 : 0)))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.field)
+                .strokeBorder(color, lineWidth: Theme.Border.width))
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .animation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
 
