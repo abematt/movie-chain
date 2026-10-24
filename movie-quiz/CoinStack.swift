@@ -166,7 +166,7 @@ struct CoinStack: View {
         let room = (onLeft ? left : size.width - left - Self.width) - 20
         guard room > 30 else { return }
         let text = context.resolve(Text(node.matchText)
-            .font(Theme.Font.small)
+            .font(Theme.Font.coinLabel)
             .foregroundStyle(labelColor))
         // Up to two lines, so a long name wraps rather than truncating.
         let measured = text.measure(in: CGSize(width: room, height: 34))

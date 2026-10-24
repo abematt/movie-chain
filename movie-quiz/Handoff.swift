@@ -290,14 +290,16 @@ private struct FlightLayers: View {
             SentenceBlank(kind: node.nextKind)
                 .frame(width: a.width, height: a.height)
                 .scaleEffect(x: rect.width / max(a.width, 1), y: 1, anchor: .topLeading)
-                .opacity(1 - ramp(p, 0.2, 0.6))
-                .blur(radius: bridge(p, 0.2, 0.9))
+                // Gone by 0.4, while the stretch (it widens, it doesn't grow) is
+                // still too small to read in its text and corners.
+                .opacity(1 - ramp(p, 0.1, 0.4))
+                .blur(radius: bridge(p, 0.1, 0.7))
                 .offset(x: rect.minX, y: rect.minY)
             DockLook(kind: node.nextKind)
                 .frame(width: b.width, height: b.height)
                 .compositingGroup()
-                .opacity(ramp(p, 0.4, 0.9))
-                .blur(radius: bridge(p, 0.2, 0.9))
+                .opacity(ramp(p, 0.25, 0.7))
+                .blur(radius: bridge(p, 0.1, 0.7))
                 .offset(x: rect.minX, y: rect.minY + (rect.height - b.height) / 2)
         }
     }
@@ -347,7 +349,7 @@ private struct DockLook: View {
         HStack(spacing: Theme.Spacing.sm + 2) {
             Text(kind.placeholder)
                 .font(Theme.Font.sentence(.body))
-                .foregroundStyle(SentenceBlank.fieldText)
+                .foregroundStyle(Theme.Color.fieldPlaceholder)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.Spacing.md)
                 .frame(minHeight: 52)
@@ -374,9 +376,16 @@ enum SentenceType {
     static let artSize: CGFloat = 54
 }
 
-/// The deck card's name type, at the reader's text size.
+/// The deck card's name type, at the reader's text size — capped as the play
+/// screen caps it (`Theme.Font.gameTypeCap`), so the flight lands at the size
+/// the card actually draws.
 enum DeckType {
-    static var nameSize: CGFloat { UIFontMetrics(forTextStyle: .title2).scaledValue(for: 22) }
+    static var nameSize: CGFloat {
+        let reader = UITraitCollection.current.preferredContentSizeCategory
+        let size = min(reader, Theme.Font.gameTypeCapCategory)
+        return UIFontMetrics(forTextStyle: .title2)
+            .scaledValue(for: 22, compatibleWith: UITraitCollection(preferredContentSizeCategory: size))
+    }
 }
 
 /// The dealt start's name in the home sentence.
@@ -400,6 +409,7 @@ struct DeckName: View {
     var body: some View {
         Text(text)
             .font(Theme.Font.heading(.title2))
+            .tracking(Theme.Font.deckNameTracking)
             .foregroundStyle(Theme.Color.ink)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
@@ -431,14 +441,12 @@ struct SentenceBlank: View {
     @Environment(\.blankPressed) private var pressed
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// The field is paper in both modes: it sits on the dock's colour, not the ground.
-    static let fieldText = Color(white: 0.42)
-
     var body: some View {
         HStack(spacing: Theme.Spacing.md - 4) {
-            Text(dealing ? "Dealing…" : kind == .movie ? "a movie…" : "an actor…")
+            // The same words the dock's field shows, so nothing changes in flight.
+            Text(dealing ? "Dealing…" : kind.placeholder)
                 .font(Theme.Font.sentence(size: SentenceType.blankSize))
-                .foregroundStyle(Self.fieldText)
+                .foregroundStyle(Theme.Color.fieldPlaceholder)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .keyframeAnimator(initialValue: 1.0, trigger: nudge) { view, opacity in

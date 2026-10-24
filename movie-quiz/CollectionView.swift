@@ -84,7 +84,6 @@ struct CollectionView: View {
                             else { withAnimation(Theme.Motion.emphasized) { statsIn = true } }
                         }
                     }
-                    .overlay { detail }
                     #if DEBUG
                     // QA hook: lift the first actor card a moment after opening,
                     // to watch the lift and the tilt without tapping.
@@ -115,6 +114,9 @@ struct CollectionView: View {
                     })
                 }
             }
+            // Over the header too: the dark room is the whole sheet, so Done and
+            // Share don't stay lit (and live) while a card is out.
+            .overlay { detail }
         }
         // What was looked at, and for how long: one `card_viewed` per card put
         // back, one `reel_closed` for the visit.
@@ -150,7 +152,7 @@ struct CollectionView: View {
                 Text("logged across")
                 Text("\(store.chainsLogged) \(store.chainsLogged == 1 ? "chain" : "chains")")
                 if bestChain > 0 {
-                    Text("best \(bestChain) links")
+                    Text("best \(bestChain) \(bestChain == 1 ? "link" : "links")")
                 }
             }
             .font(Theme.Font.body)
@@ -425,7 +427,7 @@ struct CollectionView: View {
     }
 
     /// Flying home: quick and unbouncy — the system putting the card back.
-    private static let homeFlight: Animation = .spring(duration: 0.38, bounce: 0)
+    private static let homeFlight: Animation = .spring(duration: 0.28, bounce: 0)
 
     /// Lift a card out (`id`), or send the one that's out home (`nil`). Picking
     /// a card up is the deliberate moment and the detail runs its own open;

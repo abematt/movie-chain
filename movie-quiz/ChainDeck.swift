@@ -2,9 +2,9 @@
 //  ChainDeck.swift
 //  movie-quiz
 //
-//  The default chain style (Settings → Chain style → Deck): the chain as a physical pile of
-//  cards. Every link is the same full-size card for its whole life — when a new
-//  link is dealt in from below, the card it lands on is *pushed back* into the
+//  The chain as a physical pile of cards. Every link is the same full-size card
+//  for its whole life — when a new link is dealt in from below, the card it
+//  lands on is *pushed back* into the
 //  pile (smaller, higher, its shadow sinking) instead of being swapped for a
 //  compact copy, so nothing ever cross-fades.
 //
@@ -29,7 +29,10 @@ struct ChainDeck: View {
     /// Upper bound on cards behind the newest, however tall the screen.
     private static let maxBehind = 8
     /// A named peek shows the card's whole header row: its height at full scale.
-    private static let namedPeek: CGFloat = 30
+    /// Scales with the chip's text, so a large text size can't clip the row.
+    @ScaledMetric(relativeTo: .caption2) private var namedPeek: CGFloat = 30
+    /// The card's height, scaled with its name (`DeckCard.baseHeight` at Large).
+    @ScaledMetric(relativeTo: .title2) private var cardHeight: CGFloat = 122
     /// An edge peek shows just the card's top border — pile thickness.
     private static let edgePeek: CGFloat = 6
     private static let maxEdges = 4
@@ -43,13 +46,13 @@ struct ChainDeck: View {
     /// How far above the newest card's top each depth sits (index = depth), for
     /// as many depths as fit the available height.
     private var offsets: [CGFloat] {
-        let budget = (availableHeight ?? (DeckCard.height + Theme.Shadow.card + Self.labelReserve + 60))
-            - DeckCard.height - Theme.Shadow.card - Self.labelReserve
+        let budget = (availableHeight ?? (cardHeight + Theme.Shadow.card + Self.labelReserve + 60))
+            - cardHeight - Theme.Shadow.card - Self.labelReserve
         var offsets: [CGFloat] = [0]
         var total: CGFloat = 0
         var edges = 0
         for depth in 1...Self.maxBehind {
-            let named = (Self.namedPeek * Self.scale(depth)).rounded(.up)
+            let named = (namedPeek * Self.scale(depth)).rounded(.up)
             if edges == 0, total + named <= budget {
                 total += named
             } else if edges < Self.maxEdges, total + Self.edgePeek <= budget {
@@ -80,7 +83,7 @@ struct ChainDeck: View {
             ZStack(alignment: .top) {
                 ForEach(visible, id: \.element.id) { index, node in
                     let depth = chain.count - 1 - index
-                    DeckCard(node: node, isStart: index == 0, depth: depth)
+                    DeckCard(node: node, isStart: index == 0, depth: depth, height: cardHeight)
                         .scaleEffect(Self.scale(depth), anchor: .top)
                         .offset(y: -offsets[min(depth, offsets.count - 1)])
                         // Under Reduce Motion a card snaps to its new depth rather
@@ -136,8 +139,10 @@ struct DeckCard: View {
     /// The home → play handoff lands in the start card while it is the only one.
     @Environment(HandoffStage.self) private var stage: HandoffStage?
 
-    /// Fixed so every card in the pile is the same height and the peeks line up.
-    static let height: CGFloat = 122
+    /// One height for every card in the pile, so the peeks line up. `ChainDeck`
+    /// scales it with the reader's text size; this is its value at Large.
+    static let baseHeight: CGFloat = 122
+    var height: CGFloat = DeckCard.baseHeight
 
     private var isFront: Bool { depth == 0 }
 
@@ -163,7 +168,7 @@ struct DeckCard: View {
             }
         }
         .padding(Theme.Spacing.md - 4)
-        .frame(height: Self.height, alignment: .top)
+        .frame(height: height, alignment: .top)
         .neoSurface(radius: Theme.Radius.card,
                     // The shadow sinks as the card goes back into the pile.
                     shadow: isFront ? Theme.Shadow.card : Theme.Shadow.small)

@@ -655,7 +655,7 @@ struct ReelPressStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? Theme.Motion.pressScale : 1)
                 .opacity(configuration.isPressed && reduceMotion ? 0.85 : 1)
                 .animation(Theme.Motion.press, value: configuration.isPressed)
         }

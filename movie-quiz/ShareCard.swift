@@ -21,8 +21,8 @@ struct ShareCard: View {
     /// Points, not pixels: rendered at 3×.
     static let size = CGSize(width: 360, height: 640)
 
-    private static let rule = Color(white: 0.35)
-    private static let quiet = Color(white: 0.74)
+    private static let rule = Theme.Color.ruleOnNight
+    private static let quiet = Theme.Color.quietOnNight
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

@@ -94,7 +94,7 @@ struct SlabButtonStyle: ButtonStyle {
                 .font(Theme.Font.button)
                 .textCase(.uppercase)
                 .tracking(Theme.Font.buttonTracking)
-                .foregroundStyle(isEnabled ? foreground : Color(white: 0.55))
+                .foregroundStyle(isEnabled ? foreground : Theme.Color.disabledSlabText)
                 .padding(.horizontal, Theme.Spacing.lg - 4)
                 .frame(minWidth: 52, minHeight: 52)
                 .neoSurface(radius: Theme.Radius.field, fill: fill,
@@ -332,7 +332,7 @@ struct PressScaleStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? Theme.Motion.pressScale : 1)
                 .opacity(configuration.isPressed ? 0.85 : 1)
                 .animation(Theme.Motion.press, value: configuration.isPressed)
         }
@@ -479,14 +479,15 @@ struct FloatingGain: View {
             .foregroundStyle(Theme.Color.good)
             .opacity(shown && !rise ? 1 : 0)
             .scaleEffect(shown || reduceMotion ? 1 : 0.85, anchor: .bottom)
-            .offset(y: rise && !reduceMotion ? -34 : 0)
-            // Two beats: pop in fast, hold long enough to be read, then drift off.
+            .offset(y: rise && !reduceMotion ? -20 : 0)
+            // Two beats: pop in fast, hold long enough to be read, then drift off —
+            // briskly, since it plays on every link alongside the deal and the dock.
             // Under Reduce Motion it only fades in and out, in place.
             .task {
                 withAnimation(.easeOut(duration: 0.12)) { shown = true }
                 try? await Task.sleep(for: .milliseconds(280))
                 guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: 0.55)) { rise = true }
+                withAnimation(.easeOut(duration: 0.3)) { rise = true }
             }
     }
 }

@@ -27,17 +27,20 @@ struct GameOverView: View {
     @State private var shareImage: Image?
 
     private var best: Bool { summary.isNewBest }
+    /// How much of the recap shows above the actions on the first screen.
+    private static let recapPeek: CGFloat = 52
     /// Type on the ground: white on Night, ink on the holo sky.
     private var fg: Color { best ? Theme.Color.night : .white }
-    private var sub: Color { best ? Theme.Color.night.opacity(0.72) : Color(white: 0.74) }
+    private var sub: Color { best ? Theme.Color.night.opacity(0.72) : Theme.Color.quietOnNight }
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     result
-                        // The first screenful is the result alone; the recap waits below.
-                        .frame(height: max(420, geo.size.height - Theme.Spacing.md))
+                        // The first screenful is the result; the recap's top edge
+                        // peeks above the actions, so it reads as more below.
+                        .frame(height: max(420, geo.size.height - Self.recapPeek))
                     recap
                 }
                 .padding(.horizontal, Theme.Spacing.gutter)
@@ -52,9 +55,12 @@ struct GameOverView: View {
         // still be on its way down, it slides off over this screen instead of
         // re-laying it out as it goes.
         .ignoresSafeArea(.keyboard)
+        // Applied before the Reel sheet, so the sheet still follows the reader's size.
+        .dynamicTypeSize(...Theme.Font.gameTypeCap)
         .task {
-            // After the push, so drawing the card can't catch the slide.
-            try? await Task.sleep(for: .milliseconds(500))
+            // Once the screen has settled — after the push, the coin stack's rise
+            // and a new best's bounce — so drawing the card can't hitch any of them.
+            try? await Task.sleep(for: .milliseconds(1200))
             guard !Task.isCancelled else { return }
             shareImage = ShareCard.image(chain: summary.chain, links: summary.links)
         }
@@ -141,7 +147,7 @@ struct GameOverView: View {
     }
 
     private var pointsLine: String {
-        var line = "\(summary.points) pts"
+        var line = "\(summary.points.formatted()) pts"
         if best, summary.previousBest > 0 { line += " · was \(summary.previousBest)" }
         return line
     }
@@ -277,6 +283,8 @@ struct GameOverView: View {
                 }
             }
             .buttonStyle(OutlineButtonStyle(color: fg))
+            // The pair stays one height when one label wraps and the other doesn't.
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, Theme.Spacing.gutter)
         .padding(.top, Theme.Spacing.md)
@@ -324,12 +332,12 @@ private struct OutlineButtonStyle: ButtonStyle {
             .textCase(.uppercase)
             .tracking(Theme.Font.buttonTracking)
             .foregroundStyle(color)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: 48, maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.Radius.field)
                 .fill(color.opacity(configuration.isPressed ? 0.12 : 0)))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.field)
                 .strokeBorder(color, lineWidth: Theme.Border.width))
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? Theme.Motion.pressScale : 1)
             .animation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
