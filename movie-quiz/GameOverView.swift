@@ -284,6 +284,15 @@ struct GameOverView: View {
 
     // MARK: Actions
 
+    /// This run as a chain link, once `Config.shareBaseURL` is set.
+    private var shareLink: URL? {
+        guard let base = Config.shareBaseURL,
+              let shared = SharedChain(chain: summary.chain, points: summary.points,
+                                       sharer: SharerID.current(in: .standard))
+        else { return nil }
+        return shared.url(base: base)
+    }
+
     private var actions: some View {
         VStack(spacing: Theme.Spacing.sm) {
             Button {
@@ -293,7 +302,7 @@ struct GameOverView: View {
             }
             .buttonStyle(.primary)
 
-            ShareLink(item: summary.shareText) {
+            ShareLink(item: summary.shareText(link: shareLink)) {
                 Text("Share").frame(maxWidth: .infinity)
             }
             .buttonStyle(.ghost)

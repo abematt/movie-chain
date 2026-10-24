@@ -121,6 +121,11 @@ enum Config {
     /// fallback when a refetch fails. `nonisolated` so the off-main cache can read it.
     nonisolated static let seedPoolMaxAge: TimeInterval = 7 * 24 * 60 * 60
 
+    /// Where chain links live: `<base>/c?d=…` (`SharedChain`). `nil` until the
+    /// domain exists and serves the universal-links file; while it's `nil`, shares
+    /// carry no link. `nonisolated` so the pure `SharedChain` code can use it.
+    nonisolated static let shareBaseURL: URL? = nil
+
     /// Base for TMDB-hosted images (headshots/posters shown in the collection).
     /// Full URL = base + size + path, e.g. `.../t/p/w185/abc.jpg`.
     static let imageBaseURL = "https://image.tmdb.org/t/p/"

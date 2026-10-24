@@ -53,11 +53,14 @@ final class GameEngine {
         /// Manual retries after a failed candidate load.
         var retries = 0
 
-        /// Spoiler-free share card: each link as a coloured square, never a name.
-        var shareText: String {
+        /// Spoiler-free share card: each link as a coloured square, never a name,
+        /// plus the run as a link when there's somewhere for links to go.
+        func shareText(link: URL?) -> String {
             let squares = chain.map { $0.kind == .actor ? "🟦" : "🟨" }.joined()
             let linkWord = links == 1 ? "link" : "links"
-            return "Unspool 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            let card = "Unspool 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            guard let link else { return card }
+            return card + "\n" + link.absoluteString
         }
     }
 
