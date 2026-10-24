@@ -5,9 +5,9 @@
 //  End-of-run summary, on Night — or, when the run beat the record, on the holo
 //  sky: a new best isn't a screen of its own, it's this one with the foil laid
 //  flat as the ground. The first screenful is the result: how it ended, the link
-//  count huge, and the chain as a coin stack. Scrolling down gives the recap:
-//  the answer you were one away from, and every link by name. Play again stays
-//  pinned at the foot.
+//  count huge, and the chain as a coin stack, which names every link. Scrolling
+//  down gives the answer you were one away from, and the best and the Reel.
+//  Play again stays pinned at the foot.
 //
 
 import SwiftUI
@@ -38,9 +38,11 @@ struct GameOverView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     result
-                        // The first screenful is the result; the recap's top edge
-                        // peeks above the actions, so it reads as more below.
-                        .frame(height: max(420, geo.size.height - Self.recapPeek))
+                        // The first screenful is the result. The one-away card's top
+                        // edge peeks above the actions, so it reads as more below;
+                        // with no card, the quiet lines under it stay below the fold.
+                        .frame(height: max(420, geo.size.height
+                                            - (summary.missedAnswer == nil ? Theme.Spacing.md : Self.recapPeek)))
                     recap
                 }
                 .padding(.horizontal, Theme.Spacing.gutter)
@@ -164,17 +166,13 @@ struct GameOverView: View {
             .accessibilityHidden(true)   // the count's label already says "a new best"
     }
 
-    // MARK: Recap — one away, then every link
+    // MARK: Recap — one away, then the best and the Reel
+    //
+    // No list of the links: the coin stack already names each one in order.
 
     private var recap: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
             if let missed = summary.missedAnswer { oneAway(missed) }
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Your chain · \(summary.links) \(linkWord) · \(summary.points) pts").metaLabel(sub)
-                ForEach(Array(summary.chain.enumerated()), id: \.element.id) { i, node in
-                    recapRow(node, index: i)
-                }
-            }
             if showsBest || showsReel { footnotes }
         }
         .padding(.top, Theme.Spacing.md)
@@ -198,29 +196,6 @@ struct GameOverView: View {
         .padding(Theme.Spacing.md + 2)
         .neoSurface(radius: Theme.Radius.card, fill: .white, shadow: Theme.Shadow.large, side: .black)
         .environment(\.colorScheme, .light)
-    }
-
-    private func recapRow(_ node: ChainNode, index: Int) -> some View {
-        HStack(spacing: Theme.Spacing.md - 4) {
-            Text(index == 0 ? "ST" : String(format: "%02d", index))
-                .font(Theme.Font.labelSmall)
-                .foregroundStyle(sub)
-                .frame(width: 22, alignment: .leading)
-            NodeDot(kind: node.kind)
-            Text(node.matchText)
-                .font(Theme.Font.bodyStrong)
-                .foregroundStyle(fg)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if case .movie(let m) = node, let year = m.year {
-                Text(String(year)).font(Theme.Font.small).foregroundStyle(sub)
-            }
-        }
-        .padding(.vertical, Theme.Spacing.sm)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(fg.opacity(0.14)).frame(height: 1.5)
-        }
-        .accessibilityElement(children: .combine)
     }
 
     private var showsBest: Bool { !best && engine.bestChain > 0 }

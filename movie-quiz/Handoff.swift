@@ -205,7 +205,7 @@ private struct FlightLayers: View {
         if let target = to[.card] {
             let shown = ramp(p, 0.25, 0.8)
             Color.clear
-                .neoSurface(radius: Theme.Radius.card)
+                .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
                 // The start card's sticker, placed as `DeckCard` places it.
                 .overlay(alignment: .topTrailing) {
                     StartSticker()

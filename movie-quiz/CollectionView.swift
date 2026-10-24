@@ -148,19 +148,34 @@ struct CollectionView: View {
                 .contentTransition(.numericText(value: Double(store.total)))
                 .foregroundStyle(Theme.Color.ink)
                 .padding(.bottom, -18)
+            // Set like the home's best run: condensed caps, the figures in ink.
             VStack(alignment: .leading, spacing: 2) {
-                Text("logged across")
-                Text("\(store.chainsLogged) \(store.chainsLogged == 1 ? "chain" : "chains")")
+                Text("Logged across")
+                stat(store.chainsLogged, store.chainsLogged == 1 ? "chain" : "chains")
                 if bestChain > 0 {
-                    Text("best \(bestChain) \(bestChain == 1 ? "link" : "links")")
+                    stat(bestChain, bestChain == 1 ? "link" : "links", lead: "Best run")
                 }
             }
-            .font(Theme.Font.body)
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
             .foregroundStyle(Theme.Color.muted)
+            .lineLimit(1)
             .padding(.bottom, Theme.Spacing.xs)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    /// "Best run 13 links": the figure in ink numerals between quiet caps.
+    private func stat(_ value: Int, _ unit: String, lead: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm - 2) {
+            if let lead { Text(lead) }
+            Text("\(value)")
+                .font(Theme.Font.numeral(.title3))
+                .foregroundStyle(Theme.Color.ink)
+            Text(unit)
+        }
     }
 
     // MARK: Regulars — most-logged actor + movie

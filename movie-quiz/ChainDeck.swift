@@ -46,8 +46,8 @@ struct ChainDeck: View {
     /// How far above the newest card's top each depth sits (index = depth), for
     /// as many depths as fit the available height.
     private var offsets: [CGFloat] {
-        let budget = (availableHeight ?? (cardHeight + Theme.Shadow.card + Self.labelReserve + 60))
-            - cardHeight - Theme.Shadow.card - Self.labelReserve
+        let budget = (availableHeight ?? (cardHeight + Theme.Shadow.small + Self.labelReserve + 60))
+            - cardHeight - Theme.Shadow.small - Self.labelReserve
         var offsets: [CGFloat] = [0]
         var total: CGFloat = 0
         var edges = 0
@@ -106,7 +106,7 @@ struct ChainDeck: View {
             .padding(.top, offsets[max(0, visible.count - 1)])
         }
         // Room for the side, which draws below the card's frame.
-        .padding(.bottom, Theme.Shadow.card)
+        .padding(.bottom, Theme.Shadow.small)
         .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: chain.count)
     }
 }
@@ -169,9 +169,10 @@ struct DeckCard: View {
         }
         .padding(Theme.Spacing.md - 4)
         .frame(height: height, alignment: .top)
-        .neoSurface(radius: Theme.Radius.card,
-                    // The shadow sinks as the card goes back into the pile.
-                    shadow: isFront ? Theme.Shadow.card : Theme.Shadow.small)
+        // One thin side for every card: the pile's peeks already carry its
+        // thickness, and a deeper slab under the front card read as a heavy
+        // black bar across the bottom of the play screen.
+        .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
         // Stuck flat on the card's face, inside its edges — a sticker hanging off
         // the border read as floating. Sits in the header row, so it shows in
         // the card's peek once the start is pushed back.

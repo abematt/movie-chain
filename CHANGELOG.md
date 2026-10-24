@@ -76,7 +76,8 @@ Unspool rebrand was inserted as 0.6.0.)
 - **Game over is on Night, with the chain as a coin stack.** The run reads as one
   number and one object: every link a coin, actors labelled left and movies right, a
   film spool on top when the run ended on a movie. A new best is the same screen on
-  the holo sky rather than a sticker. The full recap is a scroll away.
+  the holo sky rather than a sticker. The answer you were one away from is a scroll
+  away; the list of every link is gone, since the stack already names them in order.
 - **Share sends a picture.** The text now travels with a 9:16 card: the count, the
   stack with no names on it, and the start to beat it from, so the dare is the image.
 - **A new icon in the new colours**, the mark on paper (night in dark mode), and the
@@ -106,6 +107,12 @@ Unspool rebrand was inserted as 0.6.0.)
   the same thing ("a movie…"), so nothing changes as one flies into the other.
 - **Game over shows there's more below.** The top of the recap (the answer you were one
   away from) peeks above Play again; before, nothing said the screen scrolled.
+- **The deck's cards share one thin side.** The front card stood on a 10pt ink slab, the
+  deepest in the app, which read as a heavy black bar across the bottom of the play
+  screen; the pile's peeks already show its thickness.
+- **The Reel's caption reads like the home's best run**: "LOGGED ACROSS / 36 CHAINS /
+  BEST RUN 13 LINKS" in condensed caps with the figures in ink, instead of the app's
+  only lowercase sentence broken over three lines.
 - **Touch and polish:** 44pt targets on the home's links, the search's back link and
   its clear button; bold icons beside the heavy caps; the search's empty state on the
   same leading edge as the rest; the Reel's dim now covers its header too, so Done
