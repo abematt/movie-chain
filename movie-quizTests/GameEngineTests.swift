@@ -180,7 +180,9 @@ struct GameEngineTests {
         #expect(summary.links == 1)
         #expect(summary.points == points && points > 0)
         #expect(summary.chain.map(\.id) == ["p1", "m100"])
-        #expect(summary.shareText.hasSuffix("🟦🟨"))
+        #expect(summary.shareText(link: nil).hasSuffix("🟦🟨"))
+        let link = URL(string: "https://unspool.example/c?d=x")!
+        #expect(summary.shareText(link: link).hasSuffix("🟦🟨\n\(link.absoluteString)"))
     }
 
     // MARK: The run's record (read by analytics)

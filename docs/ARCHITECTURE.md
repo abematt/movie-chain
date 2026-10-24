@@ -677,6 +677,16 @@ social hook the single-player loop is missing, and it fits the architecture almo
 suspiciously well — noting the intended shape here so it's not re-derived from
 scratch:
 
+> **Built 2026-10-24: the codec.** `SharedChain.swift` is the payload + codec below,
+> generalized beyond Pass & Play: one versioned format for every chain that travels
+> (game-over share, challenge links, daily results). Version 1 carries the start (kind,
+> id, name), the links' TMDB ids, points, a per-device `SharerID` (deliberately *not*
+> the analytics `DeviceID`) and an optional sender name, as base64url JSON under
+> `<base>/c?d=…`. Transport is a **universal link** on our own domain rather than a
+> custom scheme (`Config.shareBaseURL`, `nil` until the domain exists): a custom scheme
+> is dead for anyone without the app. `open` answers `.chain` / `.needsUpdate` /
+> `.invalid` and never throws. Pass & Play's per-link owners would be a version 2.
+
 - **Transport is a deep link, not a backend.** A finished chain encodes into a
   `moviechain://` link shared via the system share sheet (the same surface as
   today's `shareSummary` card). No accounts, no server — the link *is* the game
