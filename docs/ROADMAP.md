@@ -254,7 +254,7 @@ than renaming before.
 
 ## Ground & Object — the 1.0 look
 
-Started 2026-10-24; takes the next minor version when it lands. Cream Neobrutalist read
+Landed on `main` 2026-10-24 ([PR #20](https://github.com/abematt/movie-chain/pull/20)); takes the next minor version when it is cut. Cream Neobrutalist read
 as "vibe coded" and too close to Claude's ivory, serif and clay. The new direction is
 **Ground & Object**, drawn from Bakers Studio's Pera identity and Tinyman visuals: a
 paper ground, heavy objects with an ink edge and a hard ink side, blue and yellow living

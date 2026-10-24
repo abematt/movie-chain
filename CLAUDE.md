@@ -74,8 +74,8 @@ changelog table before choosing a bump**. Each is documented in
 [`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
 the relevant section before starting one.
 
-> Note: the visual design is moving from 0.5.0's Cream Neobrutalist to **Ground &
-> Object** (branch `feature_ground-and-object`, specced on a design canvas — see
+> Note: the visual design is **Ground & Object** (landed 2026-10-24, replacing 0.5.0's
+> Cream Neobrutalist; specced on a design canvas — see
 > [`docs/ROADMAP.md`](docs/ROADMAP.md#ground--object--the-10-look)): paper ground,
 > objects with a hard ink side, blue/yellow only on objects and in the answer dock,
 > Night for game over, Archivo + JetBrains Mono caps, no serif or italics. The chain
