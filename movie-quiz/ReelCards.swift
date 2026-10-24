@@ -173,6 +173,9 @@ struct ReelActorCard: View {
             if lifted { ReelGlare().clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm)) }
         }
         .neoSurface(radius: Theme.Radius.sm, fill: .clear, shadow: grounded ? Theme.Shadow.small : 0)
+        // A printed card is paper in any light: it keeps its light-mode inks in
+        // dark mode, the one lit object on the dim ground.
+        .environment(\.colorScheme, .light)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
@@ -293,6 +296,8 @@ struct ReelFrame: View {
                 Rectangle().fill(Theme.Color.shadow).offset(y: depth)
             }
             .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 3, y: -5) } }
+            // Paper and moulding in any light, like the actor cards.
+            .environment(\.colorScheme, .light)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(entity.displayName)
     }
@@ -536,6 +541,8 @@ struct ReelCardDetail: View {
         .clipShape(RoundedRectangle(cornerRadius: isActor ? Theme.Radius.md : 0))
         // Only shown while out, when the card is off the table (`ReelActorCard.grounded`).
         .neoSurface(radius: isActor ? Theme.Radius.md : 0, fill: .clear, shadow: 0)
+        // The back is paper too.
+        .environment(\.colorScheme, .light)
     }
 
     @ViewBuilder private func row(_ other: CollectedEntity) -> some View {

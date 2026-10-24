@@ -201,7 +201,7 @@ struct GameView: View {
             // points as one quiet line under it. A chain is the whole run; a link
             // is one correct answer.
             Text("\(engine.score)")
-                .font(Theme.Font.display(96))
+                .font(Theme.Font.display(84))
                 .contentTransition(.numericText())
                 .foregroundStyle(beatingBest ? Theme.Color.good : Theme.Color.ink)
                 // The "+N" rises off the figure's shoulder.
@@ -308,7 +308,7 @@ struct GameView: View {
                         Text(engine.expectedKind.placeholder).foregroundStyle(SentenceBlank.fieldText)
                     }
                         .textFieldStyle(.plain)
-                        .font(Theme.Font.sentence(.title3))
+                        .font(Theme.Font.sentence(.body))
                         .foregroundStyle(Theme.Color.night)
                         .tint(Theme.Color.night)
                         .autocorrectionDisabled()

@@ -473,8 +473,8 @@ Type; icons are SF Symbols.
   mark as its "oo"); the **`FilmStrip`** supporting graphic (launch screen, store
   screenshots, share card — never the logo). All are SVG with "Preserve Vector Data"
   and an on-dark variant. The **app icon** (`AppIcon.appiconset`) is the mark on a
-  cream tile, one 1024 universal entry plus iOS 18 **dark** (ink tile) and **tinted**
-  variants. Every icon bitmap is **opaque (no alpha channel)** — iOS rejects icons
+  paper tile, one 1024 universal entry plus iOS 18 **dark** (night tile, light rings)
+  and **tinted** variants. Every icon bitmap is **opaque (no alpha channel)** — iOS rejects icons
   with alpha at archive/upload; verify with `sips -g hasAlpha`.
 
 ### UI — SwiftUI, routed by phase

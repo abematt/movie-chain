@@ -797,8 +797,10 @@ private struct SentenceHead: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(spacing: Theme.Spacing.sm + 4) {
-                HandoffArt(node: seed, radius: SentenceType.artSize / 2)
-                    .frame(width: SentenceType.artSize, height: SentenceType.artSize)
+                // An actor's face in a circle; a movie's poster as a poster.
+                HandoffArt(node: seed, radius: seed.kind == .movie ? Theme.Radius.sm : SentenceType.artSize / 2)
+                    .frame(width: seed.kind == .movie ? SentenceType.artSize * 0.8 : SentenceType.artSize,
+                           height: seed.kind == .movie ? SentenceType.artSize * 1.15 : SentenceType.artSize)
                     .handoffSource(.art, stage, for: seed.id)
                 KindChip(kind: seed.kind)
                     .handoffSource(.chip, stage, for: seed.id)

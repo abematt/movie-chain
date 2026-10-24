@@ -79,6 +79,9 @@ Unspool rebrand was inserted as 0.6.0.)
   the holo sky rather than a sticker. The full recap is a scroll away.
 - **Share sends a picture.** The text now travels with a 9:16 card: the count, the
   stack with no names on it, and the start to beat it from, so the dare is the image.
+- **A new icon in the new colours**, the mark on paper (night in dark mode), and the
+  Reel's cards stay paper in dark mode: they're printed things, the lit objects on a
+  dim ground.
 - **Out of film reads like the home it replaces**, with an empty spool and Reconnect
   in a night dock that says the Reel and best run are safe.
 - **The deal pool is saved between launches.** Every cold launch used to fire about 24

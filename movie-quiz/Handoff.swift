@@ -227,7 +227,8 @@ private struct FlightLayers: View {
         if let a = from[.art] {
             let b = to[.art] ?? a
             let rect = lerp(a, b, p)
-            let radius = lerp(a.width / 2, Theme.Radius.sm, p)
+            // A face starts round; a poster is already a rounded rectangle.
+            let radius = lerp(node.kind == .movie ? Theme.Radius.sm : a.width / 2, Theme.Radius.sm, p)
             HandoffArt(node: node, radius: radius)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
@@ -345,7 +346,7 @@ private struct DockLook: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.sm + 2) {
             Text(kind.placeholder)
-                .font(Theme.Font.sentence(.title3))
+                .font(Theme.Font.sentence(.body))
                 .foregroundStyle(SentenceBlank.fieldText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.Spacing.md)
