@@ -620,7 +620,7 @@ struct SeedView: View {
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.md - 2)
         .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
-        .padding(.trailing, Theme.Shadow.small)
+        .padding(.bottom, Theme.Shadow.small)
     }
 
     private var emptyState: some View {

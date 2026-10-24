@@ -12,11 +12,11 @@ import SwiftUI
 
 // MARK: - Neo surface (the neobrutalist atom)
 //
-// White (or tinted) fill, a 2pt ink border, and a solid shadow offset
-// down-right with no blur. Everything bordered in the app — cards, buttons,
-// inputs — is drawn by this one modifier, so the border weight and shadow depth
-// stay one system. `pressed` is the spec's press: the shadow collapses and the
-// surface shifts 1pt down-right.
+// White (or tinted) fill, a 2pt ink edge, and a hard ink side straight below
+// it: thickness, not a shadow, so it never blurs and never leans. Everything
+// bordered in the app — cards, buttons, inputs — is drawn by this one modifier,
+// so the edge weight and side depth stay one system. `pressed` pushes the object
+// down onto its side: the side collapses as the face sinks by the same amount.
 
 struct NeoSurface<S: InsettableShape>: ViewModifier {
     var shape: S
@@ -26,12 +26,12 @@ struct NeoSurface<S: InsettableShape>: ViewModifier {
 
     func body(content: Content) -> some View {
         let depth = pressed ? 0 : shadow
-        let shift: CGFloat = pressed ? 1 : 0
+        let sink: CGFloat = pressed ? shadow : 0
         content
             .background(shape.fill(fill))
             .overlay(shape.strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .background(shape.fill(Theme.Color.shadow).offset(x: depth, y: depth))
-            .offset(x: shift, y: shift)
+            .background(shape.fill(Theme.Color.shadow).offset(y: depth))
+            .offset(y: sink)
     }
 }
 

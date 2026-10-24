@@ -75,7 +75,7 @@ struct HoloSticker<Label: View>: View {
             .overlay { PeelFlap(peel: peel) }
             .background {
                 if shadow > 0 {
-                    shape.fill(Theme.Color.shadow).offset(x: shadow, y: shadow)
+                    shape.fill(Theme.Color.shadow).offset(y: shadow)
                 }
             }
     }

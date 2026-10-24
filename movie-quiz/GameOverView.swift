@@ -274,8 +274,7 @@ struct GameOverView: View {
                                     offset: 14, after: Theme.Motion.screenSettle)
                     }
                 }
-                // Room for the hard shadows, which draw outside each card.
-                .padding(.trailing, Theme.Shadow.small)
+                // Room for the sides, which draw below each card.
                 .padding(.bottom, Theme.Spacing.sm)
             }
         }

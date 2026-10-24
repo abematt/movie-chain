@@ -79,18 +79,20 @@ enum Theme {
         static let gutter: CGFloat = 24
     }
 
-    // MARK: Borders & hard shadows (neobrutalist)
+    // MARK: Edges & sides
     //
-    // Every bordered surface uses one border weight. Shadows are solid, unblurred
-    // and offset down-right only: `small` for chrome (inputs, chips, compact
-    // cards, secondary buttons), `large` for primary cards and the main CTA.
+    // Every object has one edge weight and a hard ink side straight below it —
+    // thickness, never a blur or a lean. The deeper the side, the heavier the
+    // object: `small` for pills, chips and inputs, `large` for buttons, `card`
+    // for the cards that hold the game.
     enum Border {
         static let width: CGFloat = 2
     }
 
     enum Shadow {
-        static let small: CGFloat = 2
-        static let large: CGFloat = 4
+        static let small: CGFloat = 4
+        static let large: CGFloat = 6
+        static let card: CGFloat = 10
     }
 
     // MARK: Type roles

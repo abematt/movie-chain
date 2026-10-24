@@ -288,7 +288,7 @@ struct ReelFrame: View {
             .background(Theme.Color.ink)
             .background {
                 let depth = grounded ? Theme.Shadow.small : 0
-                Rectangle().fill(Theme.Color.shadow).offset(x: depth, y: depth)
+                Rectangle().fill(Theme.Color.shadow).offset(y: depth)
             }
             .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 3, y: -5) } }
             .accessibilityElement(children: .ignore)
