@@ -75,7 +75,7 @@ struct HoloSticker<Label: View>: View {
             .overlay { PeelFlap(peel: peel) }
             .background {
                 if shadow > 0 {
-                    shape.fill(Theme.Color.shadow).offset(x: shadow, y: shadow)
+                    shape.fill(Theme.Color.shadow).offset(y: shadow)
                 }
             }
     }
@@ -386,7 +386,7 @@ final class TiltMotion {
         HoloSticker(rotation: .degrees(-8), peel: 0.22, wearSeed: 21) {
             VStack(spacing: 0) {
                 Text("New best!").font(Theme.Font.heading(.title3))
-                Text("was 7").font(Theme.Font.flourish(.footnote))
+                Text("was 7").font(Theme.Font.sentence(.footnote))
             }
             .padding(.horizontal, 4)
         }

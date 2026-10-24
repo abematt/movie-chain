@@ -3,54 +3,15 @@
 //  movie-quiz
 //
 //  The chain's card pieces, shared by the play screen's `ChainDeck` and the
-//  game-over recap: the compact card (a small art thumb and the name, one line
-//  each), the actor/movie kind chip, and `ChainArt`, the poster or headshot that
-//  develops in as it streams.
+//  home → play handoff: the actor/movie kind chip, and `ChainArt`, the poster or
+//  headshot that develops in as it streams. (Game over draws the chain as a
+//  `CoinStack` instead.)
 //
 //  The chain used to come in three styles (Cards, Deck, Tiles) behind a
 //  setting; the Deck won and the other two were removed.
 //
 
 import SwiftUI
-
-// MARK: - Compact card (earlier links)
-
-struct CompactChainCard: View {
-    let node: ChainNode
-    /// Link number, shown as a leading numeral (the game-over recap). Links
-    /// count from 1; the start is not a link.
-    var position: Int? = nil
-    /// The dealt start: shows a flag in the numeral column instead of a number.
-    var isStart = false
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.sm + 2) {
-            if isStart {
-                Image(systemName: "flag.fill")
-                    .font(Theme.Font.labelSmall)
-                    .foregroundStyle(Theme.Color.muted)
-                    .frame(minWidth: 18)
-                    .accessibilityLabel("Start")
-            } else if let position {
-                Text("\(position)")
-                    .font(Theme.Font.numeral(.subheadline))
-                    .foregroundStyle(Theme.Color.muted)
-                    .frame(minWidth: 18)
-            }
-            ChainArt(node: node, width: 26, height: 26, radius: 6, glyphSize: 11)
-            NodeName(node: node)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Spacer(minLength: 0)
-            Text(node.kind.tileLabel)
-                .metaLabel(size: .small)
-        }
-        .padding(.horizontal, Theme.Spacing.sm + 2)
-        .padding(.vertical, Theme.Spacing.sm - 1)
-        .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
-        .accessibilityElement(children: .combine)
-    }
-}
 
 // MARK: - Pieces
 
@@ -133,14 +94,4 @@ private struct DevelopingImage: View {
             .animation(.easeOut(duration: 0.22), value: developed)
             .onAppear { developed = true }
     }
-}
-
-#Preview("Recap cards") {
-    VStack(spacing: Theme.Spacing.xs + 2) {
-        CompactChainCard(node: .actor(Person(id: 1, name: "Brad Pitt")), position: nil, isStart: true)
-        CompactChainCard(node: .movie(Movie(id: 1001, title: "Ocean's Eleven", year: 2001)), position: 1)
-        CompactChainCard(node: .actor(Person(id: 2, name: "Matt Damon")), position: 2)
-    }
-    .padding()
-    .background(Theme.Color.canvas)
 }

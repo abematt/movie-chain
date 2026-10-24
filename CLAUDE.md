@@ -74,16 +74,19 @@ changelog table before choosing a bump**. Each is documented in
 [`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
 the relevant section before starting one.
 
-> Note: the visual design is **Cream Neobrutalist** as of 0.5.0 — no longer
-> placeholder. The chain is drawn as the **Deck** (`ChainDeck.swift` — a physical pile
+> Note: the visual design is moving from 0.5.0's Cream Neobrutalist to **Ground &
+> Object** (branch `feature_ground-and-object`, specced on a design canvas — see
+> [`docs/ROADMAP.md`](docs/ROADMAP.md#ground--object--the-10-look)): paper ground,
+> objects with a hard ink side, blue/yellow only on objects and in the answer dock,
+> Night for game over, Archivo + JetBrains Mono caps, no serif or italics. The chain
+> is drawn as the **Deck** (`ChainDeck.swift` — a physical pile
 > that fills the space above the keyboard); the Cards and Tiles styles that sat behind
 > a setting were removed once the Deck won. The motion re-tune landed as 0.5.1. The recurring
 > constraint is still vertical room against the docked keyboard. Vocabulary is fixed:
 > a *chain* is a whole run, a *link* is one correct answer (the score counts links),
 > the dealt start is not a link, and the best run is the most links with points
 > breaking ties (`Scoring.isNewRecord`). Reuse `Theme` tokens and `Components` — never
-> hardcode fonts, colours or sizes. See
-> [`docs/ROADMAP.md`](docs/ROADMAP.md#050--design-overhaul).
+> hardcode fonts, colours or sizes.
 
 - **Where the version lives:** `MARKETING_VERSION` (e.g. `0.4.0`) and
   `CURRENT_PROJECT_VERSION` (the build number) in build settings — set in all four
@@ -329,27 +332,24 @@ because the Reel sheet hosts the required **TMDB attribution**. Brand art (`Word
 dark variants — never redraw it in code. Styling is a
 small design-system layer: `Theme.swift` (color/spacing/radius/motion tokens +
 per-node category identity — **blue = actor, yellow = movie**) and
-`Components.swift` (`.neoSurface` = border + hard shadow, `PrimaryButtonStyle` = coral, `GhostButtonStyle`,
-`PressScaleStyle` = `.pressScale` subtle press feedback, `.card()`,
-`NodeTile`/`NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
-(`.appear(i)`)), all built on the
-Cream Neobrutalist palette (0.5.0) defined in `Assets.xcassets`
-(Canvas/Ink/Tile/Shadow/Hairline/Coral/ActorBlue/MovieYellow/Good/OnAccent, each
-light+dark). The chain is the **Deck** (`ChainDeck.swift`: every link is one card for
+`Components.swift` (`.neoSurface` = edge + a hard side straight down,
+`DockGround` = the coloured dock, `SlabButtonStyle` = dock slabs, `PrimaryButtonStyle`
+= an ink slab, `GhostButtonStyle`, `PressScaleStyle` = `.pressScale` subtle press
+feedback, `Heading`, `NodeDot`, plus juice pieces `Shake`/`FloatingGain`/`StaggeredAppear`
+(`.appear(i)`)), all built on the Ground & Object palette in `Assets.xcassets`
+(Canvas/Ink/Tile/Shadow/Hairline/Socket/Night/Go/ActorBlue/MovieYellow/Good/OnAccent,
+each light+dark; dark is a dim room where black stays the side). The chain is the **Deck** (`ChainDeck.swift`: every link is one card for
 its whole life — a new one is dealt in from below and pushes the last back into a pile
 that peeks out above it, sized to the room above the keyboard); `ChainCards.swift`
-holds the pieces it shares with the game-over recap (`CompactChainCard`, `KindChip`,
-`ChainArt`). The dealt
+holds the pieces it shares with the handoff (`KindChip`, `ChainArt`). The dealt
 start wears a holographic sticker (`HoloSticker.swift`, gyro-lit foil) instead of a
-number, as does a new best on game over. The play
-screen docks the text input via `.safeAreaInset(.bottom)` above the
+number. The play screen docks the answer dock (coloured for the kind you name next,
+carrying the prompt) via `.safeAreaInset(.bottom)` above the
 **always-present keyboard** (with `TimerBar.swift` as a slim linear countdown), and
-swaps it for a **Retry** button if a candidate load failed
-(`engine.awaitingRetry`); the full chain is revealed as a numbered recap of compact
-cards at game over, cascading in, and the score pops when the run set a new best. App-wide
-tint (ink) is set once in `movie_quizApp` (no rounded font — the look pairs the
-system serif wordmark with the default sans). Prefer reusing these over hardcoded
-values.
+swaps the field for a **Retry** slab if a candidate load failed
+(`engine.awaitingRetry`). Game over is on Night (the holo sky for a new best), with the
+chain as a `CoinStack` and the recap below; Share sends a `ShareCard` image. App-wide
+tint (ink) is set once in `movie_quizApp`. Prefer reusing these over hardcoded values.
 
 Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall
 every Nth link) all layer on this same engine — keep the engine/provider split clean.

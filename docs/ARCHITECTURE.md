@@ -402,88 +402,86 @@ to the end; a *link* is one correct answer, and the score counts links; the deal
 *start* is not a link. Copy, numbering and the recap all follow this, so the last
 link number always equals the score.
 
-**Cream Neobrutalist** (0.5.0): a cream canvas, white surfaces with a 2pt ink border and a hard unblurred
-offset shadow, one coral call-to-action, and two category accents — **blue for
-actors, yellow for movies** (the most colour-blind-safe pair). Dark mode flips the
-borders to cream on a warm charcoal canvas. A bold serif with an italic flourish
-carries display type in **Fraunces**, bundled in `movie-quiz/Fonts/` as four static
-cuts (bold and italic at a 72pt and a 24pt optical size) with its SIL OFL license, and
-registered at first use by `FontRegistry` in `Theme.swift`. Body, buttons and labels
-stay in SF rather than the spec's Inter, since SF is the iOS-native equivalent. Two
-other deliberate deviations: everything but the big numerals scales with Dynamic Type,
-and icons are SF Symbols rather than Phosphor. UI labels are
-small, bold, uppercase and tracked.
+**Ground & Object** (replacing 0.5.0's Cream Neobrutalist; see [`ROADMAP.md`](ROADMAP.md#ground--object--the-10-look)):
+a paper ground, white objects with a 2pt edge and a hard ink **side** straight below
+(thickness, never a blur or a lean), and two category colours — **blue for actors,
+yellow for movies** (the most colour-blind-safe pair) — that live on objects and in the
+answer **dock**, never on the ground. Game over and the share card sit on **Night**
+(#141414); a new best is the same screen on the **holo sky**. Dark mode is a dim room,
+not a black one: the ground lifts to a warm grey and black stays the edge and side.
+Type is **one family, three widths**: Archivo for names and sentences, condensed black
+Archivo for numbers and actions, and JetBrains Mono bold caps for chips and card numbers
+only — no serif, no italics. The fonts are static cuts of the two variable fonts,
+bundled in `movie-quiz/Fonts/` with their SIL OFL licences and registered at first use
+by `FontRegistry` in `Theme.swift`. Everything but the big numerals scales with Dynamic
+Type; icons are SF Symbols.
 - **Color** lives in `Assets.xcassets` as named sets with light+dark variants —
-  `Canvas` (cream), `Ink` (text and every border), `Tile` (white surface),
-  `Shadow` (the hard offset shadow), `Hairline` (muted track), `Coral` (the CTA),
-  `ActorBlue`, `MovieYellow`, `Good` (correct-link green), and `OnAccent`
-  (near-black text for the light accents; actor blue takes white instead, via
-  `NodeKind.onAccent`). `Theme.Color` just names them;
-  muted text still uses Apple's semantic `.secondary`/`.tertiary`.
-- `Theme` — token namespaces: `Color`, `Spacing`, `Border`, `Shadow` (`small`
-  2pt for chrome, `large` 4pt for primary cards and the CTA), `Font` (the whole
-  type system: serif `display`/`heading` with an italic `flourish`, sans `body`/
-  `bodyStrong`/`small`, and the tracked uppercase `label` — everything but the big
-  numerals rides a Dynamic Type text style), `Radius`, `Motion` (incl.
-  `drop`, the spring a new tile lands on; `screen`, the soft spring the
-  screen-to-screen carousel rides; `intro`, the seed cold-launch reveal; and
-  `cascade`, the springy wave a staggered group of siblings rises in on).
-  Views reference these, never literals. `AnyTransition.screenPush(reduceMotion:)`
-  (also here) is the router's directional page push — see the UI section.
+  `Canvas` (the paper ground), `Ink` (text, filled controls), `Tile` (objects),
+  `Shadow` (the side and the edge: ink in light, black in dark), `Hairline`, `Socket`
+  (empty places: the timer track, loading sockets), `Night` and `Go` (game over's
+  ground and Play again; the same in both modes), `ActorBlue`, `MovieYellow` (the same
+  in both modes), `Good`, `Danger` and `OnAccent` (near-black text for the light
+  accents; actor blue takes white instead, via `NodeKind.onAccent`). `Theme.Color`
+  just names them; `primary` is ink (the call to action is an ink slab).
+- `Theme` — token namespaces: `Color`, `Spacing`, `Border`, `Shadow` (side depths:
+  `small` 4 for pills and inputs, `large` 6 for buttons, `card` 10 for the deck's
+  front card), `Font` (`display`/`numeral` condensed black, `name`/`heading` Archivo
+  semibold, `sentence` regular, `body`/`bodyStrong`/`small`, mono `label`/
+  `labelSmall`/`cardStamp`, condensed `button`), `Radius` (incl. `field` and `dock`),
+  `Holo` (the foil stops and the new-best `sky`), `Motion` (incl. `drop`, the spring
+  a new card lands on; `screen`, the carousel; `intro`, the seed cold-launch reveal;
+  `cascade`, a staggered group's wave). Views reference these, never literals.
+  `AnyTransition.screenPush(reduceMotion:)` (also here) is the router's push.
 - `NodeKind` / `ChainNode` extensions give each kind one `accent` (blue/yellow), an `onAccent` text colour,
   a `tileLabel` ("ACTOR"/"MOVIE"), and a `symbol`, eliminating color/label logic
   that was duplicated across views.
 - `Components.swift` — owned, reusable primitives (the app's shadcn-equivalent):
-  `.metaLabel()` (the one uppercase-label recipe), `NodeName` (a name with the
-  movie year as an italic flourish, never a parenthetical),
-  `.neoSurface(...)` (the neobrutalist atom: fill, ink border, hard shadow, and a
-  `pressed` state that collapses the shadow), `PrimaryButtonStyle`
-  (`.buttonStyle(.primary)`, coral with a 4pt shadow), `GhostButtonStyle`
-  (`.ghost`, white with a 2pt shadow), `PressScaleStyle` (`.pressScale` — a
-  near-imperceptible press squish+dim for buttons that carry their own chrome but
-  lacked an `isPressed` state, e.g. the in-game "Go"), `CardModifier` (`.card()`), `NodeTile`
-  (the Connections category tile — the atom of the chain), `NodeDot` (small
-  category chip), plus the juice pieces `Shake` (`.shake(trigger)` for a rejected
-  answer), `FloatingGain` (the rising "+N"), and `StaggeredAppear` (`.appear(i)` —
-  fades + lifts a view in on appear, delayed by its position, so a group of
-  siblings assembles one-after-another; drives both the seed intro's control
-  reveal and the Reel grid tiles from one place, and honors Reduce Motion). Its
-  `enabled:` flag keeps the stagger for a first-run reveal but skips it on
-  ordinary re-insertions — the seed controls stagger during the cold-launch intro
-  yet arrive **solid** on a "Play again" re-entry, so they don't run their own
-  motion *while the carousel is already pushing the screen in* (that clash read as
-  whiplash).
+  `.metaLabel()` (the one mono-caps label recipe), `NodeName` (a name with the movie
+  year in the sentence voice, never a parenthetical), `Heading` (a title in one voice),
+  `.neoSurface(...)` (the atom: fill, edge, a hard side, an optional `side` colour, and
+  a `pressed` state that sinks the face onto its side), `DockGround` (the coloured
+  panel across the bottom of Home and Play), `SlabButtonStyle` (a dock slab: night
+  lettered in the dock's colour, white for Retry/Reconnect, Go lime on Night),
+  `PrimaryButtonStyle` (`.primary`, an ink slab), `GhostButtonStyle` (`.ghost`),
+  `PressScaleStyle` (`.pressScale` — a near-imperceptible press squish+dim for
+  buttons that carry their own chrome), `NodeDot` (small category chip), plus the
+  juice pieces `Shake` (`.shake(trigger)` for a rejected answer), `FloatingGain` (the
+  rising "+N"), and `StaggeredAppear` (`.appear(i)` — fades + lifts a view in on
+  appear, delayed by its position, so a group of siblings assembles
+  one-after-another; drives the seed intro's control reveal and the Reel grid, and
+  honors Reduce Motion). Its `enabled:` flag keeps the stagger for a first-run reveal
+  but skips it on ordinary re-insertions, so the seed controls arrive **solid** on a
+  "Play again" re-entry rather than moving *while the carousel pushes the screen in*.
 - Feature components in their own files: [`ChainDeck.swift`](../movie-quiz/ChainDeck.swift)
   is the signature visual — every link is one card for its whole life: a new one is
   dealt in from below and pushes the last back into a pile that peeks out above it,
   sized to the room above the keyboard. [`ChainCards.swift`](../movie-quiz/ChainCards.swift)
-  holds the pieces it shares with the game-over recap (`CompactChainCard`, `KindChip`,
-  `ChainArt`). The original `ChainStack` tile stack, and the Cards style that briefly
+  holds the pieces it shares with the handoff (`KindChip`, `ChainArt`).
+  [`CoinStack.swift`](../movie-quiz/CoinStack.swift) draws a finished chain as one
+  continuous coin stack in a single `Canvas` (blue actors labelled left, yellow movies
+  right, the top coin a film spool when it's a movie), for game over and the share card. The original `ChainStack` tile stack, and the Cards style that briefly
   replaced it, sat behind a Settings → Chain style picker until the Deck won; both
   were removed.
   [`TimerBar.swift`](../movie-quiz/TimerBar.swift) is the slim linear countdown
-  (drains in ink, shifts to a warning red in the final quarter).
+  (drains in ink over a socket track, shifts to a warning red in the final quarter).
 - App-wide `.tint(.accentColor)` (ink) is applied once at the root in
-  `movie_quizApp`; **no `.fontDesign`** — the look pairs the system serif (wordmark,
-  game-over number) with the default sans for UI. The accent is defined for
-  light/dark in `Assets.xcassets/AccentColor` (near-black / off-white).
+  `movie_quizApp`. The accent is defined for light/dark in
+  `Assets.xcassets/AccentColor` (near-black / off-white).
 - **Brand art** (0.6.0, Unspool) is supplied as finished assets, not drawn in code:
   the **two-circle mark** (blue actor + yellow movie, the ink overlap is the link) as
-  `LogoMark`; the **`Wordmark`** ("unspool" in outlined Fraunces Display Bold with the
+  `LogoMark`; the **`Wordmark`** ("unspool" in outlined Archivo ExtraBold with the
   mark as its "oo"); the **`FilmStrip`** supporting graphic (launch screen, store
   screenshots, share card — never the logo). All are SVG with "Preserve Vector Data"
   and an on-dark variant. The **app icon** (`AppIcon.appiconset`) is the mark on a
-  cream tile, one 1024 universal entry plus iOS 18 **dark** (ink tile) and **tinted**
-  variants. Every icon bitmap is **opaque (no alpha channel)** — iOS rejects icons
+  paper tile, one 1024 universal entry plus iOS 18 **dark** (night tile, light rings)
+  and **tinted** variants. Every icon bitmap is **opaque (no alpha channel)** — iOS rejects icons
   with alpha at archive/upload; verify with `sips -g hasAlpha`.
 
 ### UI — SwiftUI, routed by phase
 
-> ⚠️ Same caveat as the design system above: **the visuals described here are
-> placeholder.** The routing, state ownership, and layout *constraints* (keyboard
-> docking, portrait-only, Reduce Motion) are real and load-bearing; the styling is not
-> settled, and the chain's replacement is still an open question. See **[`ROADMAP.md` →
-> 0.5.0](ROADMAP.md#050--design-overhaul)** before changing anything visual.
+> The routing, state ownership, and layout *constraints* (keyboard docking,
+> portrait-only, Reduce Motion) are load-bearing. The look is Ground & Object, specced
+> on the design canvas linked from [`ROADMAP.md`](ROADMAP.md#ground--object--the-10-look).
 
 - [`movie_quizApp.swift`](../movie-quiz/movie_quizApp.swift) — `@main` entry.
 - [`ContentView.swift`](../movie-quiz/ContentView.swift) — owns the single
@@ -506,10 +504,13 @@ small, bold, uppercase and tracked.
   first turn**: a sentence with a blank, not a search box or a button. Since 0.6.0
   (Unspool): a header of the **`Wordmark`** asset with the Reel and gear pills
   overlaid on its trailing edge; the dealt start as the head of a sentence (round
-  avatar + kind chip, the name in Fraunces display, "*was in*" for an actor or
-  "*starred*" for a movie); the **blank** ("a movie…" / "an actor…" over an ink rule,
-  with a coral arrow); "Deal again" and "Pick your own" links; and the best run,
-  centred at the foot of the screen (absent until there is one). No instruction text: the sentence
+  avatar + kind chip, the name in Archivo semibold, "was in" for an actor or
+  "starred" for a movie); then the **dock**, filled with the kind you name next
+  (yellow after an actor, blue after a movie, grey while dealing), holding the
+  **blank** (a white field reading "a movie…" / "an actor…" beside a night start slab
+  with its arrow in the dock's colour), "Deal again" and "Pick your own", and the best
+  run (absent until there is one). With no connection the deal is replaced by "Out of
+  film." over an empty spool, with Reconnect in a night dock. No instruction text: the sentence
   is the rule, and the blank nudges once, ever, for a new player. The Reel pill is always reachable (count
   hidden when empty) because the Reel sheet hosts the TMDB attribution.
   - **The sentence's head** sits in a fixed-height region pinned to its bottom, so the
@@ -567,20 +568,25 @@ small, bold, uppercase and tracked.
   play) after 1s without destinations. `ContentView` makes seed → play a cross-fade
   under it rather than a push.
 - [`GameView.swift`](../movie-quiz/GameView.swift) — the turn. The chrome (sound ·
-  seconds · quit) + `TimerBar`, the centered **serif score hero** (chain number +
-  points), the `ChainDeck`, and the next-up hint, with the answer input
-  **docked via `.safeAreaInset(.bottom)`** directly above the keys (auto-focused;
+  seconds · quit) + `TimerBar`, the centered **score hero** (one huge condensed
+  figure, "links · N pts" under it), and the `ChainDeck` on a paper ground, with the
+  answer **dock** (filled with the kind you name next; the prompt or the error, a
+  white field and a night Go slab) **docked via `.safeAreaInset(.bottom)`**
+  directly above the keys (auto-focused;
   the keyboard's Go submits) — laid out around the **always-present software
   keyboard**, the dominant constraint of a typing game. A **Retry** button replaces
   the input when `engine.awaitingRetry` (a candidate load failed, so typing would be
   futile — nothing would validate). Reacts to `engine.score` /
   `engine.feedback` to fire haptics, sound, the "+N" pop and the shake.
-- [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — final score (serif) +
-  points, a quiet "a new best" mark (a serif-italic green pill, no confetti), the
-  **Personal best fenced between hairlines** so it never reads as this run, the
-  "you were one away" near-miss, **a "+N new to your Reel" line that opens the
-  collection sheet**, the full chain revealed as a numbered recap of
-  compact cards, and **Play again** + **Share** (the 🟦🟪 card).
+- [`GameOverView.swift`](../movie-quiz/GameOverView.swift) — on **Night**: how the
+  run ended, the link count huge, and the chain as a `CoinStack`; a new best is the
+  same screen on the **holo sky** with a "New best" tag (no confetti, no separate
+  screen). Scrolling down gives the recap — the "you were one away" card and every
+  link by name — then the best and the Reel line. **Play again** (a Go slab with a
+  white side) stays pinned with **Share** and **Your Reel** under it. Share sends
+  [`ShareCard`](../movie-quiz/ShareCard.swift) — the run as a spoiler-free 9:16 image
+  (count, nameless coin stack, "Start from ⟨name⟩") drawn with `ImageRenderer` —
+  with the 🟦🟨 text.
 - [`SettingsView.swift`](../movie-quiz/SettingsView.swift) — the app's settings
   surface, a `.sheet` opened from a **gear pill** on `SeedView` (mirroring the Reel
   pill on the opposite corner). A small on-brand card layout (not a stock grouped

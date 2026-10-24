@@ -252,6 +252,26 @@ than renaming before.
 
 ---
 
+## Ground & Object — the 1.0 look
+
+Started 2026-10-24; takes the next minor version when it lands. Cream Neobrutalist read
+as "vibe coded" and too close to Claude's ivory, serif and clay. The new direction is
+**Ground & Object**, drawn from Bakers Studio's Pera identity and Tinyman visuals: a
+paper ground, heavy objects with an ink edge and a hard ink side, blue and yellow living
+only on objects and in the answer dock, Archivo in three widths plus mono caps, foil saved
+for a new best. It is specced screen by screen on a design canvas (private, on the
+personal account), which is the source of truth while it lasts.
+
+**Decided:** dark mode is a dim room (the ground lifts, black stays the side);
+Home and Play put the colour in the dock; game over and the share card sit on Night
+with the chain as one coin stack, a film spool on the top disc; a new best is game over
+on the holo sky; Reel cards stay. **Tabled:** the Reel's disc grid.
+
+**Order:** foundations (tokens, fonts) → components (slabs and sides) → Home → Play →
+game over → share card and challenge → the Reel → Settings, search, first run.
+
+---
+
 ## 0.7.0 — Foundations & safety net
 
 **Why first:** none of it depends on a design decision, none of it can be wasted, and

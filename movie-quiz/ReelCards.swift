@@ -173,6 +173,9 @@ struct ReelActorCard: View {
             if lifted { ReelGlare().clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm)) }
         }
         .neoSurface(radius: Theme.Radius.sm, fill: .clear, shadow: grounded ? Theme.Shadow.small : 0)
+        // A printed card is paper in any light: it keeps its light-mode inks in
+        // dark mode, the one lit object on the dim ground.
+        .environment(\.colorScheme, .light)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
@@ -278,7 +281,9 @@ struct ReelFrame: View {
             .aspectRatio(2.0 / 3.0, contentMode: .fit)
             // Trims the parallax's overscan to the mat's window.
             .clipped()
-            .overlay { if lifted { ReelGlare() } }
+            // Clipped to the poster: the glare is drawn well past its bounds so it
+            // can slide, and unclipped it lit the whole screen.
+            .overlay { if lifted { ReelGlare().clipped() } }
             .overlay(Rectangle().strokeBorder(Theme.Color.border, lineWidth: 0.75))
             .padding(Self.mat)
             .background(Theme.Color.tile)
@@ -288,9 +293,11 @@ struct ReelFrame: View {
             .background(Theme.Color.ink)
             .background {
                 let depth = grounded ? Theme.Shadow.small : 0
-                Rectangle().fill(Theme.Color.shadow).offset(x: depth, y: depth)
+                Rectangle().fill(Theme.Color.shadow).offset(y: depth)
             }
             .overlay(alignment: .topTrailing) { if isNew { NewBadge().offset(x: 3, y: -5) } }
+            // Paper and moulding in any light, like the actor cards.
+            .environment(\.colorScheme, .light)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(entity.displayName)
     }
@@ -309,7 +316,7 @@ struct ReelFrameCaption: View {
                 .minimumScaleFactor(0.75)
             if let year = entity.year {
                 Text(String(year))
-                    .font(Theme.Font.flourish(.caption))
+                    .font(Theme.Font.sentence(.caption))
                     .foregroundStyle(Theme.Color.muted)
             }
         }
@@ -373,7 +380,9 @@ struct ReelCardDetail: View {
 
     var body: some View {
         ZStack {
-            Theme.Color.canvas.opacity(0.92)
+            // A dark room around the lifted card, in both modes: the card is the
+            // one lit object.
+            Theme.Color.night.opacity(0.62)
                 .ignoresSafeArea()
                 .opacity(out ? 1 : 0)
                 // A plain fade in (a dim mustn't bounce with the card); cleared
@@ -511,7 +520,7 @@ struct ReelCardDetail: View {
 
             if linked.isEmpty {
                 Text("Links are counted from your next chain with \(isActor ? "them" : "it").")
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .foregroundStyle(Theme.Color.muted)
             } else {
                 ScrollView {
@@ -532,6 +541,8 @@ struct ReelCardDetail: View {
         .clipShape(RoundedRectangle(cornerRadius: isActor ? Theme.Radius.md : 0))
         // Only shown while out, when the card is off the table (`ReelActorCard.grounded`).
         .neoSurface(radius: isActor ? Theme.Radius.md : 0, fill: .clear, shadow: 0)
+        // The back is paper too.
+        .environment(\.colorScheme, .light)
     }
 
     @ViewBuilder private func row(_ other: CollectedEntity) -> some View {
@@ -554,7 +565,7 @@ struct ReelCardDetail: View {
             Spacer(minLength: 4)
             if let year = other.year {
                 Text(String(year))
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .foregroundStyle(Theme.Color.muted)
             }
         }
@@ -568,7 +579,7 @@ struct ReelCardDetail: View {
                 .font(Theme.Font.numeral(.subheadline))
                 .foregroundStyle(Theme.Color.ink)
             Text("In \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
-                .font(Theme.Font.flourish(.footnote))
+                .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
         }
     }

@@ -61,6 +61,29 @@ Unspool rebrand was inserted as 0.6.0.)
   instead of as a player who silently left.
 
 ### Changed
+- **Ground & Object begins: new type and colour foundations.** Cream Neobrutalist read
+  as generic and sat too close to Claude's own ivory, serif and clay. The app is now set
+  in Archivo (names and sentences, with condensed black for numbers and actions) and
+  JetBrains Mono caps for chips, with no serif and no italics; the cream ground becomes
+  paper, coral is gone (the call to action is an ink slab), and dark mode is a dim room
+  rather than a black one, so edges and sides keep their weight. Objects get a hard ink
+  side straight below them, never a blur, and a press sinks them onto it.
+- **Home and Play put the colour in the dock.** The ground stays paper; the panel you
+  act in is filled with the kind you name next, yellow for a movie and blue for an
+  actor, so the turn's colour is always where your thumb is. On Play the dock carries
+  the prompt, and a miss takes its line instead of adding a row. The wordmark is
+  redrawn in Archivo.
+- **Game over is on Night, with the chain as a coin stack.** The run reads as one
+  number and one object: every link a coin, actors labelled left and movies right, a
+  film spool on top when the run ended on a movie. A new best is the same screen on
+  the holo sky rather than a sticker. The full recap is a scroll away.
+- **Share sends a picture.** The text now travels with a 9:16 card: the count, the
+  stack with no names on it, and the start to beat it from, so the dare is the image.
+- **A new icon in the new colours**, the mark on paper (night in dark mode), and the
+  Reel's cards stay paper in dark mode: they're printed things, the lit objects on a
+  dim ground.
+- **Out of film reads like the home it replaces**, with an empty spool and Reconnect
+  in a night dock that says the Reel and best run are safe.
 - **The deal pool is saved between launches.** Every cold launch used to fire about 24
   TMDB requests to rebuild the same most-watched pool. Now a copy less than a week old
   is dealt from with no requests at all, which spares most launches and keeps a burst

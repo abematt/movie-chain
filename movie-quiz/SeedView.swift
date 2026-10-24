@@ -241,7 +241,7 @@ struct SeedView: View {
         Image("Wordmark")
             .resizable()
             .scaledToFit()
-            .frame(height: 40)
+            .frame(height: 34)
             .scaleEffect(revealed ? 1 : 1.5)
             .opacity(markShown ? 1 : 0)
             .frame(maxWidth: .infinity, alignment: revealed ? .leading : .center)
@@ -317,16 +317,43 @@ struct SeedView: View {
     private var dealSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: Theme.Spacing.md)
-            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                cascade(sentenceHead, 0)
-                cascade(blank, 1)
-                cascade(dealLinks, 2)
-                    .padding(.top, -Theme.Spacing.xs)
-            }
-            Spacer(minLength: Theme.Spacing.md)
-            cascade(bestRun, 3)
+            cascade(sentenceHead, 0)
+                .padding(.bottom, Theme.Spacing.lg + 4)
+            dock
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    // MARK: Dock — the blank, deal again / pick your own, the best run
+    //
+    // The colour lives here, not on the ground: the dock is filled with the kind
+    // you name next (yellow when the start is an actor, blue when it's a movie),
+    // grey while a start is being dealt. It bleeds to the screen's edges and runs
+    // under the home indicator.
+
+    private var nextKind: NodeKind { engine.dealtSeed?.nextKind ?? .movie }
+
+    private var dockColor: Color { engine.dealtSeed == nil ? Theme.Color.socket : nextKind.accent }
+
+    /// Type on the dock: white on blue, ink on yellow and on the dealing grey.
+    private var dockInk: Color { engine.dealtSeed == nil ? Theme.Color.ink : nextKind.onAccent }
+
+    private var dock: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.lg - 2) {
+            cascade(blank, 1)
+            cascade(dealLinks, 2)
+            cascade(bestRun(ink: dockInk, muted: dockInk.opacity(0.72)), 3)
+                .padding(.top, Theme.Spacing.sm)
+        }
+        .padding(.horizontal, Theme.Spacing.gutter)
+        .padding(.top, Theme.Spacing.lg - 2)
+        .padding(.bottom, Theme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { DockGround(color: dockColor) }
+        // Out to the screen's edges, past the body's gutter and bottom inset.
+        .padding(.horizontal, -Theme.Spacing.gutter)
+        .padding(.bottom, -Theme.Spacing.sm)
+        .animation(Theme.Motion.standard, value: dockColor)
     }
 
     /// Deal ⇄ search: the leaving layout fades out fast, the arriving one fades
@@ -352,9 +379,7 @@ struct SeedView: View {
                     .id(seed.id)
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
-                Text("Dealing…")
-                    .font(Theme.Font.flourish(size: SentenceType.verbSize))
-                    .foregroundStyle(Theme.Color.muted)
+                DealingSentence()
                     .transition(.opacity)
             }
         }
@@ -365,33 +390,42 @@ struct SeedView: View {
 
     // MARK: No connection — the pools didn't load and nothing was saved
 
-    /// Replaces the whole deal while there's no start to deal: say what's wrong
-    /// in a sentence, and make trying again the one thing to do. The best run
-    /// stays at the foot, where it always sits.
+    /// Replaces the whole deal while there's no start to deal: an empty spool,
+    /// what's wrong in a sentence where the start's name would be, and trying
+    /// again as the one thing to do, in a night dock where the colour would be.
     private var offlineSection: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: Theme.Spacing.md)
-            VStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "wifi.slash")
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                EmptySpool()
+                    .frame(width: 96, height: 96)
+                    .padding(.bottom, Theme.Spacing.sm)
                 Text("Out of film.")
-                    .font(Theme.Font.flourish(size: SentenceType.verbSize))
+                    .font(Theme.Font.name(size: SentenceType.nameSize))
+                    .tracking(-1.5)
                     .foregroundStyle(Theme.Color.ink)
                 Text("Looks like we unspooled a little too far. Let's thread a new reel.")
-                    .font(Theme.Font.body)
+                    .font(Theme.Font.sentence(.title3))
                     .foregroundStyle(Theme.Color.muted)
-                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                retryDealButton
-                    .padding(.top, Theme.Spacing.sm)
             }
+            .padding(.bottom, Theme.Spacing.lg + 4)
+
+            VStack(spacing: Theme.Spacing.md) {
+                retryDealButton
+                Text("Your Reel and best run are safe on this phone.")
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Color(white: 0.74))
+            }
+            .padding(.horizontal, Theme.Spacing.gutter)
+            .padding(.top, Theme.Spacing.lg - 2)
+            .padding(.bottom, Theme.Spacing.md)
             .frame(maxWidth: .infinity)
-            Spacer(minLength: Theme.Spacing.md)
-            bestRun
+            .background { DockGround(color: Theme.Color.night) }
+            .padding(.horizontal, -Theme.Spacing.gutter)
+            .padding(.bottom, -Theme.Spacing.sm)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
     private var retryDealButton: some View {
@@ -402,7 +436,7 @@ struct SeedView: View {
         } label: {
             HStack(spacing: Theme.Spacing.sm) {
                 if dealRetrying {
-                    ProgressView().tint(Theme.Color.onAccent)
+                    ProgressView().tint(Theme.Color.night)
                 } else {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -410,14 +444,14 @@ struct SeedView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.primary)
+        .buttonStyle(SlabButtonStyle(fill: .white, foreground: Theme.Color.night, side: .black))
         .disabled(dealRetrying)
     }
 
     // The blank is the start button: tapping it plays.
     private var blank: some View {
         Button(action: startFromBlank) {
-            SentenceBlank(kind: engine.dealtSeed?.nextKind ?? .movie, nudge: blankNudge)
+            SentenceBlank(kind: nextKind, nudge: blankNudge, dealing: engine.dealtSeed == nil)
                 .contentTransition(.opacity)
                 .contentShape(Rectangle())
         }
@@ -456,22 +490,30 @@ struct SeedView: View {
         }
         .buttonStyle(.pressScale)
         .labelStyle(LinkLabelStyle())
-        .font(Theme.Font.bodyStrong)
-        .foregroundStyle(Theme.Color.ink)
+        .font(Theme.Font.button)
+        .textCase(.uppercase)
+        .tracking(Theme.Font.buttonTracking)
+        .foregroundStyle(dockInk)
     }
 
     // The best run, centred at the foot of the screen — and nothing before
     // there is one. No "tap the blank": the sentence already reads
     // as the rule, and the blank's one-time nudge (`playBlankHint`) shows a new
     // player where to tap.
-    @ViewBuilder private var bestRun: some View {
+    @ViewBuilder private func bestRun(ink: Color, muted: Color) -> some View {
         if engine.bestChain > 0 {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                Text("Best run").metaLabel()
-                Text("\(Text("\(engine.bestChain)").font(Theme.Font.numeral(.title3)).foregroundStyle(Theme.Color.ink)) \(Text(engine.bestChain == 1 ? "link" : "links").font(Theme.Font.flourish(.body)))")
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
+                Text("Best run")
+                Text("\(engine.bestChain)")
+                    .font(Theme.Font.numeral(.title))
+                    .foregroundStyle(ink)
+                Text(engine.bestChain == 1 ? "link" : "links")
             }
+            .font(Theme.Font.button)
+            .textCase(.uppercase)
+            .tracking(Theme.Font.buttonTracking)
+            .foregroundStyle(muted)
+            .lineLimit(1)
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .combine)
         }
@@ -620,13 +662,12 @@ struct SeedView: View {
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.md - 2)
         .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
-        .padding(.trailing, Theme.Shadow.small)
+        .padding(.bottom, Theme.Shadow.small)
     }
 
     private var emptyState: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            SplitHeading(roman: query.isEmpty ? "Pick your" : "No",
-                         flourish: query.isEmpty ? "start" : "matches")
+            Heading(query.isEmpty ? "Pick your start" : "No matches")
             Text(query.isEmpty
                  ? "Search an \(engine.seedKind == .actor ? "actor" : "movie") to begin your chain."
                  : "Try a different spelling.")
@@ -756,8 +797,10 @@ private struct SentenceHead: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(spacing: Theme.Spacing.sm + 4) {
-                HandoffArt(node: seed, radius: 20)
-                    .frame(width: 40, height: 40)
+                // An actor's face in a circle; a movie's poster as a poster.
+                HandoffArt(node: seed, radius: seed.kind == .movie ? Theme.Radius.sm : SentenceType.artSize / 2)
+                    .frame(width: seed.kind == .movie ? SentenceType.artSize * 0.8 : SentenceType.artSize,
+                           height: seed.kind == .movie ? SentenceType.artSize * 1.15 : SentenceType.artSize)
                     .handoffSource(.art, stage, for: seed.id)
                 KindChip(kind: seed.kind)
                     .handoffSource(.chip, stage, for: seed.id)
@@ -770,6 +813,52 @@ private struct SentenceHead: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A spool with no film on it: the reel's rim and five spoke holes, on paper
+/// with a side. The no-connection screen's picture.
+private struct EmptySpool: View {
+    var body: some View {
+        Canvas { context, size in
+            let r = min(size.width, size.height) / 2
+            let c = CGPoint(x: size.width / 2, y: size.height / 2)
+            let ink = GraphicsContext.Shading.color(Theme.Color.night)
+            func hole(at p: CGPoint, radius: CGFloat) {
+                let rect = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
+                context.fill(Path(ellipseIn: rect), with: ink)
+            }
+            for k in 0..<5 {
+                let angle: Double = (-90 + 72 * Double(k)) * .pi / 180
+                let spoke: CGFloat = 0.52 * r
+                hole(at: CGPoint(x: c.x + spoke * CGFloat(cos(angle)), y: c.y + spoke * CGFloat(sin(angle))),
+                     radius: r * 0.19)
+            }
+            hole(at: c, radius: r * 0.1)
+        }
+        .background(Circle().fill(.white))
+        .overlay(Circle().strokeBorder(Theme.Color.night, lineWidth: 3))
+        .background(Circle().fill(Theme.Color.shadow).offset(y: Theme.Shadow.large))
+        .accessibilityHidden(true)
+    }
+}
+
+/// The sentence's shape while a start is being dealt: sockets where the avatar,
+/// chip, name and verb will land, so nothing jumps when the start arrives.
+private struct DealingSentence: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(spacing: Theme.Spacing.sm + 4) {
+                Circle().frame(width: SentenceType.artSize, height: SentenceType.artSize)
+                Capsule().frame(width: 66, height: 26)
+            }
+            .padding(.bottom, Theme.Spacing.xs)
+            RoundedRectangle(cornerRadius: 10).frame(width: 240, height: 46)
+            RoundedRectangle(cornerRadius: 8).frame(width: 110, height: 30)
+        }
+        .foregroundStyle(Theme.Color.socket)
+        .accessibilityElement()
+        .accessibilityLabel("Dealing a start")
     }
 }
 

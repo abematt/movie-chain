@@ -12,26 +12,29 @@ import SwiftUI
 
 // MARK: - Neo surface (the neobrutalist atom)
 //
-// White (or tinted) fill, a 2pt ink border, and a solid shadow offset
-// down-right with no blur. Everything bordered in the app — cards, buttons,
-// inputs — is drawn by this one modifier, so the border weight and shadow depth
-// stay one system. `pressed` is the spec's press: the shadow collapses and the
-// surface shifts 1pt down-right.
+// White (or tinted) fill, a 2pt ink edge, and a hard ink side straight below
+// it: thickness, not a shadow, so it never blurs and never leans. Everything
+// bordered in the app — cards, buttons, inputs — is drawn by this one modifier,
+// so the edge weight and side depth stay one system. `pressed` pushes the object
+// down onto its side: the side collapses as the face sinks by the same amount.
 
 struct NeoSurface<S: InsettableShape>: ViewModifier {
     var shape: S
     var fill: Color = Theme.Color.tile
     var shadow: CGFloat = Theme.Shadow.large
     var pressed = false
+    /// The side's colour. Ink everywhere, except on Night, where an ink side
+    /// would vanish into the ground and white takes its place.
+    var side: Color = Theme.Color.shadow
 
     func body(content: Content) -> some View {
         let depth = pressed ? 0 : shadow
-        let shift: CGFloat = pressed ? 1 : 0
+        let sink: CGFloat = pressed ? shadow : 0
         content
             .background(shape.fill(fill))
             .overlay(shape.strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
-            .background(shape.fill(Theme.Color.shadow).offset(x: depth, y: depth))
-            .offset(x: shift, y: shift)
+            .background(shape.fill(side).offset(y: depth))
+            .offset(y: sink)
     }
 }
 
@@ -40,25 +43,66 @@ extension View {
     func neoSurface(radius: CGFloat = Theme.Radius.md,
                     fill: Color = Theme.Color.tile,
                     shadow: CGFloat = Theme.Shadow.large,
-                    pressed: Bool = false) -> some View {
+                    pressed: Bool = false,
+                    side: Color = Theme.Color.shadow) -> some View {
         modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: radius),
-                            fill: fill, shadow: shadow, pressed: pressed))
+                            fill: fill, shadow: shadow, pressed: pressed, side: side))
     }
 }
 
-// MARK: - Primary button (coral, hard shadow)
+// MARK: - Primary button (an ink slab)
 //
-// The one prominent call-to-action per screen ("Play again", "Retry"). Coral
-// fill, ink border, 4pt hard shadow; pressing darkens it to the pressed coral,
-// collapses the shadow and shifts it 1pt into the page. Under Reduce Motion the
-// shift and collapse are dropped and only the colour change remains.
+// The one prominent call-to-action per screen ("Play again", "Retry"). Ink
+// fill with a hard side; pressing collapses the side and sinks it into the
+// page. Under Reduce Motion nothing moves; the press still registers through
+// the system's own highlight.
 
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         NeoButtonBody(configuration: configuration,
-                      fill: configuration.isPressed ? Theme.Color.primaryPressed : Theme.Color.primary,
-                      foreground: .white,
+                      fill: Theme.Color.primary,
+                      foreground: Theme.Color.onInk,
                       shadow: Theme.Shadow.large)
+    }
+}
+
+// MARK: - Slab button (in the dock)
+//
+// A square-shouldered slab for the dock, where the colour around it is the
+// kind's: "Go" and the home's start arrow are night slabs lettered in the dock's
+// colour; Retry is a white one. The same in both modes, because the dock is.
+
+struct SlabButtonStyle: ButtonStyle {
+    var fill: Color = Theme.Color.night
+    var foreground: Color
+    var side: Color = Theme.Color.shadow
+
+    func makeBody(configuration: Configuration) -> some View {
+        SlabBody(configuration: configuration, fill: fill, foreground: foreground, side: side)
+    }
+
+    private struct SlabBody: View {
+        let configuration: ButtonStyleConfiguration
+        let fill: Color
+        let foreground: Color
+        let side: Color
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(Theme.Font.button)
+                .textCase(.uppercase)
+                .tracking(Theme.Font.buttonTracking)
+                .foregroundStyle(isEnabled ? foreground : Color(white: 0.55))
+                .padding(.horizontal, Theme.Spacing.lg - 4)
+                .frame(minWidth: 52, minHeight: 52)
+                .neoSurface(radius: Theme.Radius.field, fill: fill,
+                            shadow: Theme.Shadow.large,
+                            pressed: configuration.isPressed && !reduceMotion,
+                            side: side)
+                .animation(Theme.Motion.press, value: configuration.isPressed)
+        }
     }
 }
 
@@ -97,10 +141,31 @@ private struct NeoButtonBody: View {
             // fill, secondary text, no shadow — the border stays solid.
             .foregroundStyle(isEnabled ? foreground : Theme.Color.muted)
             .modifier(NeoSurface(shape: RoundedRectangle(cornerRadius: Theme.Radius.md),
-                                 fill: isEnabled ? fill : Theme.Color.hairline,
+                                 fill: isEnabled ? fill : Theme.Color.socket,
                                  shadow: isEnabled ? shadow : 0,
                                  pressed: configuration.isPressed && !reduceMotion))
             .animation(Theme.Motion.press, value: configuration.isPressed)
+    }
+}
+
+// MARK: - Dock ground
+//
+// The panel the colour lives in: a slab across the bottom of the screen, its top
+// corners rounded and edged in ink, filled with the kind you name next (yellow for
+// a movie, blue for an actor). It runs under the home indicator.
+
+struct DockGround: View {
+    var color: Color
+
+    var body: some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: Theme.Radius.dock,
+                                           topTrailingRadius: Theme.Radius.dock)
+        shape.fill(color)
+            .overlay(shape.stroke(Theme.Color.border, lineWidth: Theme.Border.width))
+            // Only the top edge shows: the sides and bottom sit just off screen.
+            .padding(.horizontal, -Theme.Border.width)
+            .padding(.bottom, -Theme.Border.width)
+            .ignoresSafeArea(edges: .bottom)
     }
 }
 
@@ -125,14 +190,14 @@ extension View {
 
 // MARK: - Node name
 //
-// A node's name with the movie year as an italic flourish ("Les Misérables
-// *2012*") instead of a parenthetical. One definition so every row, card and
+// A node's name with the movie year as a quiet sentence-weight figure
+// ("Les Misérables 2012") instead of a parenthetical. One definition so every row, card and
 // recap shows years the same way.
 
 struct NodeName: View {
     let node: ChainNode
     var font: Font = Theme.Font.bodyStrong
-    var yearFont: Font = Theme.Font.flourish(.subheadline)
+    var yearFont: Font = Theme.Font.sentence(.subheadline)
 
     var body: some View {
         if case .movie(let m) = node, let year = m.year {
@@ -143,19 +208,22 @@ struct NodeName: View {
     }
 }
 
-// MARK: - Split heading
+// MARK: - Heading
 //
-// The spec's heading recipe: a bold roman phrase followed by an italic
-// flourish word ("Your *regulars*", "Movie *Chain*").
+// A title in one voice: Archivo semibold, ink. Emphasis is size, never a
+// second face.
 
-struct SplitHeading: View {
-    let roman: String
-    let flourish: String
+struct Heading: View {
+    let text: String
     var style: Font.TextStyle = .title3
 
+    init(_ text: String, style: Font.TextStyle = .title3) {
+        self.text = text
+        self.style = style
+    }
+
     var body: some View {
-        Text("\(Text(roman).font(Theme.Font.heading(style))) \(Text(flourish).font(Theme.Font.flourish(style)))")
-            .foregroundStyle(Theme.Color.ink)
+        Text(text).font(Theme.Font.heading(style)).foregroundStyle(Theme.Color.ink)
     }
 }
 
@@ -196,20 +264,49 @@ struct NeoSegmented<Value: Hashable>: View {
     }
 }
 
-// MARK: - Sheet chrome (the spec's top app bar)
+// MARK: - Sheet header
 //
-// Cream bar, serif title, a 2pt ink rule under it. Applied to a sheet's
-// NavigationStack content so the Reel and Settings sheets match the app
-// instead of showing the stock translucent bar.
+// The Reel's and Settings' top bar, drawn by us rather than the system: a title
+// in the middle, plain-text actions either side, an ink rule beneath. The stock
+// bar's toolbar buttons turn into glass capsules on iOS 26, which no other
+// control in the app looks like.
+
+struct SheetHeader<Leading: View, Trailing: View>: View {
+    let title: String
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 0) {
+            leading.frame(maxWidth: .infinity, alignment: .leading)
+            Heading(title, style: .headline)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+            trailing.frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .font(Theme.Font.bodyStrong)
+        .foregroundStyle(Theme.Color.ink)
+        .buttonStyle(.pressScale)
+        .padding(.horizontal, Theme.Spacing.gutter - 4)
+        .frame(height: 52)
+        .background(Theme.Color.canvas)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+        }
+    }
+}
 
 extension View {
-    func neoNavigationBar<Title: View>(@ViewBuilder title: () -> Title) -> some View {
+    /// Pins a `SheetHeader` to the top and hides the system bar.
+    func sheetHeader<Leading: View, Trailing: View>(
+        _ title: String,
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
         self
-            .toolbarBackground(Theme.Color.canvas, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar { ToolbarItem(placement: .principal) { title() } }
+            .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
-                Rectangle().fill(Theme.Color.border).frame(height: Theme.Border.width)
+                SheetHeader(title: title, leading: leading, trailing: trailing)
             }
     }
 }
@@ -257,28 +354,10 @@ extension ButtonStyle where Self == GhostButtonStyle {
     static var ghost: GhostButtonStyle { .init() }
 }
 
-// MARK: - Card container
-//
-// Wraps content in a padded neo surface — the standard way to visually cluster
-// related content (the game-over near-miss uses it).
-
-struct CardModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(Theme.Spacing.md)
-            .neoSurface(radius: Theme.Radius.card)
-    }
-}
-
-extension View {
-    /// Usage: `someView.card()`
-    func card() -> some View { modifier(CardModifier()) }
-}
-
 // MARK: - Node dot
 //
 // A small category chip (blue = actor, yellow = movie) used where a full tile
-// would be too heavy — seed results, the "what comes next" hint.
+// would be too heavy — seed results, the game-over recap.
 
 struct NodeDot: View {
     let kind: NodeKind

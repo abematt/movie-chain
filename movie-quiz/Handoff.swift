@@ -227,7 +227,8 @@ private struct FlightLayers: View {
         if let a = from[.art] {
             let b = to[.art] ?? a
             let rect = lerp(a, b, p)
-            let radius = lerp(a.width / 2, Theme.Radius.sm, p)
+            // A face starts round; a poster is already a rounded rectangle.
+            let radius = lerp(node.kind == .movie ? Theme.Radius.sm : a.width / 2, Theme.Radius.sm, p)
             HandoffArt(node: node, radius: radius)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
@@ -343,15 +344,16 @@ private struct DockLook: View {
     let kind: NodeKind
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: Theme.Spacing.sm + 2) {
             Text(kind.placeholder)
-                .foregroundStyle(Color(uiColor: .placeholderText))
+                .font(Theme.Font.sentence(.body))
+                .foregroundStyle(SentenceBlank.fieldText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.Spacing.md)
-                .frame(minHeight: 44)
-                .neoSurface(radius: Theme.Radius.md, shadow: Theme.Shadow.small)
+                .frame(minHeight: 52)
+                .neoSurface(radius: Theme.Radius.field, fill: .white, shadow: 0)
             Button("Go") {}
-                .buttonStyle(.primary)
+                .buttonStyle(SlabButtonStyle(foreground: kind.accent))
                 .fixedSize()
                 .disabled(true)
         }
@@ -365,9 +367,11 @@ private struct DockLook: View {
 
 /// The home sentence's type.
 enum SentenceType {
-    static let nameSize: CGFloat = 44
+    static let nameSize: CGFloat = 50
     static let verbSize: CGFloat = 34
-    static let blankSize: CGFloat = 34
+    static let blankSize: CGFloat = 24
+    /// The dealt start's avatar.
+    static let artSize: CGFloat = 54
 }
 
 /// The deck card's name type, at the reader's text size.
@@ -381,7 +385,8 @@ struct SentenceName: View {
 
     var body: some View {
         Text(text)
-            .font(Theme.Font.display(SentenceType.nameSize))
+            .font(Theme.Font.name(size: SentenceType.nameSize))
+            .tracking(-1.5)
             .foregroundStyle(Theme.Color.ink)
             .lineLimit(3)
             .minimumScaleFactor(0.5)
@@ -407,62 +412,68 @@ struct SentenceVerb: View {
 
     var body: some View {
         Text(node.kind == .actor ? "was in" : "starred")
-            .font(Theme.Font.flourish(size: SentenceType.verbSize))
+            .font(Theme.Font.sentence(size: SentenceType.verbSize))
             .foregroundStyle(Theme.Color.muted)
     }
 }
 
-/// The blank: the next link's placeholder over an ink rule, with the coral arrow.
+/// The blank: a white field holding the next link's placeholder, and the start
+/// button beside it — a night slab with its arrow in the dock's colour. It sits in
+/// the dock, so it reads the same on either ground and in either mode.
 /// Presses through `\.blankPressed` (set by the home's button style). `nudge`
 /// bumps to play the first-run hint once: the arrow nudges toward the play
-/// screen and the placeholder brightens (only the brightening under Reduce
-/// Motion).
+/// screen and the placeholder blinks (only the blink under Reduce Motion).
+/// `dealing` shows the field waiting for a start.
 struct SentenceBlank: View {
     let kind: NodeKind
     var nudge = 0
+    var dealing = false
     @Environment(\.blankPressed) private var pressed
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// The field is paper in both modes: it sits on the dock's colour, not the ground.
+    static let fieldText = Color(white: 0.42)
+
     var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            HStack(alignment: .center) {
-                Text(kind == .movie ? "a movie…" : "an actor…")
-                    .font(Theme.Font.flourish(size: SentenceType.blankSize))
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .keyframeAnimator(initialValue: 0.6, trigger: nudge) { view, opacity in
-                        view.opacity(opacity)
-                    } keyframes: { _ in
-                        KeyframeTrack {
-                            CubicKeyframe(1.0, duration: 0.3)
-                            CubicKeyframe(0.6, duration: 0.3)
-                        }
+        HStack(spacing: Theme.Spacing.md - 4) {
+            Text(dealing ? "Dealing…" : kind == .movie ? "a movie…" : "an actor…")
+                .font(Theme.Font.sentence(size: SentenceType.blankSize))
+                .foregroundStyle(Self.fieldText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .keyframeAnimator(initialValue: 1.0, trigger: nudge) { view, opacity in
+                    view.opacity(opacity)
+                } keyframes: { _ in
+                    KeyframeTrack {
+                        CubicKeyframe(0.45, duration: 0.3)
+                        CubicKeyframe(1.0, duration: 0.3)
                     }
-                Spacer(minLength: Theme.Spacing.sm)
-                Image(systemName: "arrow.right")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(Theme.Color.ink)
-                    .keyframeAnimator(initialValue: 0.0, trigger: nudge) { [reduceMotion] view, x in
-                        view.offset(x: reduceMotion ? 0 : x)
-                    } keyframes: { _ in
-                        KeyframeTrack {
-                            CubicKeyframe(3, duration: 0.3)
-                            CubicKeyframe(0, duration: 0.3)
-                        }
+                }
+                .frame(maxWidth: .infinity, minHeight: Self.height, alignment: .leading)
+                .padding(.horizontal, Theme.Spacing.md)
+                .neoSurface(radius: Theme.Radius.field, fill: .white, shadow: 0)
+            Image(systemName: "arrow.right")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(dealing ? Theme.Color.muted : kind.accent)
+                .keyframeAnimator(initialValue: 0.0, trigger: nudge) { [reduceMotion] view, x in
+                    view.offset(x: reduceMotion ? 0 : x)
+                } keyframes: { _ in
+                    KeyframeTrack {
+                        CubicKeyframe(3, duration: 0.3)
+                        CubicKeyframe(0, duration: 0.3)
                     }
-                    .frame(width: 48, height: 48)
-                    .neoSurface(radius: Theme.Radius.md,
-                                fill: pressed ? Theme.Color.primaryPressed : Theme.Color.primary,
-                                shadow: Theme.Shadow.small,
-                                pressed: pressed && !reduceMotion)
-                    .animation(Theme.Motion.press, value: pressed)
-            }
-            Rectangle()
-                .fill(Theme.Color.ink)
-                .frame(height: 3)
+                }
+                .frame(width: Self.height, height: Self.height)
+                .neoSurface(radius: Theme.Radius.field,
+                            fill: Theme.Color.night,
+                            shadow: Theme.Shadow.large,
+                            pressed: pressed && !reduceMotion)
+                .animation(Theme.Motion.press, value: pressed)
         }
+        .padding(.bottom, Theme.Shadow.large)
     }
+
+    static let height: CGFloat = 56
 }
 
 extension EnvironmentValues {

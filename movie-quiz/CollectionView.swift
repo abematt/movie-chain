@@ -100,24 +100,19 @@ struct CollectionView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.canvas.ignoresSafeArea())
-            .navigationTitle("Your Reel")
-            .toolbarTitleDisplayMode(.inline)
-            .neoNavigationBar { SplitHeading(roman: "Your", flourish: "Reel", style: .headline) }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: {
-                        Text("Done").font(Theme.Font.bodyStrong).foregroundStyle(Theme.Color.ink)
+            .sheetHeader("Your Reel") {
+                Button("Done") { dismiss() }
+                    .frame(minHeight: 44)
+            } trailing: {
+                if !store.isEmpty {
+                    ShareLink(item: store.shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(minWidth: 44, minHeight: 44)
                     }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    if !store.isEmpty {
-                        ShareLink(item: store.shareText) {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            telemetry?.shared(from: .reel)
-                        })
-                    }
+                    .accessibilityLabel("Share your Reel")
+                    .simultaneousGesture(TapGesture().onEnded {
+                        telemetry?.shared(from: .reel)
+                    })
                 }
             }
         }
@@ -141,31 +136,29 @@ struct CollectionView: View {
     // only in the Actors / Movies tabs, and no header repeating them above the
     // grid.
 
+    // Scale is the drama: the count huge and left-set, what it means in a
+    // quiet line beside it.
     private var hero: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            VStack(spacing: Theme.Spacing.xs) {
-                Text("You have logged")
-                    .font(Theme.Font.flourish(.body))
-                    .foregroundStyle(Theme.Color.muted)
-                Text("\(statsIn ? store.total : 0)")
-                    .font(Theme.Font.display(64))
-                    .monospacedDigit()
-                    .contentTransition(.numericText(value: Double(store.total)))
-                    .foregroundStyle(Theme.Color.ink)
-            }
-
-            if bestChain > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "trophy.fill")
-                        .font(Theme.Font.label)
-                        .foregroundStyle(Theme.Color.muted)
-                    Text("Best chain").metaLabel()
-                    Text("\(bestChain) links")
-                        .font(Theme.Font.numeral(.subheadline))
-                        .foregroundStyle(Theme.Color.ink)
+        HStack(alignment: .bottom, spacing: Theme.Spacing.md - 4) {
+            Text("\(statsIn ? store.total : 0)")
+                .font(Theme.Font.display(116))
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(store.total)))
+                .foregroundStyle(Theme.Color.ink)
+                .padding(.bottom, -18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("logged across")
+                Text("\(store.chainsLogged) \(store.chainsLogged == 1 ? "chain" : "chains")")
+                if bestChain > 0 {
+                    Text("best \(bestChain) links")
                 }
             }
+            .font(Theme.Font.body)
+            .foregroundStyle(Theme.Color.muted)
+            .padding(.bottom, Theme.Spacing.xs)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Regulars — most-logged actor + movie
@@ -173,7 +166,7 @@ struct CollectionView: View {
     @ViewBuilder private var regulars: some View {
         if store.mostLoggedActor != nil || store.mostLoggedMovie != nil {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                SplitHeading(roman: "Your", flourish: "regulars")
+                Heading("Your regulars")
                 HStack(spacing: Theme.Spacing.sm) {
                     if let a = store.mostLoggedActor { regularCard(a) }
                     if let m = store.mostLoggedMovie { regularCard(m) }
@@ -199,7 +192,7 @@ struct CollectionView: View {
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("in \(entity.timesLogged) \(entity.timesLogged == 1 ? "chain" : "chains")")
-                    .font(Theme.Font.flourish(.footnote))
+                    .font(Theme.Font.sentence(.footnote))
                     .foregroundStyle(Theme.Color.muted)
             }
             Spacer(minLength: 0)
@@ -413,7 +406,7 @@ struct CollectionView: View {
     /// side of a filter that matches no linked film.
     private var nothingMatches: some View {
         Text("Nothing here yet. Try another decade or genre.")
-            .font(Theme.Font.flourish(.subheadline))
+            .font(Theme.Font.sentence(.subheadline))
             .foregroundStyle(Theme.Color.muted)
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.xl)
@@ -470,7 +463,7 @@ struct CollectionView: View {
                 Image(systemName: "film.stack")
                     .font(.system(size: 40))
                     .foregroundStyle(Theme.Color.muted)
-                SplitHeading(roman: "Your reel is", flourish: "empty")
+                Heading("Your reel is empty")
                 Text("Finish a chain and every actor and movie you named lands here.")
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.muted)
@@ -506,7 +499,7 @@ struct TMDBAttribution: View {
                 .frame(height: 14)
                 .accessibilityLabel("The Movie Database (TMDB)")
             Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
-                .font(Theme.Font.flourish(.caption))
+                .font(Theme.Font.sentence(.caption))
                 .foregroundStyle(Theme.Color.muted)
                 .multilineTextAlignment(.center)
         }
