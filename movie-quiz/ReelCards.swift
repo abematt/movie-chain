@@ -278,7 +278,9 @@ struct ReelFrame: View {
             .aspectRatio(2.0 / 3.0, contentMode: .fit)
             // Trims the parallax's overscan to the mat's window.
             .clipped()
-            .overlay { if lifted { ReelGlare() } }
+            // Clipped to the poster: the glare is drawn well past its bounds so it
+            // can slide, and unclipped it lit the whole screen.
+            .overlay { if lifted { ReelGlare().clipped() } }
             .overlay(Rectangle().strokeBorder(Theme.Color.border, lineWidth: 0.75))
             .padding(Self.mat)
             .background(Theme.Color.tile)

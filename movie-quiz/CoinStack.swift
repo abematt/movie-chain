@@ -47,8 +47,10 @@ struct CoinStack: View {
         let w = Self.width, h = Self.faceHeight, t = Self.thickness
         let left = (size.width - w) / 2
         let coinHeight = h + t
-        let step = Self.step(count: chain.count, height: size.height)
-        let bottomTop = size.height - coinHeight
+        // Room for the outline's outer half, so the bottom coin isn't clipped.
+        let height = size.height - Theme.Border.width
+        let step = Self.step(count: chain.count, height: height)
+        let bottomTop = height - coinHeight
         let every = Int((Self.labelGap / max(step, 1)).rounded(.up))
         let line = Theme.Color.night
         let lineWidth = Theme.Border.width
@@ -59,8 +61,7 @@ struct CoinStack: View {
             let isTop = i == chain.count - 1
             // Each coin is a band with elliptical ends; the next one up covers
             // all of it but the bottom sliver, which reads as this coin's side.
-            let band = Path(roundedRect: CGRect(x: left, y: top, width: w, height: coinHeight),
-                            cornerSize: CGSize(width: w / 2, height: h / 2))
+            let band = Self.coin(left: left, top: top)
             context.fill(band, with: .color(colour))
             context.stroke(band, with: .color(line), lineWidth: lineWidth)
 
@@ -79,6 +80,31 @@ struct CoinStack: View {
             let mid = isTop ? top + coinHeight / 2 : top + coinHeight - step / 2
             drawLabel(node, in: &context, left: left, mid: mid, size: size)
         }
+    }
+
+    /// A coin's outline: the face's top half, straight sides as deep as the
+    /// coin is thick, and the face's bottom half below them. Built from the same
+    /// quarter-ellipse curves `Path(ellipseIn:)` uses, so its top meets the top
+    /// coin's face exactly; a rounded rectangle's corners don't, and leaked this
+    /// coin's colour around the one above.
+    static func coin(left: CGFloat, top: CGFloat) -> Path {
+        let rx = width / 2, ry = faceHeight / 2, t = thickness
+        let k: CGFloat = 0.5523  // a quarter ellipse as one cubic
+        let cx = left + rx, right = left + width
+        let upper = top + ry, lower = top + ry + t
+        var p = Path()
+        p.move(to: CGPoint(x: left, y: upper))
+        p.addCurve(to: CGPoint(x: cx, y: top),
+                   control1: CGPoint(x: left, y: upper - k * ry), control2: CGPoint(x: cx - k * rx, y: top))
+        p.addCurve(to: CGPoint(x: right, y: upper),
+                   control1: CGPoint(x: cx + k * rx, y: top), control2: CGPoint(x: right, y: upper - k * ry))
+        p.addLine(to: CGPoint(x: right, y: lower))
+        p.addCurve(to: CGPoint(x: cx, y: lower + ry),
+                   control1: CGPoint(x: right, y: lower + k * ry), control2: CGPoint(x: cx + k * rx, y: lower + ry))
+        p.addCurve(to: CGPoint(x: left, y: lower),
+                   control1: CGPoint(x: cx - k * rx, y: lower + ry), control2: CGPoint(x: left, y: lower + k * ry))
+        p.closeSubpath()
+        return p
     }
 
     /// How far apart the coins sit for `count` coins in `height` points.
@@ -134,6 +160,8 @@ struct CoinStack: View {
             .foregroundStyle(labelColor))
         // Up to two lines, so a long name wraps rather than truncating.
         let measured = text.measure(in: CGSize(width: room, height: 34))
+        // A two-line label on the start coin mustn't run off the bottom.
+        let mid = min(mid, size.height - measured.height / 2)
         let leader: CGFloat = 12
         let gap: CGFloat = 4
         var rule = Path()
