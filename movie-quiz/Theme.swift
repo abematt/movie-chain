@@ -95,8 +95,8 @@ enum Theme {
     //
     // Every object has one edge weight and a hard ink side straight below it —
     // thickness, never a blur or a lean. The deeper the side, the heavier the
-    // object: `small` for pills, chips, inputs and the deck's cards, `large` for
-    // buttons.
+    // object: `small` for pills, chips, inputs and the cards in the pile, `large`
+    // for buttons and the deck's front card.
     enum Border {
         static let width: CGFloat = 2
     }

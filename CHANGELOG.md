@@ -107,9 +107,11 @@ Unspool rebrand was inserted as 0.6.0.)
   the same thing ("a movie…"), so nothing changes as one flies into the other.
 - **Game over shows there's more below.** The top of the recap (the answer you were one
   away from) peeks above Play again; before, nothing said the screen scrolled.
-- **The deck's cards share one thin side.** The front card stood on a 10pt ink slab, the
+- **The deck's front card stands on a lighter side.** It stood on a 10pt ink slab, the
   deepest in the app, which read as a heavy black bar across the bottom of the play
-  screen; the pile's peeks already show its thickness.
+  screen. It now uses the buttons' 6pt side and sinks to the small one as it goes back
+  into the pile. A uniform 4pt side was tried and lost the pile's depth: the front
+  card's bottom read as a doubled outline, as if it were cut off.
 - **The Reel's caption reads like the home's best run**: "LOGGED ACROSS / 36 CHAINS /
   BEST RUN 13 LINKS" in condensed caps with the figures in ink, instead of the app's
   only lowercase sentence broken over three lines.

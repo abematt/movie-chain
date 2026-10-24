@@ -46,8 +46,8 @@ struct ChainDeck: View {
     /// How far above the newest card's top each depth sits (index = depth), for
     /// as many depths as fit the available height.
     private var offsets: [CGFloat] {
-        let budget = (availableHeight ?? (cardHeight + Theme.Shadow.small + Self.labelReserve + 60))
-            - cardHeight - Theme.Shadow.small - Self.labelReserve
+        let budget = (availableHeight ?? (cardHeight + Theme.Shadow.large + Self.labelReserve + 60))
+            - cardHeight - Theme.Shadow.large - Self.labelReserve
         var offsets: [CGFloat] = [0]
         var total: CGFloat = 0
         var edges = 0
@@ -106,7 +106,7 @@ struct ChainDeck: View {
             .padding(.top, offsets[max(0, visible.count - 1)])
         }
         // Room for the side, which draws below the card's frame.
-        .padding(.bottom, Theme.Shadow.small)
+        .padding(.bottom, Theme.Shadow.large)
         .animation(reduceMotion ? Theme.Motion.reducedFade : Theme.Motion.drop, value: chain.count)
     }
 }
@@ -169,10 +169,12 @@ struct DeckCard: View {
         }
         .padding(Theme.Spacing.md - 4)
         .frame(height: height, alignment: .top)
-        // One thin side for every card: the pile's peeks already carry its
-        // thickness, and a deeper slab under the front card read as a heavy
-        // black bar across the bottom of the play screen.
-        .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+        // The front card stands on the buttons' side and sinks to the small one
+        // as it goes back into the pile, so the newest link reads as forward.
+        // A thinner front side read as a doubled outline, as if the card were
+        // cut off; the old 10pt slab read as a black bar.
+        .neoSurface(radius: Theme.Radius.card,
+                    shadow: isFront ? Theme.Shadow.large : Theme.Shadow.small)
         // Stuck flat on the card's face, inside its edges — a sticker hanging off
         // the border read as floating. Sits in the header row, so it shows in
         // the card's peek once the start is pushed back.
