@@ -141,31 +141,29 @@ struct CollectionView: View {
     // only in the Actors / Movies tabs, and no header repeating them above the
     // grid.
 
+    // Scale is the drama: the count huge and left-set, what it means in a
+    // quiet line beside it.
     private var hero: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            VStack(spacing: Theme.Spacing.xs) {
-                Text("You have logged")
-                    .font(Theme.Font.sentence(.body))
-                    .foregroundStyle(Theme.Color.muted)
-                Text("\(statsIn ? store.total : 0)")
-                    .font(Theme.Font.display(64))
-                    .monospacedDigit()
-                    .contentTransition(.numericText(value: Double(store.total)))
-                    .foregroundStyle(Theme.Color.ink)
-            }
-
-            if bestChain > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "trophy.fill")
-                        .font(Theme.Font.label)
-                        .foregroundStyle(Theme.Color.muted)
-                    Text("Best chain").metaLabel()
-                    Text("\(bestChain) links")
-                        .font(Theme.Font.numeral(.subheadline))
-                        .foregroundStyle(Theme.Color.ink)
+        HStack(alignment: .bottom, spacing: Theme.Spacing.md - 4) {
+            Text("\(statsIn ? store.total : 0)")
+                .font(Theme.Font.display(116))
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(store.total)))
+                .foregroundStyle(Theme.Color.ink)
+                .padding(.bottom, -18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("logged across")
+                Text("\(store.chainsLogged) \(store.chainsLogged == 1 ? "chain" : "chains")")
+                if bestChain > 0 {
+                    Text("best \(bestChain) links")
                 }
             }
+            .font(Theme.Font.body)
+            .foregroundStyle(Theme.Color.muted)
+            .padding(.bottom, Theme.Spacing.xs)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Regulars — most-logged actor + movie

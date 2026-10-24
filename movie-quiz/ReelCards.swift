@@ -373,7 +373,9 @@ struct ReelCardDetail: View {
 
     var body: some View {
         ZStack {
-            Theme.Color.canvas.opacity(0.92)
+            // A dark room around the lifted card, in both modes: the card is the
+            // one lit object.
+            Theme.Color.night.opacity(0.62)
                 .ignoresSafeArea()
                 .opacity(out ? 1 : 0)
                 // A plain fade in (a dim mustn't bounce with the card); cleared
