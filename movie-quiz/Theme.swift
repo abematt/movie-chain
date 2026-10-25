@@ -321,6 +321,16 @@ enum Theme {
         /// A start leaving on Deal again: quicker than the new one lands, so it is
         /// out of the way rather than competing with it.
         static let dealOut: Animation = .snappy(duration: 0.22)
+        /// The coin stack opening under a finger (after hairline's stack figure):
+        /// a long ease-out that lifts quickly and settles calmly. Closing is slower
+        /// and softer, so letting go reads as the coins settling back down. Each
+        /// coin starts `stackStagger` after its neighbour, spreading out from the
+        /// coin chosen. Sampled on the stack's own clock (`CoinStack`).
+        static let stackLiftCurve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.32, y: 0.72),
+                                                     endControlPoint: UnitPoint(x: 0, y: 1))
+        static let stackOpen: Double = 0.7
+        static let stackClose: Double = 1.25
+        static let stackStagger: Double = 0.045
     }
 }
 
