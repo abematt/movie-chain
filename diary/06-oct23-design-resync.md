@@ -1,13 +1,13 @@
 ---
 id: design-resync
 label: Launch & look
-span: Oct 23 10:35 – Oct 25 12:28
+span: Oct 23 10:35 – Oct 25 15:07
 versions: 0.7.0
 accent: yellow
 order: 6
 sessions: bb139731 8aa6b002 4227355d c300b3a3 02d88d55 8211d405 335f6441 4f62ab15 07e8ef21 c617f475 a1bf803b 5f2b56a2 4f948fc0
 start: 2026-10-23
-end: 2026-10-25T12:28
+end: 2026-10-25T15:07
 ---
 
 ## Era: After the cut — housekeeping, then analytics and a launch plan (2026-10-23)
@@ -1492,11 +1492,64 @@ Abraham sent two phone screenshots and "you tell me".
 - Before merging the coin stack, a changelog entry ("Game over's coin stack opens under a finger") and notes in ARCHITECTURE.md and CLAUDE.md, as the repo's rules require (`a58923e`). PR #24 merged at 12:28 (`da0cd48`).
 - The two leftover branches still show in `git branch` after the merge (`feature_site-ground-and-object`, `site-export`); it isn't clear from the capture whether the `-D` line was run.
 
-### Where things stand (2026-10-25 ~12:28)
+## Era: Writing it down, and what that cost (2026-10-25 midday to afternoon)
 
-- **On `main`** (`da0cd48`): the review fixes (PR #22), the square dock, the 6pt front side, small-text-safe deck cards, the Reel caption in caps, no game-over list, and the drag-to-open coin stack with film years. All under `[Unreleased]`; 0.7.0 still not cut.
-- **The landing page** lives in the private repo `abematt/unspool-site`, Ground & Object, with the hairline-style stack and a waitlist form. The form has **no endpoint yet**, there are no Privacy or Support pages, and there's no hosting.
+**Arc.** The overhaul was done and merged; what was left was the paperwork, and the paperwork turned out to be the expensive part. The first `/diary` run of this stretch started five subagents and hit the usage limit before two of them finished. A thumbnail sheet of someone else's design work went into the public repo by mistake and had to be taken back out. Abraham's reaction to both was practical: "how do we make sure that the diary skill always uses a cheaper model". The next `/diary` run, two and a half hours later, was the first on that setting.
+
+### 2026-10-25 ~12:28 — the diary run itself (session 4f948fc0)
+
+**Ask (verbatim):** "And then lets run a /diary"
+
+- The backfill found chapter 06 still tagged `0.7.0` and unreleased, so the rule was to extend it, not start a seventh chapter. Eight sessions between Oct 23 14:50 and now were uncovered.
+- **Five writers, one per stretch**, each told to write a part file (era entries, decision rows, story bullets, media lines) into the scratchpad, not to return it. No model was set on any of them, so they ran on the session's own, which the API error later named as Opus.
+- **~12:35: the usage limit.** Two of the five (the Oct 24 evening overhaul, and this session's own review-to-site stretch) stopped with an HTTP 429, "resets 4:50pm". The other three had reported 216k, 238k and 139k tokens (about **594k** between them). The two cut-off agents don't report a figure.
+- **Decision: use the cut-off drafts rather than re-run them.** Both part files had all four parts and had been written at 12:35, a minute or two before the limit. Checked instead of trusting: every `![…](media/…)` path existed (80 images across the five), and the ten pasted screenshots were laid out in one sheet and looked at. They were all app screens and design-canvas boards, with no account details.
+- The signed-in account also changed mid-run (work, then personal again, as it had on Oct 22–23); the two artifact watches closed with it. Nothing in the diary depended on them.
+- **Abraham (verbatim):** "keep going" (12:37).
+- **Merge:** 151 decision-log rows, nine eras, 1,912 lines; the page rebuilt to 7 chapters, 340 decisions, 230 images, 20 sessions. Committed as `937c6be`, PR #25 merged 12:40 (`f06ebe4`).
+
+### ~12:41 — the contact sheet that shouldn't have shipped
+
+- Reviewing what had just merged, the embedded `refs_sheet.jpg` turned out to be a **contact sheet of eight Bakers Studio images** (Pera and Tinyman), the references behind the Ground & Object look. They are a third party's work, in a public repo. One draft had embedded it and another had correctly left the same images out and indexed them "do not publish".
+- **Fix:** PR #26 (`edb2bd9`, merged 12:41 as `71d507d`) removed the file from `diary/web/` and replaced the image with a description that names where the originals are. The media index line now says "Third-party work: do not publish".
+- **Decision: don't rewrite `main` to purge it.** The file is still in history through `937c6be`. Removing it means a force-push to a shared branch, for a thumbnail sheet of references, and that's Abraham's call. It was offered to him and not taken up.
+- Also left out of every draft: his Xcode screenshots showing account details.
+
+### ~12:42 — "overhaul more or less finished"
+
+**Abraham (verbatim):** "alright done, so we're good, all up to date, overhaul more or less finished"
+
+- Both repos were in sync with GitHub. `git branch` no longer listed `feature_site-ground-and-object` or `site-export`, so the `-D` line the safety hook wouldn't let Claude run **had been run by Abraham** (the 12:26 entry couldn't tell).
+- Three older branches remain (`docs/architecture-overview`, `feature_cream-neobrutalist`, `gamification-and-fixes`), from before this work.
+- **Timing:** he first wrote "i'm starting to doubt our general design aesthetic a little bit" at Oct 24 ~11:31. This line is 25 hours and 11 minutes later. Within that: a moodboard on a design canvas, the overhaul built and merged in about an hour (17:47–18:41), a review pass, rounds of phone feedback, a new landing page, and a new interaction for the coin stack.
+- Claude's list of what's left before launch: cut 0.7.0, a TestFlight build to friends, a domain, the daily start, challenge links.
+
+### ~13:03 — "we use up a lot of tokens for this"
+
+**Abraham (verbatim):** "alright working on a landing page that i can deploy to the domain i will buy" … "how do we make sure that the diary skill always uses a cheaper model, we use up a lot of tokens for this"
+
+- **Decisions** (PR #27, `c5df1e6`, merged 13:04 as `1684a38`):
+  - `model: sonnet` in the skill's frontmatter, so a `/diary` run is on Sonnet whatever the session is on.
+  - **Every subagent is started on `model: "sonnet"`**, because an agent with no model inherits the session's. The transcript-reading agents were most of a run's cost.
+  - Agents write their part to a file and the merge reads files, so the merge doesn't flood the main context.
+  - Written down as skill rules: no third-party work, and no screenshots showing account details, email addresses or IPs, in a chapter; index them as "do not publish".
+- **Rejected: Haiku.** Cheaper again, but the chapters depend on quoting him word for word and on judging which decisions mattered. Claude's advice was to stay on Sonnet unless the output is fine and he wants to push the cost down further.
+- **Also unverified at the time:** Claude said the first run on the new setting should be checked, and that if it didn't switch, another way to pin the model would be needed.
+- The landing page: he'll buy the domain; Claude's answer was to open a session in `~/dev/one-offs/unspool-site`, whose `CLAUDE.md` already points at the design system. Hosting stays open (Cloudflare Pages, Netlify or Vercel all serve a static page free).
+
+### 2026-10-25 ~15:06 — the first `/diary` on Sonnet
+
+- It ran, and the session's model line changed to Sonnet 5.5 (so did the commit attribution line), so the frontmatter was honoured.
+- Only this stretch was new: 12:28 to 15:07, one session tail and three PRs. It was written directly, **without subagents**, which is the cheapest way to extend a chapter by two and a half hours.
+- **Noticed:** two Swift files are modified and uncommitted in the working tree (`ContentView.swift`, `GameEngine.swift`). They add a DEBUG `-uiDemoClean` launch flag, "for the landing page's screenshots", so the home and game-over screens tell one run (five links, no near miss). No captured session made them (inferred: the landing-page work in another tab), so they are left out of this commit.
+
+### Where things stand (2026-10-25 ~15:07)
+
+- **On `main`** (`1684a38`): the review fixes (PR #22), the square dock, the 6pt front side, small-text-safe deck cards, the Reel caption in caps, no game-over list, and the drag-to-open coin stack with film years. All under `[Unreleased]`; **0.7.0 still not cut.**
+- **The landing page** lives in the private repo `abematt/unspool-site`, Ground & Object, with the hairline-style stack and a waitlist form. The form has **no endpoint yet**, there are no Privacy or Support pages, there's no hosting, and the domain isn't bought.
 - **The design system and moodboard** match what shipped (personal account).
+- **The diary skill** runs on Sonnet and starts its agents on Sonnet; `refs_sheet.jpg` is out of the tree but still in history.
+- **Uncommitted, not part of this chapter:** the `-uiDemoClean` debug flag.
 - **Unconfirmed:** whether the site's holo flash is fixed in Safari; the play screen with the software keyboard up; Instruments on a real phone.
 - **Noticed, not fixed:** "Jean-Claude Van Damme" crowds the START sticker on the pushed-back start card.
 - **Launch blockers, in Claude's order:** cut 0.7.0, a TestFlight build to friends, a domain, the daily start, challenge links.
@@ -1691,6 +1744,13 @@ Abraham sent two phone screenshots and "you tell me".
 | Oct 25 12:19 | Landing page to private repo `unspool-site`, with history via subtree split; remove `site/` by PR | Iterate on the site separately from the app | 4f948fc0 |
 | Oct 25 12:21 | Verify tree hashes match before deleting the leftover branches; leave `-D` to Abraham | History-destructive ops need a human; the hook blocked it | 4f948fc0 |
 | Oct 25 12:27 | Changelog + ARCHITECTURE + CLAUDE.md for the coin stack before merging PR #24 | The repo's rules: every user-visible change documented when it lands | 4f948fc0 |
+| Oct 25 12:30 | Five subagents, one per stretch of the chapter, each writing a part file | Session transcripts run to 200KB+; the skill says one agent per long session. No model was set, so they ran on Opus (about 594k tokens from the three that reported) | 4f948fc0 |
+| Oct 25 12:36 | Use the two drafts cut off by the usage limit instead of re-running them | Both had all four parts, written a minute or two before the limit; every embedded image existed and the ten pasted screenshots were checked | 4f948fc0 |
+| Oct 25 12:39 | Keep Xcode account screenshots and the Bakers Studio images out of the chapter | The repo is public: account details, and a third party's work | 4f948fc0 |
+| Oct 25 12:41 | Remove the reference contact sheet by PR #26, but don't rewrite `main` to purge it from history | A force-push to a shared branch is Abraham's call, for a thumbnail sheet | 4f948fc0 |
+| Oct 25 13:03 | Diary skill runs on Sonnet, its subagents start on Sonnet, and they write part files | The transcript-reading agents were most of a run's cost, and an agent with no model inherits Opus | 4f948fc0 |
+| Oct 25 13:03 | Stay on Sonnet, not Haiku | The chapters quote him verbatim and judge which decisions mattered | 4f948fc0 |
+| Oct 25 15:07 | Write this stretch by hand, without subagents | Two and a half hours of new material is cheaper to write directly | 4f948fc0 |
 
 ### Story material
 
@@ -1774,6 +1834,10 @@ Abraham sent two phone screenshots and "you tell me".
 - **The site that was out of date before it shipped.** Added at 17:47 on 10-24, it was obsolete 55 minutes later when Ground & Object merged. The next morning it was redrawn, and by noon it had its own repo with its history.
 - **Phone locked.** Two installs went through but couldn't launch: "the device was not, or could not be, unlocked." "also on phone? did you install."
 - **The design system, re-synced again.** Its second full re-sync in three days, this time with an "On the web" section so a different repo's sessions can follow it.
+- **The diary that billed itself.** A `/diary` run started five Opus agents, three of which reported about 594k tokens between them, and the other two hit the usage limit mid-write. The next thing Abraham asked was how to make the diary cheaper.
+- **Twenty-five hours from doubt to done.** "i'm starting to doubt our general design aesthetic a little bit" (Oct 24 ~11:31) to "overhaul more or less finished" (Oct 25 12:42): 25 hours 11 minutes, with the overhaul itself built and merged in under an hour in the middle.
+- **The sheet that two drafts disagreed about.** The same eight Bakers Studio images were left out by one writer ("do not publish") and embedded by another as a contact sheet. Only looking at the merged chapter caught it.
+- **A setting that proved itself by changing the session.** The skill's `model: sonnet` line worked the first time it was used: the session switched, and the commit attribution line changed with it.
 
 ### Media index
 
@@ -1910,3 +1974,4 @@ Abraham sent two phone screenshots and "you tell me".
 - `media/4f948fc0/ds_up_*.png` (10 files): the screenshots and three app icons as uploaded to the design system. Oct 25 ~11:58.
 - `media/4f948fc0/ds-gen_AppIcon-1024{,-dark,-tinted}.png`: the icons as written by the component generator. Oct 25 ~12:07.
 - `media/4f948fc0/ds-render_*.png` (Button, CoinStack, Cover, GameOverScreen, HomeScreen light/dark, PlayScreen, ShareCard, s1–s3, cover2, over2, play2): local renders of the rebuilt design-system previews; `s1` shows a broken wordmark image and a game-over frame mid-fade from the first pass. Oct 25 ~12:07–12:09.
+- No new media was captured in this stretch (12:28 to 15:07).
