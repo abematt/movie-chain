@@ -1541,15 +1541,15 @@ Abraham sent two phone screenshots and "you tell me".
 
 - It ran, and the session's model line changed to Sonnet 5.5 (so did the commit attribution line), so the frontmatter was honoured.
 - Only this stretch was new: 12:28 to 15:07, one session tail and three PRs. It was written directly, **without subagents**, which is the cheapest way to extend a chapter by two and a half hours.
-- **Noticed:** two Swift files are modified and uncommitted in the working tree (`ContentView.swift`, `GameEngine.swift`). They add a DEBUG `-uiDemoClean` launch flag, "for the landing page's screenshots", so the home and game-over screens tell one run (five links, no near miss). No captured session made them (inferred: the landing-page work in another tab), so they are left out of this commit.
+- **Noticed:** while this ran, two Swift files were modified and uncommitted in the working tree (`ContentView.swift`, `GameEngine.swift`). They add a DEBUG `-uiDemoClean` launch flag, "for the landing page's screenshots", so the home and game-over screens tell one run (five links, no near miss). No captured session made them (inferred: the landing-page work in another tab), so they were left out of this chapter's commit. That other tab then committed and merged them as PR #28 (`910c955`, merged 15:11), minutes after this note was first written.
 
 ### Where things stand (2026-10-25 ~15:07)
 
-- **On `main`** (`1684a38`): the review fixes (PR #22), the square dock, the 6pt front side, small-text-safe deck cards, the Reel caption in caps, no game-over list, and the drag-to-open coin stack with film years. All under `[Unreleased]`; **0.7.0 still not cut.**
+- **On `main`** (`fba645b`, with the debug flag): the review fixes (PR #22), the square dock, the 6pt front side, small-text-safe deck cards, the Reel caption in caps, no game-over list, and the drag-to-open coin stack with film years. All under `[Unreleased]`; **0.7.0 still not cut.**
 - **The landing page** lives in the private repo `abematt/unspool-site`, Ground & Object, with the hairline-style stack and a waitlist form. The form has **no endpoint yet**, there are no Privacy or Support pages, there's no hosting, and the domain isn't bought.
 - **The design system and moodboard** match what shipped (personal account).
 - **The diary skill** runs on Sonnet and starts its agents on Sonnet; `refs_sheet.jpg` is out of the tree but still in history.
-- **Uncommitted, not part of this chapter:** the `-uiDemoClean` debug flag.
+- **Landed by another session at 15:11, not part of this chapter's work:** the `-uiDemoClean` debug flag (PR #28), for the landing page's screenshots.
 - **Unconfirmed:** whether the site's holo flash is fixed in Safari; the play screen with the software keyboard up; Instruments on a real phone.
 - **Noticed, not fixed:** "Jean-Claude Van Damme" crowds the START sticker on the pushed-back start card.
 - **Launch blockers, in Claude's order:** cut 0.7.0, a TestFlight build to friends, a domain, the daily start, challenge links.
