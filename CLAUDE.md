@@ -352,7 +352,10 @@ carrying the prompt) via `.safeAreaInset(.bottom)` above the
 **always-present keyboard** (with `TimerBar.swift` as a slim linear countdown), and
 swaps the field for a **Retry** slab if a candidate load failed
 (`engine.awaitingRetry`). Game over is on Night (the holo sky for a new best), with the
-chain as a `CoinStack` and the recap below; Share sends a `ShareCard` image. App-wide
+chain as a `CoinStack` and the recap below; Share sends a `ShareCard` image. A drag on
+the stack opens it at a link: its lifts are tweens on its own clock (`Theme.Motion.stack*`),
+run only while a coin moves, and **a coin is never drawn above the one on it** and only the
+top and chosen coins show a face; keep both rules if you change it. App-wide
 tint (ink) is set once in `movie_quizApp`. Prefer reusing these over hardcoded values.
 
 Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall

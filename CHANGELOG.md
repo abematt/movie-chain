@@ -59,6 +59,12 @@ Unspool rebrand was inserted as 0.6.0.)
 - **"Share usage data" in Settings**, on by default, which stops all sending when off.
 - **`deal_failed` analytics**, so a home screen that couldn't deal shows up in PostHog
   instead of as a player who silently left.
+- **Game over's coin stack opens under a finger.** Drag up and down the stack: the coins
+  above the one you're on lift away, so its face shows, and a film's label gains its
+  year, which brings back the one thing the old per-link list showed. A tick marks each
+  new coin, and letting go settles the stack. Coins can never pass through each other
+  and only the top and chosen coins show a face, so a half-lifted coin doesn't read as
+  two discs. Modelled on the stack figure in lucasmarkes/hairline.
 
 ### Changed
 - **Ground & Object begins: new type and colour foundations.** Cream Neobrutalist read
