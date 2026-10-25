@@ -852,7 +852,7 @@ Two questions he raised drove the second half and were still open at the end: wh
 - Abraham pasted a link meaning to show where the images came from: "they were from here". It was the canvas's own link (a paste slip, inferred).
 - Claude used its memory notes instead: the references came from Bakers Studio's posts on wellmade.fyi, Pera (`1858`) and Tinyman (`1795`). It fetched them, matched each to the board's captions, and uploaded them to the canvas, so the board no longer depended on the personal account. Pera gave the coil, coins and blocks; Tinyman the dusk, Green Engine, spheres and shoe. The eighth image in the posts, the Pera website screenshot, wasn't on the board and was left out.
 
-  ![Contact sheet of the eight fetched images. Top row, Pera: a yellow-and-black coil on orange, a yellow coin stack over "$0.38999 4" on dark green, a yellow cube between two white cubes with hard black sides, and the Pera website. Bottom row, Tinyman: a tiny figure in a pink-to-sand dusk, "THE GREEN ENGINE" line-drawing poster, glowing green spheres among dark ones, and a giant green shoe over a tiny figure. Made to match each image to its caption on the References board.](media/c617f475/refs_sheet.jpg)
+  The eight fetched images (not reproduced here: they're Bakers Studio's work, on wellmade.fyi as @studiobakers/1858 and /1795). Pera: a yellow-and-black coil on orange, a yellow coin stack over a price on dark green, a yellow cube between white cubes with hard black sides, the Pera website. Tinyman: a figure in a lilac-to-lemon desert, "The Green Engine" poster, black and green spheres, a giant shoe on lime.
 
 ### ~14:24 — Play C, the share card's start, and a film spool
 
@@ -1838,7 +1838,7 @@ Abraham sent two phone screenshots and "you tell me".
 - `media/c617f475/refs_t_1858-*.jpg`, `refs_t_1795-*.jpg` (×8): thumbnails of the same, for matching to captions. ~14:08.
 - `media/c617f475/refs_pera-coil.jpg`, `refs_pera-coins.jpg`, `refs_pera-blocks.jpg`: the three Pera references renamed for upload to the canvas. ~14:09.
 - `media/c617f475/refs_tinyman-dusk.jpg`, `refs_tinyman-engine.jpg`, `refs_tinyman-spheres.jpg`, `refs_tinyman-shoe.jpg`: the four Tinyman references renamed for upload. ~14:09.
-- `media/c617f475/refs_sheet.jpg`: contact sheet of all eight fetched images, used to match captions. ~14:09.
+- `media/c617f475/refs_sheet.jpg`: contact sheet of all eight fetched images, used to match captions. ~14:09. Third-party work: do not publish.
 - `media/c617f475/pasted-1.png`: Abraham's paste of the moodboard Reel ("42 logged across 11 chains", the "15 OF 48" disc grid) asking what system the grid stands for. ~14:42.
 - Session `a1bf803b` captured no media.
 - `media/5f2b56a2/pasted-1.png`: Abraham's screenshot of the canvas board "Your Reel · discs", the original 8×6 disc grid with scattered blue/yellow lights ("15 of 48"). ~17:31.
