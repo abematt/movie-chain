@@ -14,7 +14,7 @@
 //  fit the height it's given, and thins its labels when they'd collide.
 //
 //  On game over the stack opens under a finger (after hairline's stack figure):
-//  press, then slide up and down it. The finger's height picks a link, the coins
+//  drag up and down it. The finger's height picks a link, the coins
 //  above it lift away — the top one furthest — so its face shows, and its label
 //  gains the film's year. The lifts are tweens on the stack's own clock, each
 //  retargeted from wherever it is, so sliding fast never jumps; the clock runs
@@ -62,7 +62,11 @@ struct CoinStack: View {
             }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
-        .gesture(StackPress { phase, y in press(phase, y: y) })
+        // A drag straight on the stack scrubs it; the screen scrolls from anywhere else.
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { press(chosen == nil ? .began : .moved, y: $0.location.y) }
+            .onEnded { press(.ended, y: $0.location.y) },
+                 including: interactive ? .all : .subviews)
         .task(id: settles) {
             // Stop the clock once the last coin has landed.
             let wait = settles.timeIntervalSinceNow
@@ -100,7 +104,11 @@ struct CoinStack: View {
 
     private func liftValues(at date: Date) -> [CGFloat] {
         guard lifts.count == chain.count else { return Array(repeating: 0, count: chain.count) }
-        return lifts.map { $0.value(at: date) }
+        var values = lifts.map { $0.value(at: date) }
+        // A coin is never higher than the one on it — mid-flight, retargeted
+        // tweens could otherwise cross, and a coin would show through another.
+        for j in values.indices.dropFirst() { values[j] = max(values[j], values[j - 1]) }
+        return values
     }
 
     private func press(_ phase: StackPress.Phase, y: CGFloat) {
@@ -127,7 +135,10 @@ struct CoinStack: View {
             let current = lifts[j].value(at: now)
             let target = Self.lift(j, chosen: a, count: chain.count, step: geometry.step)
             guard target != lifts[j].to else { continue }
-            let delay = reduceMotion ? 0 : Double(abs(j - from)) * Theme.Motion.stackStagger
+            // Staggered up the stack from the coin chosen; the coins below it move
+            // together. A stagger downwards too would land a coin after the one
+            // above it, and it would show through.
+            let delay = reduceMotion ? 0 : Double(max(j - from, 0)) * Theme.Motion.stackStagger
             lifts[j] = Tween(from: current, to: target, start: now.addingTimeInterval(delay), duration: duration)
             last = max(last, now.addingTimeInterval(delay + duration))
         }
@@ -337,32 +348,9 @@ struct CoinStack: View {
     }
 }
 
-// MARK: - Press and slide
-
-/// A press that turns into a slide: UIKit's long press, so a quick swipe still
-/// scrolls the screen and only a held finger scrubs the stack — the space bar's
-/// cursor drag, not a drag that fights the scroll view.
-private struct StackPress: UIGestureRecognizerRepresentable {
+/// What the finger is doing on the stack.
+private enum StackPress {
     enum Phase { case began, moved, ended }
-    let onChange: (Phase, CGFloat) -> Void
-
-    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
-        let press = UILongPressGestureRecognizer()
-        press.minimumPressDuration = 0.15
-        // Once held, the finger may travel anywhere; it's still the same press.
-        press.allowableMovement = .greatestFiniteMagnitude
-        return press
-    }
-
-    func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
-        let y = context.converter.localLocation.y
-        switch recognizer.state {
-        case .began: onChange(.began, y)
-        case .changed: onChange(.moved, y)
-        case .ended, .cancelled, .failed: onChange(.ended, y)
-        default: break
-        }
-    }
 }
 
 #Preview("Coin stack") {
