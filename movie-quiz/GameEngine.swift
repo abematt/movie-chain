@@ -763,15 +763,17 @@ final class GameEngine {
 
     /// Same sample chain, but jump straight to the game-over summary — a new
     /// best by default, or an ordinary run (`-uiDemoNoBest`), which also ends on
-    /// a movie so the film spool shows.
-    func loadDemoGameOver(newBest: Bool = true, worstCase: Bool = false) {
+    /// a movie so the film spool shows. `clean` (`-uiDemoClean`) is for the
+    /// landing page's screenshots: both end on the same five links, with no near
+    /// miss, so the two screens tell one run.
+    func loadDemoGameOver(newBest: Bool = true, worstCase: Bool = false, clean: Bool = false) {
         loadDemoChain(worstCase: worstCase)
-        if !newBest, !worstCase {
+        if !newBest || clean, !worstCase {
             chain.append(.movie(Movie(id: 1003, title: "Inception", year: 2010)))
             score = chain.count - 1
             points = score * 24
         }
-        phase = .gameOver(Summary(isNewBest: newBest, previousBest: 2, missedAnswer: candidates.first,
+        phase = .gameOver(Summary(isNewBest: newBest, previousBest: 2, missedAnswer: clean ? nil : candidates.first,
                                   chain: chain, links: score, points: points))
     }
     #endif
