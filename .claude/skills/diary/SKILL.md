@@ -1,6 +1,7 @@
 ---
 name: diary
 description: Write the next chapter of the Unspool dev diary from captured sessions, commits and phone photos, then rebuild the diary page. Use when the user says "/diary", "write the diary", "diary entry", or when cutting a version.
+model: sonnet
 ---
 
 # /diary — write the next chapter
@@ -69,7 +70,14 @@ Body, in this order:
 - `### Media index` — every file in the session media folders, one line each.
 
 Read `diary/raw/<date>-<sid8>.txt` for each session. Several long sessions: hand
-one to each subagent, then merge their sections. View the images you embed with
+one to each subagent, then merge their sections. **Start every subagent with
+`model: "sonnet"`**: an agent with no model inherits the session's (often Opus), and the
+subagents reading transcripts are most of this skill's cost. Have each write its part to a
+scratchpad file (era sections, then decision rows, story bullets and media lines, split by
+marker comments) rather than returning it, so the merge doesn't flood the context.
+Third-party work (reference images, other studios' designs) and screenshots showing
+account details, email addresses or IPs stay out of chapters: index them as "do not
+publish" instead. View the images you embed with
 Read; don't caption from filenames alone. Mark inferences "(inferred)". Times are
 local (the raw files already are).
 
