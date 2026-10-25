@@ -63,7 +63,7 @@ struct ShareCard: View {
         GeometryReader { geo in
             let ends = CoinStack.ends(count: chain.count, height: geo.size.height)
             let right = (geo.size.width + CoinStack.width) / 2
-            CoinStack(chain: chain, labels: false)
+            CoinStack(chain: chain, labels: false, interactive: false)
             if chain.count > 1 {
                 pointer("Link \(links)", colour: Self.quiet)
                     .position(x: right + 52, y: ends.top)
