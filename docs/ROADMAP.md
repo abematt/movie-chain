@@ -110,9 +110,11 @@ parallel, and the early items matter *because* they take months to pay off.
 - **App Store screenshots — budget 3–4 days.** They're the first thing a browser judges,
   and Apple gives a new app roughly two weeks of search boost that doesn't come back.
   Plus a careful title, subtitle, description and keywords.
-- **Landing page — budget about a week**, Framer again, reusing the screenshot assets.
-  Distinct from the waitlist page: it shows the app and drives downloads. Tweakable
-  after launch, so it doesn't hold launch.
+- **Landing page — budget about a week**, reusing the screenshot assets. It shows the app
+  and drives downloads. Tweakable after launch, so it doesn't hold launch. *(2026-10-25:
+  hand-built rather than in Framer, in its own repo,
+  [`abematt/unspool-site`](https://github.com/abematt/unspool-site); until launch its
+  form doubles as the waitlist.)*
 
 **The launch decision** comes from the beta: if players drop off after a day, wait; if
 they stick around for several days, launch. Judge it on week-1 retention in PostHog.
