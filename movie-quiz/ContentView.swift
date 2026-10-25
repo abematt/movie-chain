@@ -122,7 +122,8 @@ struct ContentView: View {
             let args = ProcessInfo.processInfo.arguments
             let worstCase = args.contains("-uiWorstCase")
             if args.contains("-uiDemoGameOver") {
-                engine.loadDemoGameOver(newBest: !args.contains("-uiDemoNoBest"), worstCase: worstCase)
+                engine.loadDemoGameOver(newBest: !args.contains("-uiDemoNoBest"), worstCase: worstCase,
+                                        clean: args.contains("-uiDemoClean"))
             } else if args.contains("-uiDemoChain") {
                 engine.loadDemoChain(worstCase: worstCase)
             }
