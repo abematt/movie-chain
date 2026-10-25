@@ -38,6 +38,9 @@ struct CoinStack: View {
 
     /// The coin the finger is on; nil when the stack is closed.
     @State private var chosen: Int?
+    /// The coin whose face shows under the lifted coins: the chosen one, kept
+    /// while the coins settle back onto it after the finger lifts.
+    @State private var faced: Int?
     @State private var lifts: [Tween] = []
     /// When the last coin settles; the clock stops after it.
     @State private var settles = Date.distantPast
@@ -125,7 +128,7 @@ struct CoinStack: View {
         guard a != chosen else { return }
         let from = a ?? chosen ?? 0
         chosen = a
-        if a != nil { Haptics.selection() }
+        if a != nil { faced = a; Haptics.selection() }
         let now = Date()
         let duration = reduceMotion ? 0 : (a == nil ? Theme.Motion.stackClose : Theme.Motion.stackOpen)
         let geometry = Self.layout(count: chain.count, height: usableHeight, interactive: true)
@@ -191,9 +194,10 @@ struct CoinStack: View {
             let top = g.bottomTop - CGFloat(i) * step - lift[i]
             let colour = node.kind.accent
             let isTop = i == chain.count - 1
-            // A face shows when nothing sits on it: the top coin, or one the coins
-            // above have lifted off.
-            let uncovered = isTop || lift[i + 1] - lift[i] > 1
+            // Only two faces ever show: the top coin's, and the chosen coin's once
+            // the coins above are half a coin off it. Any other coin a gap opens
+            // over just reads a little thicker, not as a second disc.
+            let uncovered = isTop || (i == faced && lift[i + 1] - lift[i] > t / 2)
             // Each coin is a band with elliptical ends; the next one up covers
             // all of it but the bottom sliver, which reads as this coin's side.
             let band = Self.coin(left: left, top: top)
