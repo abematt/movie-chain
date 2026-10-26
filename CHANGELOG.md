@@ -20,7 +20,7 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 | **0.4.0** | Solo game complete — engine, matching, providers, collection, tests |
 | **0.5.0** | [**Design overhaul**](docs/ROADMAP.md#050--design-overhaul) — the real visual identity: Cream Neobrutalist, Fraunces, the chain as cards (motion re-tuned in 0.5.1) |
 | **0.6.0** | [**Unspool**](docs/ROADMAP.md#060--unspool) — the rebrand: name, two-circle icon, wordmark, the home as the first turn |
-| 0.7.0 | [**Foundations & safety net**](docs/ROADMAP.md#070--foundations--safety-net) — backup, logging, crash reporting, build pipeline, device id + merge rule, deal-pool disk cache |
+| **0.7.0** | [**Ground & Object**](docs/ROADMAP.md#ground--object--the-10-look) and the first [**foundations**](docs/ROADMAP.md#070--foundations--safety-net) — the 1.0 look; analytics, device id, deal-pool disk cache, the chain link format (logging, crash reporting and the build pipeline follow) |
 | 0.8.0 | [**The service — TMDB proxy first**](docs/ROADMAP.md#080--the-service) — takes the shared key out of the app and caches it |
 | 0.9.0 | [**Accounts**](docs/ROADMAP.md#090--accounts) — Apple, Google or email one-time code (Supabase) over the device id, with a merge that doesn't clobber |
 | 0.10.0 | [**The Daily Chain**](docs/ROADMAP.md#0100--the-daily-chain) — one puzzle a day: longest route from A to B ([spec](docs/DAILY-CHAIN.md)) |
@@ -30,9 +30,18 @@ full loop (game + daily + friend groups), global leaderboards are dropped, and t
 Until 1.0, breaking internal changes land in minor bumps. The order above is a plan,
 not a contract — if milestones land out of order, the version follows the work. (It
 already has: the design overhaul landed before Foundations and took 0.5.0, and the
-Unspool rebrand was inserted as 0.6.0.)
+Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alongside the first foundations.)
 
 ## [Unreleased]
+
+## [0.7.0] — 2026-10-26
+
+Unspool gets its 1.0 look, **Ground & Object**: a paper ground, objects with an ink edge
+and a hard side, the colour moved into the answer dock, game over on Night with the run
+as a coin stack you can open with a finger, and a share card. Underneath, the first of
+the foundations: product analytics, a device id, a home screen that can't hang on
+"Dealing…", a deal pool saved between launches, and the link format chains will be
+shared in. Logging, crash reporting and the build pipeline follow.
 
 ### Added
 - **Product analytics (PostHog).** Until now there was no way to know where runs end,
