@@ -51,8 +51,9 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
 - **TMDB requests go through Unspool's own service** (Supabase), not straight to TMDB.
   A proxy function holds the TMDB token and caches responses, so one fetch of the deal
   pool, a cast or a filmography serves every player. Every phone used to make its own
-  requests against one shared key, which capped how many people could start at once;
-  and the token no longer has to ship inside the app.
+  requests against one shared key, which capped how many people could start at once.
+  Release builds no longer contain the TMDB token at all, where anyone could have
+  pulled it out of the app.
 - **TMDB attribution uses the terms' exact wording, and Settings → About shows it too.**
   The app carried the FAQ's shorter line; the API terms (§3) require "uses TMDB and the
   TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB", shown

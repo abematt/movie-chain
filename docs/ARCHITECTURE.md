@@ -620,12 +620,15 @@ Type; icons are SF Symbols.
 - `secondsPerTurn = 30` and other tunables.
 - `imageBaseURL` + `imageURL(path:size:)` — builds a TMDB image URL from a stored
   `profile_path`/`poster_path` for the collection grid (nil path → nil → placeholder).
-- `makeProvider()` → `TMDBProvider` when a token is present, else `StubProvider`.
-- Token is loaded **at runtime** from a gitignored
-  `movie-quiz/TMDBSecrets.plist` (key `TMDBToken`, optional `UsesBearerToken`).
-  Copy `TMDBSecrets.example.plist` to set one up. **Never commit the token.**
-- The PostHog project token rides in the same plist (key `PostHogProjectToken`); absent
-  → analytics is off.
+- `makeProvider()` → `TMDBProvider` when the proxy or a token is available
+  (`hasTMDB`), else `StubProvider`.
+- Credentials load **at runtime** from two gitignored plists; copy each
+  `.example.plist` to set one up. **Never commit either.**
+  - `AppSecrets.plist` ships: `ServiceKey` (the Supabase publishable key — present →
+    TMDB through the proxy) and `PostHogProjectToken` (absent → analytics is off).
+  - `TMDBSecrets.plist` is development-only: `TMDBToken`, optional `UsesBearerToken`.
+    The app target's Release configuration leaves it (and the `.example.plist`
+    templates) out via `EXCLUDED_SOURCE_FILE_NAMES`, so the TMDB token never ships.
 
 ### Analytics — [`Telemetry.swift`](../movie-quiz/Telemetry.swift) + [`Analytics.swift`](../movie-quiz/Analytics.swift)
 The full tracking plan (events, properties, rules, how to add analytics to a feature)

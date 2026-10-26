@@ -323,9 +323,11 @@ private struct OutlineButtonStyle: ButtonStyle {
     }
 }
 
+#if DEBUG   // the demo loader is DEBUG-only
 #Preview {
     let engine = GameEngine()
     engine.loadDemoGameOver()
     return GameOverView(engine: engine, collection: CollectionStore(fileURL: nil),
                         summary: engine.summary ?? .init())
 }
+#endif

@@ -1,5 +1,6 @@
-# Secrets — never commit the real TMDB credential.
+# Secrets — never commit these. TMDBSecrets is development-only; AppSecrets ships.
 movie-quiz/TMDBSecrets.plist
+movie-quiz/AppSecrets.plist
 
 # Xcode / build artifacts
 build/

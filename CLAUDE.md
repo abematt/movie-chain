@@ -273,10 +273,13 @@ recent-id avoidance). Every entity resolves to a stable TMDB id, so
 validation and dedup are exact. Async candidate loads are guarded by a monotonic
 `generation` token (bumped on start/end/reset) so a slow fetch from an abandoned
 or quit game can't install stale candidates into a new round. `Config.swift` holds
-tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `seedMoviePoolPages`, `requestTimeout`, `candidateLoadAttempts`) and loads the TMDB credential at runtime from a
-**gitignored** `movie-quiz/TMDBSecrets.plist` (copy `TMDBSecrets.example.plist`
-and paste a token; absent → app falls back to `StubProvider` demo data). The
-token is never committed to source.
+tunables (`secondsPerTurn`, `seedActorBias`, `seedRecentWindow`, `seedMoviePoolPages`, `requestTimeout`, `candidateLoadAttempts`) and loads credentials at runtime from two
+**gitignored** plists (copy each `.example.plist`): `AppSecrets.plist` ships (the
+Supabase publishable `ServiceKey`, which routes TMDB through the service's proxy in
+`supabase/functions/tmdb`, and the PostHog token); `TMDBSecrets.plist` holds the TMDB
+token for development only and **Release builds leave it out**
+(`EXCLUDED_SOURCE_FILE_NAMES`), so the token never ships. Neither → `StubProvider`
+demo data. Nothing is ever committed to source.
 
 **Scoring & juice** — the engine stays pure; all feedback is fired from the view
 in reaction to engine state. `Scoring.swift` (pure, unit-tested) defines the

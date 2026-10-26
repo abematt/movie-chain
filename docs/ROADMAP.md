@@ -36,8 +36,10 @@ and the head-to-head's automatic return. In order:
 
 1. **The daily start, built in** — landed; its list stays as the offline fallback.
 2. **The TMDB proxy** ([0.8.0 Job 1](#job-1--the-tmdb-proxy)) — *landed 2026-10-26*
-   (`supabase/functions/tmdb`, cache table `tmdb_cache`). Still to do: stop bundling
-   `TMDBToken` in release builds, and run the security advisor.
+   (`supabase/functions/tmdb`, cache table `tmdb_cache`). Release builds leave the TMDB
+   token out (`TMDBSecrets.plist` is development-only); the security advisor is clean
+   once `rls_auto_enable` is locked down. **Run `supabase db advisors --linked` before
+   every schema change ships.**
 3. **The daily start served from a table.**
 4. **A results table** — per-day stats and the answer data.
 5. **Head-to-head with the automatic return**, on the service from the start.

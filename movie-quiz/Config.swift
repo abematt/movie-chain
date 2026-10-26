@@ -2,39 +2,46 @@
 //  Config.swift
 //  movie-quiz
 //
-//  App configuration. The TMDB credential is NOT stored here — it is loaded at
-//  runtime from `TMDBSecrets.plist`, which is gitignored so the token never
-//  lands in source control. See TMDBSecrets.example.plist for the format.
+//  App configuration. No credential is stored here. Two gitignored plists hold
+//  them, so nothing lands in this public repo:
+//  - `AppSecrets.plist` — what ships: the service key and the PostHog token.
+//  - `TMDBSecrets.plist` — the TMDB token, for development only. Release builds
+//    leave the file out (`EXCLUDED_SOURCE_FILE_NAMES`), so the token never ships;
+//    the app reaches TMDB through the service's proxy.
+//  Each has a `.example.plist` showing its format.
 //
 
 import Foundation
 
 enum Config {
     /// TMDB API Read Access Token (v4 "Bearer" token) OR v3 API key, read from
-    /// the bundled, gitignored `TMDBSecrets.plist` (key `TMDBToken`). Empty when
-    /// the file is absent — the app then runs on the built-in demo data.
+    /// `TMDBSecrets.plist` (key `TMDBToken`). Used only without the proxy, in
+    /// development; always empty in Release, which leaves the file out.
     ///
     /// Get a token free at https://www.themoviedb.org/settings/api
     static let tmdbToken: String = {
-        guard let token = secrets["TMDBToken"] as? String else { return "" }
+        guard let token = tmdbSecrets["TMDBToken"] as? String else { return "" }
         return token.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
 
     /// true  -> `tmdbToken` is a v4 Read Access Token, sent as a Bearer header.
     /// false -> `tmdbToken` is a v3 API key, sent as the `api_key` query param.
     /// (Override via the `UsesBearerToken` boolean key in TMDBSecrets.plist.)
-    static let usesBearerToken: Bool = secrets["UsesBearerToken"] as? Bool ?? true
+    static let usesBearerToken: Bool = tmdbSecrets["UsesBearerToken"] as? Bool ?? true
 
-    /// The bundled `TMDBSecrets.plist`, read once; empty when the file is absent.
-    private static let secrets: [String: Any] = {
+    private static let tmdbSecrets = bundledPlist("TMDBSecrets")
+    private static let appSecrets = bundledPlist("AppSecrets")
+
+    /// A bundled plist as a dictionary, read once; empty when the file is absent.
+    private static func bundledPlist(_ name: String) -> [String: Any] {
         guard
-            let url = Bundle.main.url(forResource: "TMDBSecrets", withExtension: "plist"),
+            let url = Bundle.main.url(forResource: name, withExtension: "plist"),
             let data = try? Data(contentsOf: url),
             let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
             let dict = plist as? [String: Any]
         else { return [:] }
         return dict
-    }()
+    }
 
     static var hasTMDBToken: Bool { !tmdbToken.isEmpty }
 
@@ -44,12 +51,12 @@ enum Config {
     /// (`supabase/functions/tmdb`).
     static let serviceURL = URL(string: "https://hqdcmuxownykfzmnhmbb.supabase.co")!
 
-    /// The service's publishable key (`sb_publishable_…`), from the secrets plist
+    /// The service's publishable key (`sb_publishable_…`), from `AppSecrets.plist`
     /// (key `ServiceKey`). Made to ship in apps — row-level security decides what
     /// it can reach — but kept out of this public repo like the PostHog token, so
     /// other people's builds don't run on this project.
     static let serviceKey: String = {
-        guard let key = secrets["ServiceKey"] as? String else { return "" }
+        guard let key = appSecrets["ServiceKey"] as? String else { return "" }
         return key.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
 
@@ -66,12 +73,12 @@ enum Config {
     /// Live TMDB data is reachable, through the proxy or directly.
     static var hasTMDB: Bool { usesTMDBProxy || hasTMDBToken }
 
-    /// PostHog project token (`phc_…`), from the same secrets plist (key
+    /// PostHog project token (`phc_…`), from `AppSecrets.plist` (key
     /// `PostHogProjectToken`). It's a write-only key meant to ship in clients, but
     /// it stays out of this public repo so nobody else's builds report into the
     /// project. Empty → analytics is off (`NoAnalytics`).
     static let postHogToken: String = {
-        guard let token = secrets["PostHogProjectToken"] as? String else { return "" }
+        guard let token = appSecrets["PostHogProjectToken"] as? String else { return "" }
         return token.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
 
