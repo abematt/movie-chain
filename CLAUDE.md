@@ -228,7 +228,10 @@ change** — a test fails if its event list and `EventName` disagree.
 > loop, daily chain, challenge links, chain→video), sized and mapped to the code, plus
 > the TMDB request-rate gate that constrains any acquisition push;
 > [`docs/ANALYTICS.md`](docs/ANALYTICS.md) = the **tracking plan** — every analytics
-> event and property, the rules, and the checklist for adding analytics to a feature.
+> event and property, the rules, and the checklist for adding analytics to a feature;
+> [`docs/MONITORING.md`](docs/MONITORING.md) = **what to watch** on the running service
+> (proxy abuse, cache, TMDB errors, the free-plan pause) — the spec for the dashboard to
+> come; add a signal whenever a feature brings a new way to fail.
 
 The game logic is fully decoupled from both the UI and the data source.
 
