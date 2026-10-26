@@ -36,10 +36,12 @@ people actually play rather than guesses.
 - **No login at launch.** No accounts, no backend. The device id
   ([0.7.0](#070--foundations--safety-net)) is the hook a later account claims.
 - **Free at launch, no purchases.** TMDB's terms on commercial use get settled (by email)
-  before anything is charged for. Purchases such as streak saves, when they come, are
-  StoreKit consumables, which need no login.
+  before anything is charged for — see [Monetization-ready](#monetization-ready--built-in-switched-off)
+  for what that costs and the fallback. Purchases such as credits or streak saves, when
+  they come, are StoreKit consumables, which need no login.
 - **Competition without accounts, at launch.** Chain sharing (a versioned payload and
-  URL format for a chain, GROWTH.md D1), challenge links (D4), and a daily start for
+  URL format for a chain, GROWTH.md D1), challenge links (D4, built out as the
+  [head-to-head](#head-to-head--same-start-both-sides-see-the-score)), and a daily start for
   everyone (D5) from a **fixed list** of starts, not derived from each phone's cached
   pool, which can differ between friends. The A→B Daily Chain
   ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) stays after launch.
@@ -49,6 +51,76 @@ people actually play rather than guesses.
 - **After launch, in order of what players show is needed:** the Daily Chain, accounts
   (Supabase, anonymous first, then Google and Apple linked to the same user), friend
   groups, a backend of our own. Version numbers get re-cut when launch scope is final.
+
+## Monetization-ready — built in, switched off
+
+*Decided 2026-10-26.* Nothing is sold at launch, and most apps never reach the scale where
+selling matters. But if Unspool does, turning money on should mean **filling slots that
+already exist**, not reworking the game. So build the seams now; leave StoreKit products,
+paywall screens, App Store Connect setup and pricing until the numbers say so.
+
+**The seams, built as the features they belong to land:**
+1. **One access check.** An `Entitlements` type the game asks ("can this player use a
+   hint?", "is the archive unlocked?"). Today it always says yes; later it reads StoreKit.
+   No paid checks scattered through views.
+2. **Credits, given away daily.** A balance, a free daily grant, spends on hints and
+   pauses. In the beta everyone has plenty — it answers whether a stuck player wants help
+   at all (the open hint question below) for free, and a purchase later just adds to the
+   same balance.
+3. **Assisted runs are marked.** The run summary records whether a hint or continue was
+   used; those runs stay out of the best run and friend comparisons, paid or not (the
+   Hardcore flag is the precedent).
+4. **Every Daily Chain is replayable.** A date-derived id, deterministic, stored — so an
+   archive of past dailies is a sellable thing later with no rework. Expensive to
+   retrofit; build it into [0.10.0](#0100--the-daily-chain) from the start.
+5. **Credit and hint events in analytics,** in [`ANALYTICS.md`](ANALYTICS.md) — they're the
+   numbers that say when monetizing is worth it.
+
+Already in place: the `MovieDataProvider` seam (the data source can change), and StoreKit
+2 restores purchases and subscriptions without a login, so accounts don't block selling.
+
+**What would be sold, ranked:** a Daily Chain premium or subscription (archive, Practice,
+stats — the model daily puzzle games use) → credits for hints and pauses ($0.99 / $2.99 /
+$4.99 packs) → app icons and themes. Nothing sold *on* an actor's card until a lawyer has
+looked at selling around real people's faces. No ads, no upfront price (the site promises
+free), no tip jar.
+
+**TMDB's side (checked 2026-10-26).** Any revenue — purchases, ads, tips — is commercial
+use under the [API terms](https://www.themoviedb.org/api-terms-of-use) §2.A, and TMDB
+staff have said publicly it costs **$149/month under $1M revenue**, no indie tier. At
+~$2.40 kept per $2.99 sale that's ~62 sales a month, roughly 1,600–9,500 monthly players
+depending on conversion. Subscribe the day purchases go live, not before. **The fallback
+is Wikidata (CC0):** a coverage test against the top 500 films found 99.5% of top-3 billed
+and 92% of billed 4–10 actors, and 97% of pool actors' well-known films (voice roles live
+in P725, not P161), but only 40% of obscure films and no posters — film cards would go
+typographic. Also owed regardless of money: the attribution notice should use §3's exact
+wording, and §1.C's six-month cache limit covers the Reel's stored names and image paths.
+
+## Head-to-head — same start, both sides see the score
+
+*Added 2026-10-26.* The challenge loop, built so it works **without a backend** and gets
+better as the service and accounts land — not blocked on them.
+
+1. **A sends a challenge** — a `SharedChain` link (start, links, points, sharer id, name).
+2. **B plays the same start** and, at game over, sees the head-to-head on their phone:
+   most links wins, points break a tie (`Scoring.isNewRecord`'s rule).
+3. **B sends it back** — a reply link carrying both runs; A opens it and sees the same
+   head-to-head. Manual, like Pass & Play, and needs no server.
+4. **A rivalry list** on each phone, keyed by the other player's sharer id: "You vs Sam,
+   3–2", with each match.
+
+**Identity is a display name, not a username** — asked the first time someone challenges
+("what should friends call you?"), not unique, not searchable; people find each other by
+link. The sharer id already tells two Sams apart.
+
+**Upgrades as the platform grows:** the service ([0.8.0](#080--the-service)) returns B's
+result automatically with a push ("Sam beat your chain"); accounts
+([0.9.0](#090--accounts)) carry the list across phones; friend groups
+([0.11.0](#0110--friend-groups)) are this, for more than two.
+
+**Needs:** universal links on playunspool.com (the association file on the site, and the
+Apple Developer account) with a web page for anyone without the app — otherwise every
+challenge dead-ends for exactly the people it should recruit.
 
 ## The decisions this plan rests on
 
@@ -120,11 +192,20 @@ parallel, and the early items matter *because* they take months to pay off.
   - **Deletion can't be traced.** Play data isn't linked to a person, so a deletion
     request can't find it. Show the random ID in Settings, or add a "delete my play data"
     action, and say how on the page.
+- **An App Review note about TMDB.** External TestFlight builds go through beta review,
+  and TMDB apps get rejected under 4.1 / 5.2.1 / 5.2.2 (third-party IP) when the reviewer
+  can't see the rights. In App Review Information: the data comes from TMDB's API under
+  their terms, attribution is in the Reel and Settings, nothing is sold — and attach
+  TMDB's written confirmation if their reply has arrived. Never "TMDB" in the name,
+  subtitle or keywords.
 
 **Before 1.0:**
 - **App Store screenshots — budget 3–4 days.** They're the first thing a browser judges,
   and Apple gives a new app roughly two weeks of search boost that doesn't come back.
-  Plus a careful title, subtitle, description and keywords.
+  Plus a careful title, subtitle, description and keywords. **Let names and the game
+  carry the shots, not faces:** reviewers have rejected TMDB apps over celebrity photos
+  and posters in store screenshots (passing v1, failing an update). Lead with the answer
+  dock, the start sentence, the game-over stack; keep the Reel's cards small.
 - **Landing page — budget about a week**, reusing the screenshot assets. It shows the app
   and drives downloads. Tweakable after launch, so it doesn't hold launch. *(2026-10-25:
   hand-built rather than in Framer, in its own repo,
@@ -403,7 +484,10 @@ amplify it (`prepareSeeds` retries 3×, `Config.candidateLoadAttempts = 3`).
 **The fix:** a thin proxy holding the key and **caching the near-static responses**.
 Because the deal pool is a fixed query identical for every player, one cached upstream
 response serves the entire player base; cast and filmography for popular titles are
-near-static too. Plausibly removes well over 90% of TMDB calls.
+near-static too. Plausibly removes well over 90% of TMDB calls. **It also has to:** TMDB's
+only rate limit is ~40 requests/second **per IP** (staff, 2026-03), so today every phone
+gets its own allowance and the proxy concentrates everyone onto one. Keep cached
+responses under the terms' six-month limit.
 
 **Architecturally this is a new `MovieDataProvider` implementation, not an engine
 change.** That protocol is exactly why this is cheap — keep the engine/provider split
@@ -510,8 +594,10 @@ unticked opt-in**, because signing in is not consent to marketing.
 **Fully specced in [`DAILY-CHAIN.md`](DAILY-CHAIN.md)** — rules, scoring, outcomes, the
 share card, the engine changes, and the puzzle-generation job.
 
-**Two things to restate here:**
+**Three things to restate here:**
 
+- **Build every daily replayable** — a date-derived id and a stored puzzle, so a paid
+  archive needs no rework ([Monetization-ready](#monetization-ready--built-in-switched-off)).
 - **⚠️ Playtest before building.** Two people and index cards answer the open risks
   (padding, stranding, whether extend-or-bank is a real decision) for free. That test can
   happen *now* — it doesn't depend on any milestone above.

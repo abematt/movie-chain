@@ -154,6 +154,9 @@ struct SettingsView: View {
                 .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.top, Theme.Spacing.xs)
+
+            TMDBAttribution()
+                .frame(maxWidth: .infinity)
         }
     }
 

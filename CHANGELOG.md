@@ -40,6 +40,12 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
   hello@playunspool.com. The App Store needs the privacy policy reachable from the app,
   and players were never told where to send ideas.
 
+### Changed
+- **TMDB attribution uses the terms' exact wording, and Settings → About shows it too.**
+  The app carried the FAQ's shorter line; the API terms (§3) require "uses TMDB and the
+  TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB", shown
+  prominently. It matters before App Review, where TMDB apps get asked about their rights.
+
 ## [0.7.0] — 2026-10-26
 
 Unspool gets its 1.0 look, **Ground & Object**: a paper ground, objects with an ink edge

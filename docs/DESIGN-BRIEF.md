@@ -111,8 +111,8 @@ chained — a "look how many you know" record. Content: a grid/list of collected
 nodes with art, counts (actors / movies / chains logged), personal best score,
 and a filter or toggle between actors and movies. Pure counts, no rarity tiers.
 
-This sheet also carries the **required TMDB attribution** ("This product uses
-the TMDB API but is not endorsed or certified by TMDB", plus their logo), so it
+This sheet also carries the **required TMDB attribution** ("This application uses
+TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB", plus their logo; Settings → About carries it too), so it
 must always be reachable even when empty.
 
 ### 5. Settings (sheet)
