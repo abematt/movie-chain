@@ -40,7 +40,10 @@ and the head-to-head's automatic return. In order:
    token out (`TMDBSecrets.plist` is development-only); the security advisor is clean
    once `rls_auto_enable` is locked down. **Run `supabase db advisors --linked` before
    every schema change ships.**
-3. **The daily start served from a table.**
+3. **The daily start served from a table** — *built 2026-10-27* (`puzzles`, mode
+   `daily_start`; `DailyStartFeed.swift`). Publish a day with an insert in the SQL
+   editor ([`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)); the list
+   is the fallback. Days 1–9 are seeded from the placeholder list.
 4. **A results table** — per-day stats and the answer data.
 5. **Head-to-head with the automatic return**, on the service from the start.
 6. **Free daily credits + the hint ladder**, as before.
@@ -86,8 +89,8 @@ people actually play rather than guesses.
 *Set 2026-10-26.* The next mechanic work, before launch, in this order. Each item names
 where its detail lives; update this list as they land (move a landed one to the changelog).
 
-1. **A daily start for everyone** — *built 2026-10-26 (`DailyStart.swift`); the
-   hand-picked list and its `firstDay` are still placeholders.* One shared starting name per day,
+1. **A daily start for everyone** — *built 2026-10-26 (`DailyStart.swift`), served from
+   the service since 2026-10-27; the starts are still placeholders.* One shared starting name per day,
    drawn from a **fixed hand-picked list** (not each phone's cached pool, which can differ
    between friends), so everyone plays the same start on the same day and the share card
    compares. GROWTH.md D5. Small; no backend, no developer account. Not the A→B Daily

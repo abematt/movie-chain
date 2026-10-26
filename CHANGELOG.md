@@ -48,6 +48,11 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
   and players were never told where to send ideas.
 
 ### Changed
+- **The daily start comes from Unspool's service**, from a `puzzles` table, so a day can
+  be published, or a bad one fixed, without an app release. The phone fetches the week
+  ahead and keeps it, so the daily still works without signal. A day it hasn't been
+  served falls back to the built-in list. Fixing a day publishes a new revision rather
+  than editing the old one, because people may already have results against it.
 - **TMDB requests go through Unspool's own service** (Supabase), not straight to TMDB.
   A proxy function holds the TMDB token and caches responses, so one fetch of the deal
   pool, a cast or a filmography serves every player. Every phone used to make its own

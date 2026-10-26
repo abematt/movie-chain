@@ -121,8 +121,9 @@ enum ChainNode: Identifiable, Hashable, Sendable {
 
 }
 
-/// Whether a turn expects an actor or a movie.
-enum NodeKind: String, Sendable, Codable {
+/// Whether a turn expects an actor or a movie. `nonisolated` so the daily start
+/// (`DailyStart.Entry`) can decode it off the main actor.
+nonisolated enum NodeKind: String, Sendable, Codable {
     case actor
     case movie
 

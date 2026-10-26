@@ -40,15 +40,16 @@ struct ContentView: View {
         // must never be saved and dealt from once a real token is added.
         let poolCache = Config.hasTMDB
             ? SeedPoolCache.defaultFileURL.map { SeedPoolCache(fileURL: $0) } : nil
+        let dailyFeed: (any DailyStartFeed)? = Config.hasService ? ServiceDailyStartFeed() : nil
         #if DEBUG
         // QA hook: every request fails and nothing saved is read, to see the
         // home's "No connection." state.
         let offline = ProcessInfo.processInfo.arguments.contains("-uiOffline")
         let engine = offline
             ? GameEngine(provider: OfflineProvider(), collection: store)
-            : GameEngine(collection: store, poolCache: poolCache)
+            : GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed)
         #else
-        let engine = GameEngine(collection: store, poolCache: poolCache)
+        let engine = GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed)
         #endif
         // The play screen releases the first turn's clock once the keyboard is up.
         engine.holdsFirstTurnClock = true

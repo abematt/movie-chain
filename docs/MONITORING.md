@@ -54,6 +54,14 @@ sees "Out of film".
 - **Decide before the beta:** move to the Pro plan (no pausing) or schedule a keep-alive
   request. Once people play daily, the pause can't trigger.
 
+### No daily start published ahead
+Phones fetch the week ahead. A day with no row plays the app's fallback list, which is
+the same on every phone of the same build but may differ between builds, and a fix to
+that day can then only reach players through a new row.
+- **Watch:** the highest `number` for `daily_start` in `public.puzzles` against today's
+  number (`firstDay` is 2026-10-26 = #1). Keep at least seven days ahead.
+- **If it happens:** insert the missing days ([`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)).
+
 ### A schema change opened something
 - **Watch:** the advisors, before every schema change ships ([`ROADMAP.md`](ROADMAP.md)
   0.8.0's safety rules). Clean as of 2026-10-26.

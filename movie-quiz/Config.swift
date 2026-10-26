@@ -60,6 +60,9 @@ enum Config {
         return key.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
 
+    /// There's a service to talk to: the TMDB proxy and the published daily starts.
+    static var hasService: Bool { serviceKey.hasPrefix("sb_publishable_") }
+
     /// TMDB requests go through the proxy, so the TMDB token needn't ship. Without
     /// a service key, the app calls TMDB directly with `tmdbToken`. `-tmdbDirect`
     /// (DEBUG) skips the proxy, to tell a proxy fault from a TMDB one.
@@ -67,7 +70,7 @@ enum Config {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-tmdbDirect") { return false }
         #endif
-        return serviceKey.hasPrefix("sb_publishable_")
+        return hasService
     }
 
     /// Live TMDB data is reachable, through the proxy or directly.
@@ -155,6 +158,16 @@ enum Config {
     /// spares a 24-request burst on most launches. Older copies are still the
     /// fallback when a refetch fails. `nonisolated` so the off-main cache can read it.
     nonisolated static let seedPoolMaxAge: TimeInterval = 7 * 24 * 60 * 60
+
+    // MARK: Daily start
+
+    /// How many days past today each fetch of the published daily starts covers,
+    /// so a week without signal still has its dailies.
+    static let dailyDaysAhead = 7
+
+    /// The published days are refetched at most this often (on visits home), so a
+    /// day fixed after it went out reaches players within the hour.
+    static let dailyRefreshInterval: TimeInterval = 60 * 60
 
     /// Where chain links live: `<base>/c?d=…` (`SharedChain`). `nil` until the
     /// domain exists and serves the universal-links file; while it's `nil`, shares

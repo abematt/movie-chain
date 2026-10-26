@@ -210,11 +210,38 @@ home-screen deal policy is unit-tested with a seeded RNG — no network.
   empty. Tunables live in `Config` (`seedActorBias = 0.6`, `seedRecentWindow = 8`).
 
 ### Daily start — [`DailyStart.swift`](../movie-quiz/DailyStart.swift)
-One start a day, the same for everyone, from a **fixed hand-picked list** (`entries`),
-not the deal pool (pools differ between phones, so friends wouldn't match). Pure:
-`number(on:calendar:)` turns the player's *local* date into the day's number (#1 is
-`firstDay`; whole calendar days, so DST days count once), and `entry(number:)` picks
-from the list, wrapping when it runs out. The engine owns the rest: `dealDaily()`
+One start a day, the same for everyone, **published in the service's `puzzles` table**
+and falling back to a fixed hand-picked list (`entries`) for any day the phone hasn't
+been served. Never the deal pool (pools differ between phones, so friends wouldn't
+match). Pure: `number(on:calendar:)` turns the player's *local* date into the day's
+number (#1 is `firstDay`; whole calendar days, so DST days count once), `entry(number:)`
+picks from the list, wrapping when it runs out, and `latest(_:)` reduces served rows to
+each day's highest *playable* revision (`Entry.isPlayable` bounds a served row, so a bad
+one can't break the day).
+
+**Served days** ([`DailyStartFeed.swift`](../movie-quiz/DailyStartFeed.swift)): one
+PostgREST `GET /rest/v1/puzzles?mode=eq.daily_start` with the publishable key covers
+today through `Config.dailyDaysAhead`. `GameEngine.refreshDailies()` runs alongside the
+pool load in `prepareSeeds()` and on resume, at most once per
+`Config.dailyRefreshInterval` (an in-flight fetch is joined), and keeps the served days
+from today on in `UserDefaults` (`servedDailyStarts`), so the daily survives losing
+signal. If today's daily is on the home and the served start differs, the home swaps to
+it; a daily already in play is never swapped. No feed (tests, previews, no service key)
+plays the list.
+
+**The table** (`supabase/migrations/20261027120000_puzzles.sql`): `(mode, number,
+revision)` → `data jsonb`, so later modes share it. The public roles can only read it;
+a trigger refuses every update, delete and truncate, because once a day is out people
+have results against it. **To publish a day, or fix one**, insert in the SQL editor:
+
+```sql
+insert into public.puzzles (mode, number, revision, data) values
+  ('daily_start', 12, 1, '{"kind": "movie", "id": 603, "name": "The Matrix", "year": 1999}');
+-- a fix to a day that's out: same number, the next revision
+```
+
+`id` is the TMDB id. Publish at least a week ahead so phones carry it offline. Day `n`
+is `firstDay` + `n` − 1 in each player's local time. The engine owns the rest: `dealDaily()`
 puts today's start on the home (`dealtDaily` = its number) whenever it's unplayed —
 first thing in `prepareSeeds()`, before the pool loads, and on resume (which is also
 how a new day reaches a home left open). `deal()` clears `dealtDaily`, so "Deal again"
