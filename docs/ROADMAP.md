@@ -107,6 +107,19 @@ parallel, and the early items matter *because* they take months to pay off.
 - **The TestFlight beta**, invited from the waitlist: export `signups` from the D1 console
   as CSV and invite those addresses in TestFlight. Runs
   through the rest of the milestones on PostHog.
+- **The privacy page covers the app before the first invite goes out.** Testers' play data
+  reaches PostHog from their first run, so https://playunspool.com/privacy has to describe
+  the app by then (not at App Store launch). The app section is drafted and waiting,
+  unmerged, in [unspool-site PR #1](https://github.com/abematt/unspool-site/pull/1) (written from the code at 0.7.0, naming Abraham Mathew as
+  controller). Before inviting anyone: re-check it against the app's code, update what's
+  changed, then merge it (merging deploys the site). Settle these in the same pass:
+  - **Analytics is on by default** with an opt-out. EU rules on storing an identifier on
+    a device may expect consent before analytics rather than an opt-out; check whether
+    the beta needs a one-time prompt.
+  - **No retention period.** Pick one in PostHog and state it on the page.
+  - **Deletion can't be traced.** Play data isn't linked to a person, so a deletion
+    request can't find it. Show the random ID in Settings, or add a "delete my play data"
+    action, and say how on the page.
 
 **Before 1.0:**
 - **App Store screenshots — budget 3–4 days.** They're the first thing a browser judges,
