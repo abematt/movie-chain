@@ -1,13 +1,13 @@
 ---
 id: website
 label: Site, money & service
-span: Oct 25 15:41 – Oct 26 23:38
+span: Oct 25 15:41 – Oct 27 00:27
 versions: after 0.7.0 (unreleased)
 accent: blue
 order: 7
-sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613
+sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc
 start: 2026-10-25
-end: 2026-10-26T23:38
+end: 2026-10-27T00:27
 ---
 
 ## Era: 0.7.0 is tagged, and the website talks back (2026-10-26)
@@ -335,6 +335,113 @@ shared cache, the TMDB token had left release builds, and two PRs were merged.
 - **Next:** the daily start served from a table, the first table the app *reads*.
 - **Owed:** the real start list and `firstDay`; the daily's look; the share image's names; Pro or keep-alive before the beta; the privacy page and App Store label now that data reaches a server; CLT update plus brew for the CLI.
 
+## Era: the daily from a table, and every run recorded (2026-10-26 late – 10-27)
+
+A fresh session half an hour later, past midnight. In half an hour, items 3 and 4 of
+the morning's re-cut both went live. The daily start became a row in a Supabase
+table, and every finished run started going to a second table. Abraham made the four
+calls on the second one, then asked how Wordle shows stats and whether the game
+really rewards obscurity. It ended with a real run from his phone sitting in the table.
+
+### 23:58 — "alright what are the next things on our road map" (e81853bc)
+
+A read of `docs/ROADMAP.md`. The re-cut from earlier that evening put the service before
+launch, in order: the daily start (done), the TMDB proxy (done), **the daily start
+served from a table**, a results table, head-to-head, then free credits and hints. The
+recommendation was the table first: small, built on the proxy that had just landed, and
+the results table needs it.
+
+### 00:00–00:10 — "alright lets try the daily start from a table"
+
+- **The shape: one `puzzles` table, `(mode, number, revision)` → `data jsonb`.** It
+  follows the re-cut's rule about room for new modes: "keyed by a `mode` with the mode's
+  data in a JSON column, not a table per mode". The daily start is mode `daily_start`.
+- **Immutable once published.** A trigger refuses every update, delete and truncate,
+  even from the owner. A fix is the same day number with the next revision, and the app
+  plays the highest *playable* revision. This is the roadmap's 0.8.0 rule, "Corrections
+  publish a *replacement*", made into SQL.
+- **The list stays as the fallback**, as the re-cut said. The migration seeded days 1–9
+  from the placeholder list, so nothing changed for anyone who had already played #1,
+  and a test reads the migration file and checks the seed against
+  `DailyStart.entries`.
+- **The app** (`DailyStartFeed.swift`) makes one PostgREST GET with the publishable key
+  for today plus seven days, at most once an hour, and keeps the days in
+  `UserDefaults`. A served start that differs from the list swaps in on the home, never
+  mid-run. Rows are bounded (`Entry.isPlayable`), following the roadmap's "Config must
+  never be able to brick the client".
+- `NodeKind` became `nonisolated` so the entry could decode off the main actor.
+- One build error, `dealtSeed?.name` (it's `displayName`), then 135 tests green.
+  PR #42 (`0df4dd3`).
+- **00:10:** Abraham ran `db push` himself (the memory rule: he holds the database
+  password). The probe with the app's key: all nine days read, while insert, update and
+  delete were refused (401, `permission denied`). The advisor was clean. Merged
+  (`6c8a51e`).
+
+### 00:11–00:21 — "sure lets do that too": the results table
+
+The docs already had the rules: writes go through an Edge Function, results are keyed by
+puzzle number, and runs compare by links with points breaking ties. That left four
+questions, asked together:
+
+| Question | Recommended | Abraham's answer |
+|---|---|---|
+| Which runs? | Every run | **Every run** |
+| What answer data? | Links as TMDB ids | **Links as TMDB ids** (no typed misses) |
+| Server checks? | Re-check every link against TMDB | **Shape checks only** |
+| Show "you beat N%" now? | Collect now, show later | **"How does wordle do this?"** |
+
+- **The one he overruled** was validation. The recommendation was the roadmap's own
+  rule, re-check every link. He took the cheaper path. The roadmap had already admitted
+  the limit: "Server-side re-validation proves the links are real; it cannot prove they
+  were recalled."
+- **The Wordle answer:** Wordle shows a personal panel (played, win %, streaks, guess
+  distribution), and the WordleBot puts your guesses next to the average, but nothing
+  says "you beat N%". The answer flagged its own uncertainty about whether WordleBot also
+  shows today's full distribution. The table stores raw rows, so any of those can come
+  later. The UI was left alone.
+- **~00:16 (inferred), mid-build: "also are we valuing or giving importance to
+  obscurity?"** Yes, a little. `Scoring.obscurityBonus` is `30 / (1 + popularity/8)`, so
+  a star earns 2–5 points and a deep cut ~24, on top of 10 base and up to 30 for speed.
+  But points only break ties, and TMDB popularity is page-view buzz, not difficulty of
+  recall. The results table is the fix: count what people actually name.
+- **Built:** `results` (RLS on, no public grants, one daily per device by a partial
+  unique index), the `results` function (alternating kinds, no repeats, `links` matches
+  the chain, points within 10–70 a link, no future day numbers, and the daily's start must
+  match the published one), and on the phone `RunResult` plus a `ResultsOutbox` that
+  keeps undelivered runs (newest 50) and retries on each visit home. Typed text never
+  leaves the phone. Demo launches send nothing, and DEBUG builds tag `-debug`.
+- 144 tests green. The function was deployed before the table existed. The probe showed
+  401 without a key and 422 for a malformed run, but 500 rather than 422 for a wrong daily
+  start: the service role couldn't read `puzzles` yet. PR #43 (`d42b20f`).
+- **What it adds to the privacy work:** results leave the phone even with analytics off
+  (treated as game data, not analytics), so the privacy page has to cover them, or they
+  go behind the opt-out too. Both went into the roadmap's "Before the beta".
+- **00:21 "done":** after the push, the wrong start got 422, a valid daily 201, the resend
+  200 ("Already stored"), and the public key could neither read nor insert. Advisors
+  clean. Merged (`22455b8`).
+
+### 00:22–00:26 — "is this code on my phone"
+
+No. Nothing from the session had left the simulator. A Debug build of `main` was
+installed on the iPhone 16 Pro over `devicectl`. Getting there hit two gotchas.
+`-destination name=` fell through to a visionOS placeholder that isn't installed. And
+the device's `xcodebuild` id (`00008140-…`) isn't its `devicectl` id.
+
+**00:26 "finished a run":** the row was there seconds later, read with `supabase db
+query --linked` (a CLI command found that night): daily #2, 12 nodes, **11 links, 563
+points**, quit, `0.7.0-debug`. The first real player row.
+
+### Where things stand (2026-10-27 ~00:27)
+
+- `main` at `22455b8`. Supabase: `puzzles` (days 1–9 = the placeholder list), `results`,
+  functions `tmdb` and `results`. Advisor clean. Two probe rows to delete
+  (`app_version = 'probe-debug'`).
+- **Next on the re-cut:** head-to-head (waits on universal links and the developer
+  account), then credits and hints.
+- **Owed:** the real starts before day 10 (Nov 4) or the list wraps; what the stats panel
+  shows; whether results sit behind the analytics opt-out; the privacy page now covering
+  `results`.
+
 ### Decision log
 
 | Time (local) | Decision | Rationale | Source |
@@ -394,6 +501,16 @@ shared cache, the TMDB token had left release builds, and two PRs were merged.
 | Oct 26 23:12 | DEBUG-only previews | Release had never compiled | b738c613 |
 | Oct 26 23:15 | `dealtSeed` always notifies; the sentence keyed on art path | Equal-by-id nodes defeated both Observation and SwiftUI's diffing | b738c613 |
 | Oct 26 23:33 | `docs/MONITORING.md` as the dashboard's spec | Abuse and the free-plan pause need a place to be watched | b738c613 |
+| Oct 27 00:01 | Daily starts live in one `puzzles` table keyed `(mode, number, revision)` with `data jsonb` | The re-cut said a mode's content shares one table so new modes need no new ones | e81853bc |
+| Oct 27 00:01 | Published puzzles are immutable (a trigger refuses update/delete/truncate); a fix is the next revision | People may have results against a day once it's out; the roadmap said corrections publish a replacement | e81853bc |
+| Oct 27 00:02 | Keep the built-in list as the fallback and seed days 1–9 from it | No change for anyone who already played; the daily still works offline and on a missed publish | e81853bc |
+| Oct 27 00:02 | Fetch a week ahead at most once an hour, keep it in UserDefaults, swap the home's daily only before play | Survives losing signal; a same-day fix reaches players within the hour; never changes a run in progress | e81853bc |
+| Oct 27 00:15 | Send every run, not only dailies | Answer data for obscurity needs volume; stats use the daily rows | e81853bc |
+| Oct 27 00:15 | Links as TMDB ids with per-link seconds; no typed text | Enough to measure recall; nothing personal can end up in the table | e81853bc |
+| Oct 27 00:15 | Shape checks only, no re-check against TMDB (overruling the recommendation) | Cheaper; re-validation proves links real but not recalled, and nothing is at stake | e81853bc |
+| Oct 27 00:16 | Collect results now, decide the on-screen stats later | Abraham asked how Wordle does it first; raw rows support any panel | e81853bc |
+| Oct 27 00:18 | Results are game data, not analytics: sent regardless of the opt-out, for now | Flagged for the privacy pass to confirm or put behind the opt-out | e81853bc |
+| Oct 27 00:18 | An outbox keeps undelivered runs (newest 50) and drops ones the server refuses | Offline game overs still count; a refused run would fail forever | e81853bc |
 
 ### Story material
 
@@ -421,6 +538,13 @@ shared cache, the TMDB token had left release builds, and two PRs were merged.
 - **The PR GitHub closed.** Deleting a stacked PR's base branch closed it instead of retargeting it. Nothing was lost; it came back as #40.
 - **A token search as proof.** "The token leaves release builds" was checked by grepping a built app for its first 24 characters. A fresh install with no token loading a full pool proved the proxy.
 
+- **Two tables in half an hour.** From "what are the next things" at 23:58 to a real run in the results table at 00:26: two migrations, two PRs, one Edge Function, 144 tests.
+- **The first row.** Daily #2, The Dark Knight, 11 links, 563 points, quit. Abraham's own run from the phone, seconds after he finished.
+- **"How does wordle do this?"** He answered a design question with a question, and it was the right one: Wordle shows a fixed panel and an average, never a percentile.
+- **Obscurity, measured honestly.** The bonus is real but small (up to 30 a link, ties only), and it measures TMDB page views. The fix is counting what players actually name.
+- **The overruled recommendation.** Re-checking every link was the roadmap's own rule. Abraham chose shape checks, and the roadmap's anti-cheat paragraph had already said why that's fine.
+- **The 500 that meant "not yet".** The wrong-start check failed with 500 before the push, because the function's role couldn't read `puzzles`. After the push it returned the intended 422.
+
 ### Media index
 
 - `media/4f948fc0/shots_s-settings.png`: Settings in light mode with the new Privacy policy, Suggest a feature and Contact rows. Embedded. Oct 26 ~08:28.
@@ -435,3 +559,4 @@ shared cache, the TMDB token had left release builds, and two PRs were merged.
 - `media/b738c613/release.png`, `release2.png`: a fresh Release install, 12s and 27s in, the daily with a placeholder avatar while the pool loaded. ~23:11.
 - `media/b738c613/release3.png`: after the first fix (observation only), still no photo. Embedded. ~23:14.
 - `media/b738c613/release4.png`: after the second fix, Tom Hanks' photo shows. Embedded. ~23:16.
+- Session `e81853bc` captured no screenshots or other media.
