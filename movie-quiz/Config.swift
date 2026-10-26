@@ -38,6 +38,34 @@ enum Config {
 
     static var hasTMDBToken: Bool { !tmdbToken.isEmpty }
 
+    // MARK: The service (Supabase)
+
+    /// The Unspool service. Its `tmdb` Edge Function is the TMDB proxy
+    /// (`supabase/functions/tmdb`).
+    static let serviceURL = URL(string: "https://hqdcmuxownykfzmnhmbb.supabase.co")!
+
+    /// The service's publishable key (`sb_publishable_…`), from the secrets plist
+    /// (key `ServiceKey`). Made to ship in apps — row-level security decides what
+    /// it can reach — but kept out of this public repo like the PostHog token, so
+    /// other people's builds don't run on this project.
+    static let serviceKey: String = {
+        guard let key = secrets["ServiceKey"] as? String else { return "" }
+        return key.trimmingCharacters(in: .whitespacesAndNewlines)
+    }()
+
+    /// TMDB requests go through the proxy, so the TMDB token needn't ship. Without
+    /// a service key, the app calls TMDB directly with `tmdbToken`. `-tmdbDirect`
+    /// (DEBUG) skips the proxy, to tell a proxy fault from a TMDB one.
+    static var usesTMDBProxy: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-tmdbDirect") { return false }
+        #endif
+        return serviceKey.hasPrefix("sb_publishable_")
+    }
+
+    /// Live TMDB data is reachable, through the proxy or directly.
+    static var hasTMDB: Bool { usesTMDBProxy || hasTMDBToken }
+
     /// PostHog project token (`phc_…`), from the same secrets plist (key
     /// `PostHogProjectToken`). It's a write-only key meant to ship in clients, but
     /// it stays out of this public repo so nobody else's builds report into the
@@ -161,6 +189,6 @@ enum Config {
     /// proxy instead of TMDB directly. Deliberately NOT doing this yet — noting
     /// it here so it's not forgotten. Revenue is the trigger to actually build it.
     static func makeProvider() -> any MovieDataProvider {
-        hasTMDBToken ? TMDBProvider() : StubProvider()
+        hasTMDB ? TMDBProvider() : StubProvider()
     }
 }

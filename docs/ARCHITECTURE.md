@@ -150,8 +150,15 @@ actually know, since `endGame` takes the first unused candidate. Every TMDB requ
 short `Config.requestTimeout` so a stalled fetch fails fast instead of freezing a
 turn (the clock is paused across candidate loads — see the engine's retry note).
 
-- [`TMDBProvider.swift`](../movie-quiz/TMDBProvider.swift) — live over
-  `https://api.themoviedb.org/3`. Supports both v4 Bearer tokens and v3 `api_key`
+- [`TMDBProvider.swift`](../movie-quiz/TMDBProvider.swift) — live over the
+  service's **TMDB proxy** when the secrets plist has a `ServiceKey`
+  (`Config.usesTMDBProxy`), else straight to `https://api.themoviedb.org/3`; the
+  proxy takes the same paths and queries, so only the base URL and the auth header
+  change. The proxy is the Supabase Edge Function
+  [`supabase/functions/tmdb`](../supabase/functions/tmdb/index.ts): it forwards only the
+  five paths the app uses, adds the token (a function secret), and caches responses
+  in `tmdb_cache` (RLS on, no policies, service role only) for 1–30 days by route,
+  serving an expired copy if TMDB fails. Directly, it supports both v4 Bearer tokens and v3 `api_key`
   query auth (`Config.usesBearerToken`). Private `Decodable` DTOs map TMDB JSON to
   the domain types. Seed search results are **sorted by TMDB `popularity`** so the
   canonical record leads — the rule is `ActorRanking.rank`, a pure type that lives

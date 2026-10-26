@@ -35,8 +35,9 @@ obscurity by what players actually remember, content changed without an app rele
 and the head-to-head's automatic return. In order:
 
 1. **The daily start, built in** — landed; its list stays as the offline fallback.
-2. **The TMDB proxy** ([0.8.0 Job 1](#job-1--the-tmdb-proxy)) — first, because it stands
-   the service up with no change players can see.
+2. **The TMDB proxy** ([0.8.0 Job 1](#job-1--the-tmdb-proxy)) — *landed 2026-10-26*
+   (`supabase/functions/tmdb`, cache table `tmdb_cache`). Still to do: stop bundling
+   `TMDBToken` in release builds, and run the security advisor.
 3. **The daily start served from a table.**
 4. **A results table** — per-day stats and the answer data.
 5. **Head-to-head with the automatic return**, on the service from the start.
@@ -99,6 +100,13 @@ where its detail lives; update this list as they land (move a landed one to the 
    built with the `Entitlements` check, assisted-run marking and analytics events from
    [Monetization-ready](#monetization-ready--built-in-switched-off). Free in the beta —
    it answers "does a stuck player want a hint?" before anything is ever sold.
+
+**To come back to** (noted 2026-10-26, after playing the daily on a phone):
+- **The daily's look** — the Today pill and the "Daily #N" tag work, but the design isn't
+  settled; iterate on them.
+- **The share image names no one.** The coins are blank by design (`ShareCard.swift`:
+  spoiler-free, the start is the dare), but on a phone it reads as missing. Decide what
+  it should reveal — at least the start, maybe the chain once played.
 
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
