@@ -52,6 +52,30 @@ people actually play rather than guesses.
   (Supabase, anonymous first, then Google and Apple linked to the same user), friend
   groups, a backend of our own. Version numbers get re-cut when launch scope is final.
 
+## Next up — the game mechanics, in order
+
+*Set 2026-10-26.* The next mechanic work, before launch, in this order. Each item names
+where its detail lives; update this list as they land (move a landed one to the changelog).
+
+1. **A daily start for everyone** — *next to build.* One shared starting name per day,
+   drawn from a **fixed hand-picked list** (not each phone's cached pool, which can differ
+   between friends), so everyone plays the same start on the same day and the share card
+   compares. GROWTH.md D5. Small; no backend, no developer account. Not the A→B Daily
+   Chain — that's [0.10.0](#0100--the-daily-chain), after launch.
+2. **Challenge links + the head-to-head (step one).** The challenge link, B's head-to-head
+   at game over, the reply link back to A, and the rivalry list — see
+   [Head-to-head](#head-to-head--same-start-both-sides-see-the-score). `SharedChain` is
+   already built; it waits on universal links (playunspool.com + the Apple Developer
+   account), and the site needs a fallback page ([`WEBSITE-SYNC.md`](WEBSITE-SYNC.md)).
+3. **Free daily credits + the hint ladder.** A credit balance with a free daily grant,
+   spent on the escalating hint ([`ASSISTED-MODE.md`](ASSISTED-MODE.md#if-assistance-returns-preserve-the-recall-act)),
+   built with the `Entitlements` check, assisted-run marking and analytics events from
+   [Monetization-ready](#monetization-ready--built-in-switched-off). Free in the beta —
+   it answers "does a stuck player want a hint?" before anything is ever sold.
+
+**Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
+([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
+
 ## Monetization-ready — built in, switched off
 
 *Decided 2026-10-26.* Nothing is sold at launch, and most apps never reach the scale where
