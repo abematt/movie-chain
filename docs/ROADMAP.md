@@ -117,6 +117,19 @@ where its detail lives; update this list as they land (move a landed one to the 
   spoiler-free, the start is the dare), but on a phone it reads as missing. Decide what
   it should reveal — at least the start, maybe the chain once played.
 
+**For Abraham, 2026-10-27** (left over from building the two tables):
+- [ ] **Delete the two probe rows** from `results`, in the SQL editor:
+  `delete from public.results where app_version = 'probe-debug';`
+- [ ] **Publish the real starts before day 10 (4 November).** Days 1–9 are the placeholder
+  list; with no row for day 10 the app wraps back to the start of its list. Insert days 10
+  onward (the statement is under *Daily start* in [`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)),
+  and replace 3–9 with new revisions if the placeholders shouldn't run.
+- [ ] **Decide what the stats panel shows** on the daily's game over. Wordle's model is a
+  fixed panel (your own stats, plus how everyone did today, e.g. the average), not "you
+  beat N%". `results` keeps raw rows, so any of these works.
+- [ ] **Decide whether results go behind the analytics opt-out.** They're sent regardless
+  today, treated as game data. Either the privacy page says so, or the opt-out covers them.
+
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
 
