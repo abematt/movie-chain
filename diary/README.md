@@ -50,6 +50,7 @@ never are.
 | `04-oct22-reel-cards.md` | Oct 22 13:17 → 18:08 | 0.5.2, 0.5.3 |
 | `05-oct22-unspool.md` | Oct 22 18:21 → 23:55 | 0.6.0 |
 | `06-oct23-design-resync.md` | Oct 23 10:35 → Oct 25 15:07 | 0.7.0 |
+| `07-oct26-website-and-privacy.md` | Oct 25 15:41 → Oct 26 08:35 | after 0.7.0 (unreleased) |
 
 ## Gaps worth filling by hand
 
