@@ -497,10 +497,11 @@ struct CollectionView: View {
 // MARK: - TMDB attribution
 //
 // TMDB's API Terms of Use require crediting them as the data source in-app, with
-// their logo and the standard non-endorsement disclaimer. This lives in the Reel
-// sheet — the calmest secondary surface — so it stays out of the deliberately
-// play-first home while remaining visible in the app (compliant: the terms only
-// require it be shown, not that it be on the home screen).
+// their logo and the standard non-endorsement disclaimer. The wording is §3's
+// exactly — the FAQ's shorter line isn't the contract. It lives in the Reel sheet
+// and in Settings → About, the calm secondary surfaces, so it stays out of the
+// deliberately play-first home while remaining visible in the app (compliant:
+// the terms only require it be shown prominently, not that it be on the home screen).
 //
 // The logo is TMDB's official "long" gradient wordmark, added to the asset
 // catalog as a vector SVG (`TMDBLogo`, from themoviedb.org/about/logos-attribution).
@@ -515,7 +516,7 @@ struct TMDBAttribution: View {
                 .scaledToFit()
                 .frame(height: 14)
                 .accessibilityLabel("The Movie Database (TMDB)")
-            Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
+            Text("This application uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.")
                 .font(Theme.Font.sentence(.caption))
                 .foregroundStyle(Theme.Color.muted)
                 .multilineTextAlignment(.center)

@@ -70,7 +70,9 @@ version — design overhaul (0.5.0, **landed**; motion re-tune landed as 0.5.1, 
 the Unspool rebrand (0.6.0, **landed**), Ground & Object with the first foundations (0.7.0, **landed**; logging, crash reporting and the build pipeline still to come), the service /
 TMDB proxy (0.8.0), accounts (0.9.0), the Daily Chain (0.10.0), friend groups (0.11.0);
 share images ship with launch (1.0.0). Global leaderboards are dropped — **check the
-changelog table before choosing a bump**. Each is documented in
+changelog table before choosing a bump**. **What to build next is the roadmap's
+[*Next up*](docs/ROADMAP.md#next-up--the-game-mechanics-in-order) list** (daily start →
+challenge + head-to-head → free daily credits and hints). Each is documented in
 [`docs/ROADMAP.md`](docs/ROADMAP.md) (scope, decisions to settle, known traps); read
 the relevant section before starting one.
 
@@ -177,7 +179,10 @@ has actually been bitten by, and how they're enforced.
 
 The landing page is https://playunspool.com, in its own repo `../unspool-site`
 ([`abematt/unspool-site`](https://github.com/abematt/unspool-site)). Its
-[`docs/handover-app.md`](https://github.com/abematt/unspool-site/blob/main/docs/handover-app.md) is what the app owes it; the parts that bite here:
+[`docs/handover-app.md`](https://github.com/abematt/unspool-site/blob/main/docs/handover-app.md) is what the app owes it;
+[`docs/WEBSITE-SYNC.md`](docs/WEBSITE-SYNC.md) is the other direction — **where the site is
+out of step with the app**. Read it when asked about the site, and add to it whenever an
+app change makes something on the site stale. The parts that bite here:
 - **Its hero phones are real screens**, shot by the site's `scripts/screens.py` with these
   DEBUG flags: `-uiDemoChain`, `-uiDemoGameOver [-uiDemoNoBest] -uiDemoClean`,
   `-uiDemoReel -uiOpenReel`. Renaming or changing one breaks it: update `screens.py` too.
