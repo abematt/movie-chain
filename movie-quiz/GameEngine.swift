@@ -152,7 +152,21 @@ final class GameEngine {
     /// The start currently dealt on the home screen (the "Start with …" button).
     /// `nil` until the popularity pool has loaded and the first deal lands — the
     /// home shows a placeholder until then.
-    private(set) var dealtSeed: ChainNode?
+    ///
+    /// Observed by hand so every set is announced. `@Observable` skips a set whose
+    /// new value `==` the old, and nodes are equal by TMDB id — so swapping the
+    /// bare daily for the pool's copy of the same start (with its art) never
+    /// reached the home, and the photo never showed.
+    private(set) var dealtSeed: ChainNode? {
+        get {
+            access(keyPath: \.dealtSeed)
+            return _dealtSeedStorage
+        }
+        set {
+            withMutation(keyPath: \.dealtSeed) { _dealtSeedStorage = newValue }
+        }
+    }
+    @ObservationIgnored private var _dealtSeedStorage: ChainNode?
     /// The pools couldn't load after every attempt and there was no saved copy to
     /// fall back on, so there is no start to deal. The home offers to try again
     /// instead of sitting on "Dealing…".
@@ -299,7 +313,9 @@ final class GameEngine {
     /// `dealtSeed` stays `nil` and the home shows a placeholder.
     func prepareSeeds() async {
         // Today's daily needs no pool, so it's on the home at once; the pool
-        // still loads for "Deal again".
+        // still loads for "Deal again". A saved pool is read first (it's
+        // synchronous), so the daily has its art from the first frame.
+        readPoolCacheOnce()
         let dealtTheDaily = dealDaily()
         // Retry a transient pool-load failure a few times so a flaky first launch
         // self-heals while the player is still on the home screen. A hard failure

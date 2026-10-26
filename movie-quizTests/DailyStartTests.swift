@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import Synchronization
 import Testing
 @testable import movie_quiz
 
@@ -114,6 +115,28 @@ struct DailyStartEngineTests {
         #expect(engine.dealtDaily == 1)
         #expect(engine.dealtSeed?.tmdbID == today.id)
         #expect(engine.dealtSeed?.imagePath == "/art.jpg")
+    }
+
+    /// The pool's copy of the daily equals the bare one (same id), so a plain
+    /// observed property would skip the swap and the home would never get the art.
+    @Test func swappingInThePoolsCopyIsObserved() async {
+        let engine = makeEngine()
+        #expect(engine.dealDaily())
+        #expect(engine.dealtSeed?.imagePath == nil)
+
+        let changed = Changed()
+        withObservationTracking { _ = engine.dealtSeed } onChange: { changed.set() }
+        await engine.prepareSeeds()
+
+        #expect(engine.dealtSeed?.imagePath == "/art.jpg")
+        #expect(changed.isSet)
+    }
+
+    /// Set from observation's `onChange`, which can run off the main actor.
+    nonisolated final class Changed: Sendable {
+        private let flag = Mutex(false)
+        func set() { flag.withLock { $0 = true } }
+        var isSet: Bool { flag.withLock { $0 } }
     }
 
     @Test func dealAgainLeavesTheDailyAndTodayBringsItBack() async {

@@ -407,7 +407,12 @@ struct SeedView: View {
         ZStack(alignment: .bottomLeading) {
             if let seed = engine.dealtSeed {
                 SentenceHead(seed: seed, daily: engine.dealtDaily, stage: stage)
-                    .id(seed.id)
+                    // The art path is in the identity because SwiftUI compares a
+                    // view's inputs with `==`, and nodes are equal by TMDB id: the
+                    // pool's copy of the daily (same id, now with art) would
+                    // otherwise never redraw. It swaps in place — the animation
+                    // below is keyed on the same `==`, so it doesn't deal again.
+                    .id("\(seed.id)|\(seed.imagePath ?? "")")
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
                 DealingSentence()
