@@ -67,6 +67,65 @@ struct DailyStartTests {
         let keys = DailyStart.entries.map { "\($0.kind)\($0.id)" }
         #expect(Set(keys).count == keys.count)
     }
+
+    // MARK: Served days
+
+    private static func served(_ number: Int, revision: Int = 1, _ entry: DailyStart.Entry?) -> DailyStart.Served {
+        DailyStart.Served(number: number, revision: revision, entry: entry)
+    }
+
+    @Test func theHighestPlayableRevisionWins() {
+        let days = DailyStart.latest([
+            Self.served(1, revision: 2, .actor(20, "Fixed")),
+            Self.served(1, revision: 1, .actor(10, "Original")),
+            Self.served(2, revision: 1, .movie(30, "Kept", 1999)),
+            Self.served(2, revision: 2, .actor(0, "No id")),   // a bad fix doesn't win
+            Self.served(3, revision: 1, nil),                  // data that didn't decode
+            Self.served(0, revision: 1, .actor(40, "Day zero")),
+        ])
+        #expect(days[1]?.id == 20)
+        #expect(days[2]?.id == 30)
+        #expect(days[3] == nil)
+        #expect(days[0] == nil)
+    }
+
+    @Test(arguments: [
+        DailyStart.Entry.actor(1, " "),
+        DailyStart.Entry.actor(1, String(repeating: "a", count: 201)),
+        DailyStart.Entry(kind: .actor, id: 1, name: "An actor with a year", year: 2000),
+        DailyStart.Entry.movie(1, "Before film", 1800),
+        DailyStart.Entry.movie(-5, "Negative id", 2000),
+    ])
+    func anUnplayableEntryIsRefused(_ entry: DailyStart.Entry) {
+        #expect(!entry.isPlayable)
+    }
+
+    /// The table's rows as the REST API returns them; a row whose data doesn't
+    /// decode is kept as a gap, not a failed fetch.
+    @Test func servedRowsDecode() throws {
+        let json = #"""
+        [{"number": 1, "revision": 1, "data": {"kind": "actor", "id": 31, "name": "Tom Hanks"}},
+         {"number": 2, "revision": 1, "data": {"kind": "movie", "id": 155, "name": "The Dark Knight", "year": 2008}},
+         {"number": 3, "revision": 1, "data": {"kind": "director", "id": 1, "name": "Someone"}}]
+        """#
+        let rows = try JSONDecoder().decode([DailyStart.Served].self, from: Data(json.utf8))
+        #expect(rows.map(\.entry) == [.actor(31, "Tom Hanks"), .movie(155, "The Dark Knight", 2008), nil])
+    }
+
+    /// The migration seeded the table with the fallback list, so serving those
+    /// days changes nothing for anyone who already played them.
+    @Test func theSeededDaysMatchTheFallbackList() throws {
+        let migration = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "supabase/migrations/20261027120000_puzzles.sql")
+        let sql = try String(contentsOf: migration, encoding: .utf8)
+        let rows = sql.matches(of: /\('daily_start', (\d+), '(\{.*\})'\)/)
+        #expect(rows.count == DailyStart.entries.count)
+        for row in rows {
+            let entry = try JSONDecoder().decode(DailyStart.Entry.self, from: Data(row.2.utf8))
+            #expect(entry == DailyStart.entry(number: Int(row.1)!))
+        }
+    }
 }
 
 // MARK: - The engine
@@ -198,5 +257,90 @@ struct DailyStartEngineTests {
         let summary = GameEngine.Summary(links: 3, points: 120, daily: 12)
         #expect(summary.shareText(link: nil).hasPrefix("Unspool #12 🎬"))
         #expect(GameEngine.Summary(links: 3).shareText(link: nil).hasPrefix("Unspool 🎬"))
+    }
+}
+
+// MARK: - Served by the service
+
+@MainActor
+struct ServedDailyStartTests {
+
+    private let defaults = UserDefaults(suiteName: "ServedDailyStartTests-\(UUID().uuidString)")!
+    private let calendar = Calendar(identifier: .gregorian)
+    private let listed = DailyStart.entry(number: 1)!
+    private let published = DailyStart.Entry.actor(900_100, "Published Star")
+
+    /// The days the service has published, or a failure.
+    @MainActor
+    final class Feed: DailyStartFeed {
+        var days: [Int: DailyStart.Entry]
+        var fails = false
+        private(set) var calls = 0
+        init(_ days: [Int: DailyStart.Entry] = [:]) { self.days = days }
+
+        func dailyStarts(_ numbers: ClosedRange<Int>) async throws -> [Int: DailyStart.Entry] {
+            calls += 1
+            if fails { throw DataProviderError.badResponse(503) }
+            return days.filter { numbers.contains($0.key) }
+        }
+    }
+
+    /// An engine on day #1.
+    private func makeEngine(_ feed: Feed) -> GameEngine {
+        let day = calendar.date(from: DailyStart.firstDay)!.addingTimeInterval(12 * 3600)
+        return GameEngine(provider: DailyStartEngineTests.Provider(daily: listed), defaults: defaults,
+                          calendar: calendar, today: { day }, dailyFeed: feed)
+    }
+
+    @Test func aPublishedDayReplacesTheListOnTheHome() async {
+        let engine = makeEngine(Feed([1: published]))
+        await engine.prepareSeeds()
+
+        #expect(engine.dealtDaily == 1)
+        #expect(engine.dealtSeed?.tmdbID == published.id)
+        #expect(engine.dealtSeed?.displayName == published.name)
+    }
+
+    @Test func aFailedFetchPlaysTheList() async {
+        let feed = Feed([1: published])
+        feed.fails = true
+        let engine = makeEngine(feed)
+        await engine.prepareSeeds()
+
+        #expect(engine.dealtDaily == 1)
+        #expect(engine.dealtSeed?.tmdbID == listed.id)
+    }
+
+    @Test func publishedDaysAreKeptForALaunchWithoutSignal() async {
+        await makeEngine(Feed([1: published])).prepareSeeds()
+
+        let offline = Feed()
+        offline.fails = true
+        let relaunched = makeEngine(offline)
+        #expect(relaunched.dealDaily())
+        #expect(relaunched.dealtSeed?.tmdbID == published.id)
+    }
+
+    @Test func aDailyInPlayIsNotSwapped() async {
+        let feed = Feed()
+        feed.fails = true   // so the next refresh isn't held back by the last one
+        let engine = makeEngine(feed)
+        await engine.prepareSeeds()
+        await engine.startGame(with: engine.dealtSeed!, daily: 1)
+
+        feed.fails = false
+        feed.days = [1: published]
+        await engine.refreshDailies()
+        #expect(feed.calls == 2)
+        #expect(engine.chain.first?.tmdbID == listed.id)
+        #expect(engine.dealtSeed?.tmdbID == listed.id)
+    }
+
+    @Test func visitsHomeWithinTheHourDontRefetch() async {
+        let feed = Feed([1: published])
+        let engine = makeEngine(feed)
+        await engine.prepareSeeds()
+        await engine.prepareSeeds()
+        #expect(feed.calls == 1)
     }
 }

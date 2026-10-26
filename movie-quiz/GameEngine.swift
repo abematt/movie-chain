@@ -179,6 +179,9 @@ final class GameEngine {
     private(set) var dailyResults: [Int: DailyResult]
     /// The daily number of the run in progress.
     private var runDaily: Int?
+    /// Daily starts the service has published, by number, kept from today on.
+    /// A day missing here falls back to `DailyStart.entries`.
+    private var servedDailies: [Int: DailyStart.Entry]
 
     // MARK: Private
 
@@ -253,14 +256,23 @@ final class GameEngine {
     private static let bestChainKey = "bestChain"
     private static let bestPointsKey = "bestPoints"
     private static let dailyResultsKey = "dailyResults"
+    private static let servedDailiesKey = "servedDailyStarts"
     /// Decides which local day it is, for the daily start. Injected so tests pin it.
     private let calendar: Calendar
     private let today: () -> Date
+    /// Where published daily starts come from; `nil` plays the built-in list only
+    /// (tests, previews, the stub provider).
+    private let dailyFeed: (any DailyStartFeed)?
+    /// The daily fetch in flight, joined rather than repeated.
+    private var dailyLoad: Task<Void, Never>?
+    /// When the served days last arrived, so every "Play again" doesn't refetch.
+    private var dailiesFetchedAt: Date?
 
     init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
          poolCache: SeedPoolCache? = nil, defaults: UserDefaults = .standard,
          now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
-         calendar: Calendar = .current, today: @escaping () -> Date = Date.init) {
+         calendar: Calendar = .current, today: @escaping () -> Date = Date.init,
+         dailyFeed: (any DailyStartFeed)? = nil) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
@@ -274,8 +286,11 @@ final class GameEngine {
         self.bestPoints = defaults.integer(forKey: Self.bestPointsKey)
         self.calendar = calendar
         self.today = today
+        self.dailyFeed = dailyFeed
         self.dailyResults = defaults.data(forKey: Self.dailyResultsKey)
             .flatMap { try? JSONDecoder().decode([Int: DailyResult].self, from: $0) } ?? [:]
+        self.servedDailies = defaults.data(forKey: Self.servedDailiesKey)
+            .flatMap { try? JSONDecoder().decode([Int: DailyStart.Entry].self, from: $0) } ?? [:]
     }
 
     var current: ChainNode? { chain.last }
@@ -317,6 +332,9 @@ final class GameEngine {
         // synchronous), so the daily has its art from the first frame.
         readPoolCacheOnce()
         let dealtTheDaily = dealDaily()
+        // The published days load alongside the pool; a different start for today
+        // replaces the fallback on the home as soon as it lands.
+        async let dailiesRefreshed: Void = refreshDailies()
         // Retry a transient pool-load failure a few times so a flaky first launch
         // self-heals while the player is still on the home screen. A hard failure
         // sets `dealFailed`, and the home's "Reconnect" calls this again (a side
@@ -332,11 +350,12 @@ final class GameEngine {
         guard !Task.isCancelled else { return }   // don't deal into an abandoned screen
         if !dealtTheDaily {
             deal()
-        } else if let entry = dealtDaily.flatMap({ DailyStart.entry(number: $0) }) {
+        } else if let entry = dealtDaily.flatMap(dailyEntry) {
             // Still on the daily: the pool may have brought its art and popularity.
             dealtSeed = resolved(entry)
         }
         dealFailed = !poolReady
+        await dailiesRefreshed
     }
 
     /// Deal a new random start on demand (the Shuffle button). Pools are usually
@@ -359,6 +378,7 @@ final class GameEngine {
         guard phase == .seed else { return }
         // Leads with the daily until it's played — also how a new day's start
         // reaches a home left open overnight.
+        Task { await refreshDailies() }
         if dealDaily() { return }
         guard poolReady else { return }
         deal()
@@ -459,18 +479,57 @@ final class GameEngine {
 
     /// Today's daily number while it hasn't been played on this phone.
     var unplayedDaily: Int? {
-        guard let number = DailyStart.number(on: today(), calendar: calendar),
+        guard let number = todaysNumber,
               dailyResults[number] == nil,
-              DailyStart.entry(number: number) != nil
+              dailyEntry(number) != nil
         else { return nil }
         return number
+    }
+
+    private var todaysNumber: Int? { DailyStart.number(on: today(), calendar: calendar) }
+
+    /// Day `number`'s start: as published, else from the fallback list.
+    private func dailyEntry(_ number: Int) -> DailyStart.Entry? {
+        servedDailies[number] ?? DailyStart.entry(number: number)
+    }
+
+    /// Fetch the published days from today through the week ahead, at most once
+    /// per `Config.dailyRefreshInterval`. A failure keeps what's saved (or the
+    /// list) and is retried on the next visit home. If today's daily is on the
+    /// home and the service has a different start for it, the home shows that one.
+    func refreshDailies() async {
+        guard let dailyFeed, let number = todaysNumber else { return }
+        if let dailyLoad {
+            await dailyLoad.value
+            return
+        }
+        if let dailiesFetchedAt, today().timeIntervalSince(dailiesFetchedAt) < Config.dailyRefreshInterval {
+            return
+        }
+        let load = Task {
+            guard let fetched = try? await dailyFeed.dailyStarts(number...(number + Config.dailyDaysAhead))
+            else { return }
+            dailiesFetchedAt = today()
+            servedDailies.merge(fetched) { $1 }
+            servedDailies = servedDailies.filter { $0.key >= number }
+            defaults.set(try? JSONEncoder().encode(servedDailies), forKey: Self.servedDailiesKey)
+            // A newer start for the daily on screen replaces it, unless it's being
+            // played already (`phase` has moved on) or the player dealt away.
+            if phase == .seed, dealtDaily == number, let entry = dailyEntry(number),
+               dealtSeed?.id != resolved(entry).id {
+                dealtSeed = resolved(entry)
+            }
+        }
+        dailyLoad = load
+        await load.value
+        dailyLoad = nil
     }
 
     /// Put today's daily on the home, if it's unplayed (the home's "Today" pill,
     /// and the first deal of every visit until it's played). Returns whether it did.
     @discardableResult
     func dealDaily() -> Bool {
-        guard let number = unplayedDaily, let entry = DailyStart.entry(number: number) else { return false }
+        guard let number = unplayedDaily, let entry = dailyEntry(number) else { return false }
         dealtSeed = resolved(entry)
         dealtDaily = number
         return true
