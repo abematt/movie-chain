@@ -456,8 +456,10 @@ private extension View {
     }
 }
 
+#if DEBUG   // the demo loader is DEBUG-only
 #Preview {
     let engine = GameEngine()
     engine.loadDemoChain()
     return GameView(engine: engine)
 }
+#endif

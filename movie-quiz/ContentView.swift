@@ -38,7 +38,7 @@ struct ContentView: View {
         _collection = State(initialValue: store)
         // The deal pools persist only for the live provider: the stub's demo graph
         // must never be saved and dealt from once a real token is added.
-        let poolCache = Config.hasTMDBToken
+        let poolCache = Config.hasTMDB
             ? SeedPoolCache.defaultFileURL.map { SeedPoolCache(fileURL: $0) } : nil
         #if DEBUG
         // QA hook: every request fails and nothing saved is read, to see the

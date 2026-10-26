@@ -34,7 +34,7 @@ enum DataProviderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "No TMDB API key set. Add one to TMDBSecrets.plist, or the app will use built-in demo data."
+            return "No TMDB access. Add a ServiceKey to AppSecrets.plist (or, in development, a token to TMDBSecrets.plist), or the app will use built-in demo data."
         case .badResponse(let code):
             return "The movie service returned an error (\(code))."
         case .decoding:

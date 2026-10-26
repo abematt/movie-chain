@@ -2,13 +2,17 @@
 //  TMDBProvider.swift
 //  movie-quiz
 //
-//  Live data source backed by The Movie Database (TMDB) REST API.
+//  Live data source backed by The Movie Database (TMDB) REST API — through the
+//  service's proxy when there's a service key (`Config.usesTMDBProxy`), else
+//  straight to TMDB with the token. The proxy takes the same paths and queries.
 //
 
 import Foundation
 
 struct TMDBProvider: MovieDataProvider {
-    private let base = URL(string: "https://api.themoviedb.org/3")!
+    private let base = Config.usesTMDBProxy
+        ? Config.serviceURL.appending(path: "functions/v1/tmdb")
+        : URL(string: "https://api.themoviedb.org/3")!
     private let session: URLSession
 
     init(session: URLSession = .shared) {
@@ -18,11 +22,12 @@ struct TMDBProvider: MovieDataProvider {
     // MARK: Requests
 
     private func request(path: String, query: [URLQueryItem] = []) throws -> URLRequest {
-        guard Config.hasTMDBToken else { throw DataProviderError.missingAPIKey }
+        guard Config.hasTMDB else { throw DataProviderError.missingAPIKey }
+        let proxied = Config.usesTMDBProxy
 
         var comps = URLComponents(url: base.appending(path: path), resolvingAgainstBaseURL: false)!
         var items = query
-        if !Config.usesBearerToken {
+        if !proxied, !Config.usesBearerToken {
             items.append(URLQueryItem(name: "api_key", value: Config.tmdbToken))
         }
         comps.queryItems = items
@@ -30,7 +35,9 @@ struct TMDBProvider: MovieDataProvider {
         var req = URLRequest(url: comps.url!)
         req.timeoutInterval = Config.requestTimeout   // fail fast; a stalled fetch must not freeze a turn
         req.setValue("application/json", forHTTPHeaderField: "accept")
-        if Config.usesBearerToken {
+        if proxied {
+            req.setValue(Config.serviceKey, forHTTPHeaderField: "apikey")
+        } else if Config.usesBearerToken {
             req.setValue("Bearer \(Config.tmdbToken)", forHTTPHeaderField: "Authorization")
         }
         return req
