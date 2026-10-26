@@ -34,6 +34,12 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
 
 ## [Unreleased]
 
+### Added
+- **Settings links to the website**: the privacy policy (playunspool.com/privacy), a
+  "Suggest a feature" row that opens the feature board, and a Contact row that writes to
+  hello@playunspool.com. The App Store needs the privacy policy reachable from the app,
+  and players were never told where to send ideas.
+
 ## [0.7.0] — 2026-10-26
 
 Unspool gets its 1.0 look, **Ground & Object**: a paper ground, objects with an ink edge

@@ -801,7 +801,7 @@ of the login-free core, never a gate in front of it.
   titles the deal can serve, ending on a two-line title with a year, and a four-digit
   score. Run it at a large text size on an SE before changing the deck, the dock or
   the recap. `-uiStackOpen N` opens game over's coin stack at link N, to check the
-  open state without a finger.
+  open state without a finger. `-uiOpenSettings` opens the Settings sheet on the home screen.
 - Command line (see `CLAUDE.md` for full `xcodebuild` invocations):
   ```bash
   xcodebuild -scheme movie-quiz -project movie-quiz.xcodeproj \

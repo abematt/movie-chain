@@ -187,6 +187,9 @@ Other User Content (typed answers), Device ID — not linked to identity, not us
 tracking, no ATT prompt. PostHog also records the IP and a city by default; turning on
 "Discard client IP data" in the project settings drops the IP.
 
+The Settings links (Privacy policy, Suggest a feature, Contact) send nothing: the feature
+board counts its own visits, and none of them answers a question about play.
+
 ## Known quirks
 
 - An event can arrive twice if the app is killed mid-send: the SDK sends the batch

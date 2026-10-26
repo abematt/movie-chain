@@ -8,8 +8,8 @@
 //  `@AppStorage`, the app's existing lightweight-preference idiom (the sound
 //  toggle used to live inline in the game chrome; it now has a home here too).
 //
-//  Currently just the sound toggle (which also still lives inline in the game
-//  chrome) — but it's the established home for whatever settings come next.
+//  Sound, the analytics opt-out, links out to the website (privacy policy, the
+//  feature board, contact), and the version.
 //
 
 import SwiftUI
@@ -21,6 +21,7 @@ struct SettingsView: View {
     /// Read at launch by `movie_quizApp` too, so the choice holds from the first event.
     @AppStorage(Telemetry.enabledKey) private var analyticsEnabled = true
     @Environment(\.telemetry) private var telemetry
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -28,6 +29,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
                     privacySection
+                    feedbackSection
                     aboutSection
                 }
                 .padding(.horizontal, Theme.Spacing.gutter)
@@ -81,7 +83,45 @@ struct SettingsView: View {
                 .font(Theme.Font.sentence(.footnote))
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.top, Theme.Spacing.xs)
+
+            linkRow("Privacy policy", to: Config.privacyPolicyURL, hint: "Opens in Safari")
+                .padding(.top, Theme.Spacing.xs)
         }
+    }
+
+    // MARK: Feedback — the feature board and a way to write in
+    //
+    // These send no analytics: the board counts its own visits, and neither link
+    // says anything about play (docs/ANALYTICS.md, Privacy).
+
+    private var feedbackSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("Feedback")
+            linkRow("Suggest a feature", to: Config.featureBoardURL, hint: "Opens in Safari")
+            linkRow("Contact", to: Config.contactURL, hint: "Opens Mail")
+        }
+    }
+
+    /// A row that leaves the app: the title, and an arrow pointing out.
+    private func linkRow(_ title: String, to url: URL, hint: String) -> some View {
+        Button { openURL(url) } label: {
+            HStack {
+                Text(title)
+                    .font(Theme.Font.bodyStrong)
+                    .foregroundStyle(Theme.Color.ink)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(Theme.Font.bodyStrong)
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(minHeight: 44)
+            .padding(.vertical, Theme.Spacing.xs)
+            .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressScale)
+        .accessibilityHint(hint)
     }
 
     // MARK: About — the app version

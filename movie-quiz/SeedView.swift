@@ -193,6 +193,7 @@ struct SeedView: View {
             #if DEBUG
             // Screenshot hook: open straight onto the Reel sheet.
             if ProcessInfo.processInfo.arguments.contains("-uiOpenReel") { showReel = true }
+            if ProcessInfo.processInfo.arguments.contains("-uiOpenSettings") { showSettings = true }
             #endif
         }
         .onChange(of: searching) { _, now in

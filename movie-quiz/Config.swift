@@ -126,6 +126,13 @@ enum Config {
     /// carry no link. `nonisolated` so the pure `SharedChain` code can use it.
     nonisolated static let shareBaseURL: URL? = nil
 
+    /// The website's pages Settings links to. The site is `abematt/unspool-site`;
+    /// its `docs/handover-app.md` lists what the app owes it.
+    static let privacyPolicyURL = URL(string: "https://playunspool.com/privacy")!
+    /// The feature board (UserJot): requests and upvotes from players.
+    static let featureBoardURL = URL(string: "https://unspool.userjot.com/")!
+    static let contactURL = URL(string: "mailto:hello@playunspool.com")!
+
     /// Base for TMDB-hosted images (headshots/posters shown in the collection).
     /// Full URL = base + size + path, e.g. `.../t/p/w185/abc.jpg`.
     static let imageBaseURL = "https://image.tmdb.org/t/p/"
