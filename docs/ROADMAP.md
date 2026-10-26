@@ -87,11 +87,12 @@ how it reaches people. None of it is versioned and most of it isn't code — it 
 parallel, and the early items matter *because* they take months to pay off.
 
 **Now:**
-- **Waitlist page.** One screenshot and an email field, built in **Framer** from a free
-  one-page template (~10 minutes), with **FormSpark** (or Framer's own forms) collecting
-  the address and the list kept in **Loops**. It measures interest, becomes the
-  TestFlight beta pool, and is the first announcement list at launch. It needs no domain
-  of our own yet — move it onto the 0.8.0 domain when that exists.
+- **Waitlist page — live (2026-10-26).** https://playunspool.com, built by hand in its own
+  repo ([`abematt/unspool-site`](https://github.com/abematt/unspool-site)) on Cloudflare
+  Workers, not Framer. Signups go to the D1 database `unspool-waitlist` (table `signups`);
+  no FormSpark or Loops. It measures interest, becomes the TestFlight beta pool, and is the
+  first announcement list at launch. What the app owes the site (privacy section, Settings
+  links, stable screenshot flags, true claims) is in the site's [`docs/handover-app.md`](https://github.com/abematt/unspool-site/blob/main/docs/handover-app.md).
 - **Reddit and forums.** Participate genuinely in r/movies, r/Letterboxd, r/trivia,
   r/iosgaming *before* mentioning the app — this channel takes months, and a link drop
   on launch day gets destroyed.
@@ -100,10 +101,11 @@ parallel, and the early items matter *because* they take months to pay off.
   near-miss) — see [`GROWTH.md`](GROWTH.md#5-two-plays-that-need-no-build).
 
 **Before the beta:**
-- **A feedback board** — **UserJot** (Canny is the pricier alternative), linked from
-  Settings. Requests and upvotes, so what players ask for is visible rather than guessed.
+- **A feedback board** — **UserJot**, live at https://unspool.userjot.com/ (free plan),
+  to be linked from Settings. Requests and upvotes, so what players ask for is visible rather than guessed.
   The 1.0 "Send feedback" email stays for bug reports.
-- **The TestFlight beta**, invited from the waitlist (Loops sends the invites). Runs
+- **The TestFlight beta**, invited from the waitlist: export `signups` from the D1 console
+  as CSV and invite those addresses in TestFlight. Runs
   through the rest of the milestones on PostHog.
 
 **Before 1.0:**
@@ -119,7 +121,8 @@ parallel, and the early items matter *because* they take months to pay off.
 **The launch decision** comes from the beta: if players drop off after a day, wait; if
 they stick around for several days, launch. Judge it on week-1 retention in PostHog.
 
-**Launch week:** start posting a week ahead; on the day, email the waitlist (Loops),
+**Launch week:** start posting a week ahead; on the day, email the waitlist (Loops or Kit, sending from `mail.playunspool.com`, with a PO box as the
+postal address),
 launch on **Product Hunt**, post to the communities above and the build-in-public
 channels, and ask friends to share. Time it so the boost window gets the best listing
 we have.
@@ -442,8 +445,12 @@ Lands with 0.9.0 and 0.11.0 on the same deployment.
 - **The service is the only source of remote config.** Not PostHog's flags, even though
   the SDK is in the app — two config sources is two places to look when a value is wrong.
 
-**Also lands here:** the domain (needed for links later), and Sentry so app and server
-errors share one view.
+**Also lands here:** Sentry so app and server errors share one view. **The domain exists**
+(2026-10-26): `playunspool.com`, Cloudflare Registrar. Put the service on a subdomain
+(e.g. `api.playunspool.com`), never the bare domain or `www`, which are the site. Know that
+on football match days Spanish ISPs block Cloudflare IP ranges (check
+https://hayahora.futbol), so a service behind Cloudflare's proxy is unreachable from Spain
+then, testing included.
 
 *A detailed service design gets its own doc when it's built — this section is scope and
 rationale, not architecture.*
@@ -620,8 +627,11 @@ The shipping checklist, plus the last player-facing pieces.
   PostHog SDK from 0.7.0 change these answers: Product Interaction, Other User Content
   (typed answers), Device ID, all not linked to identity and not used for tracking), **account deletion** since 0.9.0 ships accounts,
   and the **TMDB attribution** already rendered in the Reel sheet — keep it reachable.
-  A **privacy policy URL and a support URL** — both required for the listing; host them
-  on the 0.8.0 domain.
+  A **privacy policy URL and a support URL** — both required for the listing. Privacy is
+  https://playunspool.com/privacy; it covers the website only until the app's section is
+  added (from the app's code, before TestFlight goes beyond Abraham), and it still needs the
+  controller's name. Support must be a web page, not a `mailto:`: the site adds `/support`
+  before launch; until then, the home page.
 - **Changelog + tag** per the process in `CLAUDE.md`.
 
 ---

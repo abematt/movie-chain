@@ -51,7 +51,9 @@ query the account database for analytics, and don't put behaviour in it.
       volume estimate.
 - [ ] Build it in the right `Telemetry+<Area>.swift`; views call it, the engine doesn't.
 - [ ] Test it in `AnalyticsTests` with the recording sink and the fake clock.
-- [ ] Privacy: new kind of data → update the privacy-label note in `ROADMAP.md` (1.0).
+- [ ] Privacy: new kind of data → update the privacy-label note in `ROADMAP.md` (1.0)
+      and the app's section of https://playunspool.com/privacy (`privacy.html` in
+      `unspool-site`), so the label and the page agree.
 - [ ] Check it on a device: debug builds tag every event `debug_build: true`.
 
 ## Shared on every event

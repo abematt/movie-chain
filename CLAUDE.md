@@ -173,6 +173,21 @@ has actually been bitten by, and how they're enforced.
 - **`/swift-review [base]`** — the judgment pass a script can't do (value vs reference,
   `some`/`any`, reentrancy, structure, test coverage). Run it on a branch before merging.
 
+## The website
+
+The landing page is https://playunspool.com, in its own repo `../unspool-site`
+([`abematt/unspool-site`](https://github.com/abematt/unspool-site)). Its
+[`docs/handover-app.md`](https://github.com/abematt/unspool-site/blob/main/docs/handover-app.md) is what the app owes it; the parts that bite here:
+- **Its hero phones are real screens**, shot by the site's `scripts/screens.py` with these
+  DEBUG flags: `-uiDemoChain`, `-uiDemoGameOver [-uiDemoNoBest] -uiDemoClean`,
+  `-uiDemoReel -uiOpenReel`. Renaming or changing one breaks it: update `screens.py` too.
+- **It makes promises**: free on iPhone, beta invites in November, all from memory (no
+  suggestions, no multiple choice), a card per actor and a frame per film, challenge a
+  friend from the same start. Changing any of those means changing the site. It never
+  advertises unshipped work.
+- **Privacy**: https://playunspool.com/privacy covers the website only. Before the app goes
+  beyond TestFlight-for-one, its section is written from the app's code.
+
 ## Analytics
 
 **Every user-facing feature reports through `Telemetry` (PostHog). Read
