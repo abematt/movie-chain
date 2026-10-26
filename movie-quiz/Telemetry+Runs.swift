@@ -10,14 +10,15 @@
 import Foundation
 
 extension Telemetry {
-    enum StartSource: String { case dealt, picked }
+    enum StartSource: String { case dealt, picked, daily }
 
     struct RunState {
         var id: UUID?
         var startedAt: Date?
     }
 
-    func runStarted(seed: ChainNode, source: StartSource) {
+    /// `daily` is the daily start's number, for a `.daily` run.
+    func runStarted(seed: ChainNode, source: StartSource, daily: Int? = nil) {
         let id = UUID()
         runs = RunState(id: id, startedAt: now())
         var properties: [String: AnyHashable] = [
@@ -28,6 +29,7 @@ extension Telemetry {
             "deals_before_start": screen.dealsSinceHome,
             "home_s": seconds(since: screen.since),
         ]
+        if let daily { properties["daily_number"] = daily }
         if let gameOver = screen.lastGameOverSeconds { properties["game_over_s"] = gameOver }
         screen.lastGameOverSeconds = nil
         send(.runStarted, properties)

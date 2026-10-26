@@ -25,6 +25,32 @@
 | 0.11.0 | [Friend groups](#0110--friend-groups) | 0.9.0 |
 | 1.0.0 | [Launch](#100--launch) | all of the above |
 
+## Re-cut 2026-10-26: the service before launch
+
+**This supersedes "No login at launch… no backend" below; launch is no longer bound to
+early November.** The backend (Supabase) comes before launch, because what it unlocks
+is what makes the game different, not just bigger: per-day stats for everyone ("you
+beat 74% today") as comparison without leaderboards, answer data that can score
+obscurity by what players actually remember, content changed without an app release,
+and the head-to-head's automatic return. In order:
+
+1. **The daily start, built in** — landed; its list stays as the offline fallback.
+2. **The TMDB proxy** ([0.8.0 Job 1](#job-1--the-tmdb-proxy)) — first, because it stands
+   the service up with no change players can see.
+3. **The daily start served from a table.**
+4. **A results table** — per-day stats and the answer data.
+5. **Head-to-head with the automatic return**, on the service from the start.
+6. **Free daily credits + the hint ladder**, as before.
+
+**Room for new modes** (six degrees, A→B longest route, and whatever comes next): a
+mode's rules and screens ship as app updates; the service only serves its content and
+stores its results. So puzzles and results are keyed by a `mode` with the mode's data in
+a JSON column, not a table per mode, and modes can be switched on remotely. No more than
+that until a second mode is real.
+
+Owed before the beta because of this: the privacy policy's app section and the App Store
+privacy label (results and typed answers leave the phone), and the version plan re-cut.
+
 ## Re-cut 2026-10-24: launch early
 
 **This supersedes the first two decisions below and the milestone table above.** The
@@ -57,7 +83,8 @@ people actually play rather than guesses.
 *Set 2026-10-26.* The next mechanic work, before launch, in this order. Each item names
 where its detail lives; update this list as they land (move a landed one to the changelog).
 
-1. **A daily start for everyone** — *next to build.* One shared starting name per day,
+1. **A daily start for everyone** — *built 2026-10-26 (`DailyStart.swift`); the
+   hand-picked list and its `firstDay` are still placeholders.* One shared starting name per day,
    drawn from a **fixed hand-picked list** (not each phone's cached pool, which can differ
    between friends), so everyone plays the same start on the same day and the share card
    compares. GROWTH.md D5. Small; no backend, no developer account. Not the A→B Daily

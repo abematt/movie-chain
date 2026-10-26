@@ -65,7 +65,8 @@ struct SeedPoolCacheTests {
     @Test func aFreshCopyDealsWithoutAnyRequests() async throws {
         try seedCache(age: Self.day)
         let provider = PoolProvider()
-        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults)
+        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults,
+                                today: { .distantPast })   // before the daily start, so these deal from the pool
 
         await engine.prepareSeeds()
 
@@ -77,7 +78,8 @@ struct SeedPoolCacheTests {
     @Test func aStaleCopyIsRefetchedAndRewritten() async throws {
         try seedCache(age: 8 * Self.day)
         let provider = PoolProvider()
-        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults)
+        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults,
+                                today: { .distantPast })   // before the daily start, so these deal from the pool
 
         await engine.prepareSeeds()
 
@@ -93,7 +95,8 @@ struct SeedPoolCacheTests {
         try seedCache(age: 30 * Self.day)
         let provider = PoolProvider()
         provider.offline = true
-        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults)
+        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults,
+                                today: { .distantPast })   // before the daily start, so these deal from the pool
 
         await engine.prepareSeeds()
 
@@ -106,7 +109,8 @@ struct SeedPoolCacheTests {
     @Test func offlineWithNothingSavedFailsThenRecoversOnRetry() async {
         let provider = PoolProvider()
         provider.offline = true
-        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults)
+        let engine = GameEngine(provider: provider, poolCache: cache(), defaults: defaults,
+                                today: { .distantPast })   // before the daily start, so these deal from the pool
 
         await engine.prepareSeeds()
         #expect(engine.dealtSeed == nil)

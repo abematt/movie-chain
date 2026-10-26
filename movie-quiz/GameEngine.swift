@@ -52,13 +52,17 @@ final class GameEngine {
         var playTime: Duration = .zero
         /// Manual retries after a failed candidate load.
         var retries = 0
+        /// The daily start's number, when this run was today's daily.
+        var daily: Int?
 
         /// Spoiler-free share card: each link as a coloured square, never a name,
-        /// plus the run as a link when there's somewhere for links to go.
+        /// plus the run as a link when there's somewhere for links to go. A daily
+        /// names its number, so friends know they played the same start.
         func shareText(link: URL?) -> String {
             let squares = chain.map { $0.kind == .actor ? "🟦" : "🟨" }.joined()
             let linkWord = links == 1 ? "link" : "links"
-            let card = "Unspool 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            let title = daily.map { "Unspool #\($0)" } ?? "Unspool"
+            let card = "\(title) 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
             guard let link else { return card }
             return card + "\n" + link.absoluteString
         }
@@ -153,6 +157,14 @@ final class GameEngine {
     /// fall back on, so there is no start to deal. The home offers to try again
     /// instead of sitting on "Dealing…".
     private(set) var dealFailed = false
+    /// The daily start's number while `dealtSeed` is today's daily; `nil` for a
+    /// random deal.
+    private(set) var dealtDaily: Int?
+    /// Every daily start played on this phone, by number. An entry is written
+    /// when the run starts: one attempt per day.
+    private(set) var dailyResults: [Int: DailyResult]
+    /// The daily number of the run in progress.
+    private var runDaily: Int?
 
     // MARK: Private
 
@@ -226,10 +238,15 @@ final class GameEngine {
     private let defaults: UserDefaults
     private static let bestChainKey = "bestChain"
     private static let bestPointsKey = "bestPoints"
+    private static let dailyResultsKey = "dailyResults"
+    /// Decides which local day it is, for the daily start. Injected so tests pin it.
+    private let calendar: Calendar
+    private let today: () -> Date
 
     init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
          poolCache: SeedPoolCache? = nil, defaults: UserDefaults = .standard,
-         now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
+         now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
+         calendar: Calendar = .current, today: @escaping () -> Date = Date.init) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
@@ -241,6 +258,10 @@ final class GameEngine {
         self.now = now
         self.bestChain = defaults.integer(forKey: Self.bestChainKey)
         self.bestPoints = defaults.integer(forKey: Self.bestPointsKey)
+        self.calendar = calendar
+        self.today = today
+        self.dailyResults = defaults.data(forKey: Self.dailyResultsKey)
+            .flatMap { try? JSONDecoder().decode([Int: DailyResult].self, from: $0) } ?? [:]
     }
 
     var current: ChainNode? { chain.last }
@@ -277,6 +298,9 @@ final class GameEngine {
     /// presents a new dealt start. While the pool loads on first launch,
     /// `dealtSeed` stays `nil` and the home shows a placeholder.
     func prepareSeeds() async {
+        // Today's daily needs no pool, so it's on the home at once; the pool
+        // still loads for "Deal again".
+        let dealtTheDaily = dealDaily()
         // Retry a transient pool-load failure a few times so a flaky first launch
         // self-heals while the player is still on the home screen. A hard failure
         // sets `dealFailed`, and the home's "Reconnect" calls this again (a side
@@ -290,7 +314,12 @@ final class GameEngine {
             if Task.isCancelled { return }
         }
         guard !Task.isCancelled else { return }   // don't deal into an abandoned screen
-        deal()
+        if !dealtTheDaily {
+            deal()
+        } else if let entry = dealtDaily.flatMap({ DailyStart.entry(number: $0) }) {
+            // Still on the daily: the pool may have brought its art and popularity.
+            dealtSeed = resolved(entry)
+        }
         dealFailed = !poolReady
     }
 
@@ -311,7 +340,11 @@ final class GameEngine {
     /// screen — "a fresh start every open/resume". No-op mid-game or before a pool
     /// side has landed (cold launch is handled by `prepareSeeds`).
     func dealFreshOnResume() {
-        guard phase == .seed, poolReady else { return }
+        guard phase == .seed else { return }
+        // Leads with the daily until it's played — also how a new day's start
+        // reaches a home left open overnight.
+        if dealDaily() { return }
+        guard poolReady else { return }
         deal()
         if !poolComplete { Task { await loadSeedPoolsIfNeeded() } }
     }
@@ -399,10 +432,45 @@ final class GameEngine {
             using: &systemRNG
         ) else { return }
         dealtSeed = node
+        dealtDaily = nil
         recentSeedIds.append(node.id)
         if recentSeedIds.count > Config.seedRecentWindow {
             recentSeedIds.removeFirst(recentSeedIds.count - Config.seedRecentWindow)
         }
+    }
+
+    // MARK: Daily start
+
+    /// Today's daily number while it hasn't been played on this phone.
+    var unplayedDaily: Int? {
+        guard let number = DailyStart.number(on: today(), calendar: calendar),
+              dailyResults[number] == nil,
+              DailyStart.entry(number: number) != nil
+        else { return nil }
+        return number
+    }
+
+    /// Put today's daily on the home, if it's unplayed (the home's "Today" pill,
+    /// and the first deal of every visit until it's played). Returns whether it did.
+    @discardableResult
+    func dealDaily() -> Bool {
+        guard let number = unplayedDaily, let entry = DailyStart.entry(number: number) else { return false }
+        dealtSeed = resolved(entry)
+        dealtDaily = number
+        return true
+    }
+
+    /// The daily as the pool knows it (art, popularity, genres), or bare.
+    private func resolved(_ entry: DailyStart.Entry) -> ChainNode {
+        switch entry.kind {
+        case .actor: actorPool.first { $0.id == entry.id }.map(ChainNode.actor) ?? entry.node
+        case .movie: moviePool.first { $0.id == entry.id }.map(ChainNode.movie) ?? entry.node
+        }
+    }
+
+    private func saveDailyResults() {
+        // Encoding ints and bools can't fail.
+        defaults.set(try? JSONEncoder().encode(dailyResults), forKey: Self.dailyResultsKey)
     }
 
     /// Fetch `node`'s candidates ahead of play — the home calls this once a dealt
@@ -416,8 +484,17 @@ final class GameEngine {
         prefetch = (node.id, Task { try? await fetchCandidates(for: node) })
     }
 
-    func startGame(with seed: ChainNode) async {
+    /// Start a run from `seed`. Pass `daily` when the seed is today's daily
+    /// (`dealtDaily`): the attempt is used up here, at the start, so quitting or
+    /// closing the app mid-run doesn't buy a second go. A day already played
+    /// starts as an ordinary run.
+    func startGame(with seed: ChainNode, daily: Int? = nil) async {
         resetRun()
+        if let daily, dailyResults[daily] == nil {
+            runDaily = daily
+            dailyResults[daily] = DailyResult()
+            saveDailyResults()
+        }
         let token = generation
         chain = [seed]
         usedIds = [seed.id]
@@ -554,6 +631,7 @@ final class GameEngine {
         turnLoadTime = .zero
         playTime = .zero
         retries = 0
+        runDaily = nil
         candidates = []
         score = 0
         points = 0
@@ -688,7 +766,11 @@ final class GameEngine {
         stopCountdown()
         var summary = Summary(chain: chain, links: score, points: points, endedByQuit: quit,
                               turns: turns, finalMisses: turnMisses, playTime: playTime,
-                              retries: retries)
+                              retries: retries, daily: runDaily)
+        if let runDaily {
+            dailyResults[runDaily] = DailyResult(links: score, points: points, finished: true)
+            saveDailyResults()
+        }
 
         // "You were one away": surface a valid answer the player didn't give on
         // the turn that ran out — the sting that drives the next run. Skip it on a
