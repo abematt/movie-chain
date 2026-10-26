@@ -1,0 +1,174 @@
+//
+//  RunResults.swift
+//  movie-quiz
+//
+//  Every finished run goes to the service's `results` table, for per-day stats
+//  and the answer data (which actors and films players actually name). Not
+//  analytics: that's PostHog, and stays there (docs/ANALYTICS.md). A run is
+//  identified by the device id only, and carries TMDB ids, never typed text.
+//
+//  The outbox keeps a run until the service has it, so a game over without
+//  signal is delivered on a later visit home.
+//
+
+import Foundation
+
+/// A finished run as the `results` Edge Function takes it.
+nonisolated struct RunResult: Codable, Equatable, Sendable {
+    struct Link: Codable, Equatable, Sendable {
+        var kind: NodeKind
+        var id: Int
+        /// Clock time the link took; `nil` on the start.
+        var seconds: Double?
+    }
+
+    var deviceID: UUID
+    /// `daily_start` for a daily, else `endless`.
+    var mode: String
+    var number: Int?
+    var chain: [Link]
+    var links: Int
+    var points: Int
+    var endedByQuit: Bool
+    var appVersion: String
+
+    private enum CodingKeys: String, CodingKey {
+        case deviceID = "device_id", mode, number, chain, links, points
+        case endedByQuit = "ended_by_quit", appVersion = "app_version"
+    }
+
+    // `number` is sent as null on an endless run, not left out.
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(deviceID, forKey: .deviceID)
+        try c.encode(mode, forKey: .mode)
+        try c.encode(number, forKey: .number)
+        try c.encode(chain, forKey: .chain)
+        try c.encode(links, forKey: .links)
+        try c.encode(points, forKey: .points)
+        try c.encode(endedByQuit, forKey: .endedByQuit)
+        try c.encode(appVersion, forKey: .appVersion)
+    }
+}
+
+extension RunResult {
+    /// The run in `summary`: the start, then each link with the time it took.
+    init(summary: GameEngine.Summary, deviceID: UUID, appVersion: String) {
+        let seconds = summary.turns.map { turn in
+            let parts = turn.answerTime.components
+            return ((Double(parts.seconds) + Double(parts.attoseconds) / 1e18) * 10).rounded() / 10
+        }
+        self.init(
+            deviceID: deviceID,
+            mode: summary.daily == nil ? "endless" : "daily_start",
+            number: summary.daily,
+            chain: summary.chain.enumerated().map { i, node in
+                Link(kind: node.kind, id: node.tmdbID, seconds: i > 0 && i <= seconds.count ? seconds[i - 1] : nil)
+            },
+            links: summary.links,
+            points: summary.points,
+            endedByQuit: summary.endedByQuit,
+            appVersion: appVersion
+        )
+    }
+}
+
+/// Holds finished runs until the service has them.
+final class ResultsOutbox {
+    /// What came of one send.
+    enum Delivery: Sendable {
+        /// Stored, or already stored.
+        case delivered
+        /// The service refused the run as invalid; resending won't help.
+        case rejected
+        /// No answer, or a fault on the way; try again later.
+        case failed
+    }
+
+    /// Runs kept beyond this drop the oldest, so a long time offline can't grow
+    /// the store without bound.
+    static let limit = 50
+    private static let key = "pendingResults"
+
+    private let defaults: UserDefaults
+    private let deviceID: UUID
+    private let appVersion: String
+    private let send: (RunResult) async -> Delivery
+    private(set) var pending: [RunResult]
+    private var flushing: Task<Void, Never>?
+
+    init(defaults: UserDefaults, deviceID: UUID, appVersion: String,
+         send: @escaping (RunResult) async -> Delivery) {
+        self.defaults = defaults
+        self.deviceID = deviceID
+        self.appVersion = appVersion
+        self.send = send
+        self.pending = defaults.data(forKey: Self.key)
+            .flatMap { try? JSONDecoder().decode([RunResult].self, from: $0) } ?? []
+    }
+
+    /// Keep the run and try to deliver everything waiting.
+    func record(_ summary: GameEngine.Summary) {
+        pending.append(RunResult(summary: summary, deviceID: deviceID, appVersion: appVersion))
+        if pending.count > Self.limit { pending.removeFirst(pending.count - Self.limit) }
+        save()
+        Task { await flush() }
+    }
+
+    /// Deliver waiting runs in order, stopping at the first that fails to send.
+    /// A flush already running is joined, so no run is sent twice at once.
+    func flush() async {
+        if let flushing {
+            await flushing.value
+            return
+        }
+        let task = Task {
+            while let next = pending.first {
+                if await send(next) == .failed { break }
+                pending.removeFirst()
+                save()
+            }
+        }
+        flushing = task
+        await task.value
+        flushing = nil
+    }
+
+    private func save() {
+        defaults.set(try? JSONEncoder().encode(pending), forKey: Self.key)
+    }
+}
+
+/// Posts a run to the service's `results` function.
+struct ServiceResultsTransport {
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
+
+    func send(_ result: RunResult) async -> ResultsOutbox.Delivery {
+        var req = URLRequest(url: Config.serviceURL.appending(path: "functions/v1/results"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = Config.requestTimeout
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Config.serviceKey, forHTTPHeaderField: "apikey")
+        guard let body = try? JSONEncoder().encode(result) else { return .rejected }
+        req.httpBody = body
+        guard let (_, response) = try? await session.data(for: req),
+              let status = (response as? HTTPURLResponse)?.statusCode
+        else { return .failed }
+        return Self.delivery(status: status)
+    }
+
+    /// 2xx is delivered. A 4xx means the run itself was refused — except the
+    /// ones that are about the moment (wrong key, timeout, too many requests).
+    static func delivery(status: Int) -> ResultsOutbox.Delivery {
+        switch status {
+        case 200..<300: .delivered
+        case 401, 408, 429: .failed
+        case 400..<500: .rejected
+        default: .failed
+        }
+    }
+}

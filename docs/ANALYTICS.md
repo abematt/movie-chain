@@ -8,7 +8,9 @@ PostHog (product analytics) is the only destination. It answers *how people play
 where runs end, how long turns take, what people try, how the Reel gets used, who comes
 back. It is **not** the record of anything the player owns — scores, the Reel, streaks
 and daily results live on the device and, from 0.9.0, in the account database. Don't
-query the account database for analytics, and don't put behaviour in it.
+query the account database for analytics, and don't put behaviour in it. Finished runs
+also go to the service's `results` table (`RunResults.swift`) — game data for per-day
+stats and answer data, not analytics; nothing in it is sent to PostHog or from it.
 
 ## Where it lives
 

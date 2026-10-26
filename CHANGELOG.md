@@ -47,6 +47,14 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
   hello@playunspool.com. The App Store needs the privacy policy reachable from the app,
   and players were never told where to send ideas.
 
+- **Every finished run is sent to Unspool's service** (a `results` table, through a
+  `results` function that checks each run's shape). It sends the chain as TMDB ids with
+  the time each link took, the links, the points and the daily's number, under the device
+  id. Typed text is never sent. This is the data for per-day stats ("today's average")
+  and for scoring obscurity by what players actually remember rather than TMDB's
+  popularity. A run that ends without signal waits on the phone and goes on a later
+  visit home. Nothing on screen uses it yet.
+
 ### Changed
 - **The daily start comes from Unspool's service**, from a `puzzles` table, so a day can
   be published, or a bad one fixed, without an app release. The phone fetches the week

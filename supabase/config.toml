@@ -419,3 +419,6 @@ enabled = true
 # keys aren't JWTs, so the platform's JWT check would reject every request.
 [functions.tmdb]
 verify_jwt = false
+
+[functions.results]
+verify_jwt = false

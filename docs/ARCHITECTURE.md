@@ -252,6 +252,26 @@ number in the injected `UserDefaults` (`dailyResults`). A daily is otherwise an
 ordinary run: it can set the best and logs to the Reel. The start is resolved from the
 pool when it's in it (art, popularity, genres), else it's the bare list entry.
 
+### Run results — [`RunResults.swift`](../movie-quiz/RunResults.swift)
+Every finished run goes to the service's `results` table, for per-day stats and the
+answer data (which actors and films players name, to score obscurity by recall rather
+than TMDB popularity). `RunResult(summary:deviceID:appVersion:)` is the payload: the
+chain as TMDB ids with each link's clock time, links, points, the daily's number (mode
+`daily_start`, else `endless`) and whether it was quit — **never typed text**.
+`GameEngine.endGame` hands the summary to the injected `ResultsOutbox`, which keeps
+undelivered runs in `UserDefaults` (newest `limit`), sends them in order through
+`ServiceResultsTransport`, and stops at the first failure; `prepareSeeds()` flushes it
+again. A 4xx other than 401/408/429 means the run was refused and is dropped. Demo
+launches send nothing, and DEBUG builds tag `app_version` with `-debug`.
+
+The **`results` function** (`supabase/functions/results`) checks shape only — kinds
+alternate, ids are positive and unrepeated, `links` matches the chain, points sit in
+`Scoring`'s range (10–70 a link), a daily's number isn't in the future and its start
+matches the published one — and inserts with the service role. Links aren't re-checked
+against TMDB, and speed can't be. One daily per device (a unique index): a resend
+answers `200` and stores nothing. The table has RLS on, no policies and no public
+grants.
+
 ### Scoring & feedback (the gamification layer)
 The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and

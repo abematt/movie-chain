@@ -41,19 +41,38 @@ struct ContentView: View {
         let poolCache = Config.hasTMDB
             ? SeedPoolCache.defaultFileURL.map { SeedPoolCache(fileURL: $0) } : nil
         let dailyFeed: (any DailyStartFeed)? = Config.hasService ? ServiceDailyStartFeed() : nil
+        let results = Self.makeResultsOutbox()
         #if DEBUG
         // QA hook: every request fails and nothing saved is read, to see the
         // home's "No connection." state.
         let offline = ProcessInfo.processInfo.arguments.contains("-uiOffline")
         let engine = offline
             ? GameEngine(provider: OfflineProvider(), collection: store)
-            : GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed)
+            : GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed, results: results)
         #else
-        let engine = GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed)
+        let engine = GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed,
+                                results: results)
         #endif
         // The play screen releases the first turn's clock once the keyboard is up.
         engine.holdsFirstTurnClock = true
         _engine = State(initialValue: engine)
+    }
+
+    /// Finished runs go to the service, when there is one. Demo launches send
+    /// nothing (their chains are made up), and debug builds mark their runs so
+    /// development play can be told apart from players'.
+    private static func makeResultsOutbox() -> ResultsOutbox? {
+        guard Config.hasService else { return nil }
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains(where: { $0.hasPrefix("-uiDemo") }) || args.contains("-uiOffline") { return nil }
+        let version = Config.appVersion + "-debug"
+        #else
+        let version = Config.appVersion
+        #endif
+        let transport = ServiceResultsTransport()
+        return ResultsOutbox(defaults: .standard, deviceID: DeviceID.current(in: .standard),
+                             appVersion: version, send: transport.send)
     }
 
     var body: some View {
