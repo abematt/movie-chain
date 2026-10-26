@@ -263,6 +263,9 @@ final class GameEngine {
     /// Where published daily starts come from; `nil` plays the built-in list only
     /// (tests, previews, the stub provider).
     private let dailyFeed: (any DailyStartFeed)?
+    /// Where finished runs go for the service's `results`; `nil` sends nothing
+    /// (tests, previews, demo launches).
+    private let results: ResultsOutbox?
     /// The daily fetch in flight, joined rather than repeated.
     private var dailyLoad: Task<Void, Never>?
     /// When the served days last arrived, so every "Play again" doesn't refetch.
@@ -272,7 +275,7 @@ final class GameEngine {
          poolCache: SeedPoolCache? = nil, defaults: UserDefaults = .standard,
          now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
          calendar: Calendar = .current, today: @escaping () -> Date = Date.init,
-         dailyFeed: (any DailyStartFeed)? = nil) {
+         dailyFeed: (any DailyStartFeed)? = nil, results: ResultsOutbox? = nil) {
         // Resolve the default in the init body (which is @MainActor-isolated),
         // not in a default argument — default arguments evaluate in a
         // nonisolated context, and Config.makeProvider() is @MainActor under
@@ -287,6 +290,7 @@ final class GameEngine {
         self.calendar = calendar
         self.today = today
         self.dailyFeed = dailyFeed
+        self.results = results
         self.dailyResults = defaults.data(forKey: Self.dailyResultsKey)
             .flatMap { try? JSONDecoder().decode([Int: DailyResult].self, from: $0) } ?? [:]
         self.servedDailies = defaults.data(forKey: Self.servedDailiesKey)
@@ -335,6 +339,8 @@ final class GameEngine {
         // The published days load alongside the pool; a different start for today
         // replaces the fallback on the home as soon as it lands.
         async let dailiesRefreshed: Void = refreshDailies()
+        // Runs that ended without signal go now.
+        if let results { Task { await results.flush() } }
         // Retry a transient pool-load failure a few times so a flaky first launch
         // self-heals while the player is still on the home screen. A hard failure
         // sets `dealFailed`, and the home's "Reconnect" calls this again (a side
@@ -873,6 +879,7 @@ final class GameEngine {
             summary.reelAdditions = collection?.record(chain: chain) ?? 0
         }
 
+        results?.record(summary)
         phase = .gameOver(summary)
     }
 

@@ -62,6 +62,15 @@ that day can then only reach players through a new row.
   number (`firstDay` is 2026-10-26 = #1). Keep at least seven days ahead.
 - **If it happens:** insert the missing days ([`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)).
 
+### Results aren't arriving, or are being forged
+- **Watch:** rows in `public.results` per day against `run_ended` in PostHog (they
+  should track each other, minus demo and offline-for-good runs); `insert failed` in the
+  `results` function's logs; a run of `422`s (an app/function mismatch after a change to
+  either, or someone hand-making requests). `app_version` ending `-debug` is development
+  play: leave it out of any stat.
+- **If forged runs appear:** the function checks shape only. Re-check links against the
+  TMDB cache before storing, or drop the device's rows.
+
 ### A schema change opened something
 - **Watch:** the advisors, before every schema change ships ([`ROADMAP.md`](ROADMAP.md)
   0.8.0's safety rules). Clean as of 2026-10-26.

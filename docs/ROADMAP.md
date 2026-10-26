@@ -44,7 +44,11 @@ and the head-to-head's automatic return. In order:
    `daily_start`; `DailyStartFeed.swift`). Publish a day with an insert in the SQL
    editor ([`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)); the list
    is the fallback. Days 1–9 are seeded from the placeholder list.
-4. **A results table** — per-day stats and the answer data.
+4. **A results table** — per-day stats and the answer data. *Collecting since
+   2026-10-27* (`results`, written only by the `results` function; `RunResults.swift`).
+   Every run, links as TMDB ids with per-link seconds, no typed text; shape checks only,
+   no re-check against TMDB. **Still to decide: what the player sees.** Wordle's model is
+   a fixed panel (your stats, and how everyone did today), not a percentile.
 5. **Head-to-head with the automatic return**, on the service from the start.
 6. **Free daily credits + the hint ladder**, as before.
 
@@ -255,7 +259,10 @@ parallel, and the early items matter *because* they take months to pay off.
   - **No retention period.** Pick one in PostHog and state it on the page.
   - **Deletion can't be traced.** Play data isn't linked to a person, so a deletion
     request can't find it. Show the random ID in Settings, or add a "delete my play data"
-    action, and say how on the page.
+    action, and say how on the page. This now covers the service's `results` table too
+    (every run, under the device id, kept until deleted), not only PostHog.
+  - **Results aren't behind the analytics opt-out.** They're game data (stats), sent
+    whatever the analytics setting. Say so on the page, or put them behind it too.
 - **An App Review note about TMDB.** External TestFlight builds go through beta review,
   and TMDB apps get rejected under 4.1 / 5.2.1 / 5.2.2 (third-party IP) when the reviewer
   can't see the rights. In App Review Information: the data comes from TMDB's API under
