@@ -64,7 +64,7 @@ struct GameOverView: View {
             // and a new best's bounce — so drawing the card can't hitch any of them.
             try? await Task.sleep(for: .milliseconds(1200))
             guard !Task.isCancelled else { return }
-            shareImage = ShareCard.image(chain: summary.chain, links: summary.links)
+            shareImage = ShareCard.image(chain: summary.chain, links: summary.links, daily: summary.daily)
         }
         .task {
             guard best else { return }
@@ -100,6 +100,12 @@ struct GameOverView: View {
 
     private var result: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // A daily names its day: it's the run friends compare.
+            if let daily = summary.daily {
+                Text("Daily #\(daily)")
+                    .metaLabel(sub)
+                    .padding(.top, Theme.Spacing.xl)
+            }
             HStack(alignment: .firstTextBaseline) {
                 // How it ended, as the sentence the number finishes.
                 Text(summary.endedByQuit ? "You ended on" : "Time’s up at")
@@ -108,7 +114,7 @@ struct GameOverView: View {
                 Spacer()
                 if best { newBestTag }
             }
-            .padding(.top, Theme.Spacing.xl)
+            .padding(.top, summary.daily == nil ? Theme.Spacing.xl : Theme.Spacing.xs)
 
             HStack(alignment: .bottom, spacing: Theme.Spacing.md - 4) {
                 Text("\(summary.links)")

@@ -252,9 +252,11 @@ struct SeedView: View {
             .accessibilityAddTraits(.isHeader)
             .overlay(alignment: .trailing) {
                 HStack(spacing: Theme.Spacing.sm) {
+                    if showsTodayPill { todayButton.transition(.opacity) }
                     reelButton
                     settingsButton
                 }
+                .animation(Theme.Motion.layoutIn, value: showsTodayPill)
                 // Out with the layout they belong to, not trailing after it.
                 .animation(Theme.Motion.layoutOut, value: pillsVisible)
             }
@@ -274,6 +276,31 @@ struct SeedView: View {
         .opacity(pillsVisible ? 1 : 0)
         .disabled(!pillsVisible)
         .accessibilityLabel("Settings")
+    }
+
+    /// Back to today's daily after "Deal again" moved off it. Gone once it's played.
+    private var showsTodayPill: Bool { engine.unplayedDaily != nil && engine.dealtDaily == nil }
+
+    private var todayButton: some View {
+        Button {
+            Haptics.selection()
+            engine.dealDaily()
+        } label: {
+            Text("Today")
+                .font(Theme.Font.button)
+                .textCase(.uppercase)
+                .tracking(Theme.Font.buttonTracking)
+                .foregroundStyle(Theme.Color.ink)
+                .lineLimit(1)
+                // Tighter than the Reel pill: three pills share the SE's header.
+                .padding(.horizontal, Theme.Spacing.sm + 4)
+                .frame(minHeight: 40)
+                .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
+        }
+        .buttonStyle(.pressScale)
+        .opacity(pillsVisible ? 1 : 0)
+        .disabled(!pillsVisible)
+        .accessibilityLabel("Today's start")
     }
 
     private var reelCount: Int { reelDisplayed ?? collection.total }
@@ -379,8 +406,13 @@ struct SeedView: View {
     private var sentenceHead: some View {
         ZStack(alignment: .bottomLeading) {
             if let seed = engine.dealtSeed {
-                SentenceHead(seed: seed, stage: stage)
-                    .id(seed.id)
+                SentenceHead(seed: seed, daily: engine.dealtDaily, stage: stage)
+                    // The art path is in the identity because SwiftUI compares a
+                    // view's inputs with `==`, and nodes are equal by TMDB id: the
+                    // pool's copy of the daily (same id, now with art) would
+                    // otherwise never redraw. It swaps in place — the animation
+                    // below is keyed on the same `==`, so it doesn't deal again.
+                    .id("\(seed.id)|\(seed.imagePath ?? "")")
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
                 DealingSentence()
@@ -548,9 +580,10 @@ struct SeedView: View {
 
     private func play() {
         guard let seed = engine.dealtSeed else { return }
+        let daily = engine.dealtDaily
         searchTask?.cancel()
-        telemetry?.runStarted(seed: seed, source: .dealt)
-        Task { await engine.startGame(with: seed) }
+        telemetry?.runStarted(seed: seed, source: daily == nil ? .dealt : .daily, daily: daily)
+        Task { await engine.startGame(with: seed, daily: daily) }
     }
 
     // MARK: Search section — the demoted "pick your own start" flow
@@ -814,6 +847,8 @@ struct SeedView: View {
 /// so the handoff can fly it into the start card.
 private struct SentenceHead: View {
     let seed: ChainNode
+    /// Today's daily number, when this is it.
+    let daily: Int?
     let stage: HandoffStage?
 
     var body: some View {
@@ -826,6 +861,7 @@ private struct SentenceHead: View {
                     .handoffSource(.art, stage, for: seed.id)
                 KindChip(kind: seed.kind)
                     .handoffSource(.chip, stage, for: seed.id)
+                if let daily { DailyTag(number: daily) }
             }
             .padding(.bottom, Theme.Spacing.xs)
             SentenceName(text: seed.matchText)
@@ -835,6 +871,21 @@ private struct SentenceHead: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// "Daily #12" beside the kind chip: this start is everyone's today.
+private struct DailyTag: View {
+    let number: Int
+
+    var body: some View {
+        Text("Daily #\(number)")
+            .metaLabel(.white, size: .small)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Theme.Color.night))
+            .overlay(Capsule().strokeBorder(Theme.Color.border, lineWidth: Theme.Border.width))
+            .accessibilityLabel("Today's start, number \(number)")
     }
 }
 

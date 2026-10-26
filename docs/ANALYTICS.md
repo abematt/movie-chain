@@ -80,7 +80,8 @@ A run began. Every event until `run_ended` carries the same `run_id`.
 |---|---|
 | `run_id` | New for each run |
 | `seed_id`, `seed_kind` | The start (TMDB id, `actor` / `movie`) |
-| `source` | `dealt` (the home deal) or `picked` (searched for) |
+| `source` | `dealt` (the home deal), `daily` (today's daily start) or `picked` (searched for) |
+| `daily_number` | The daily start's number, on a `daily` run only |
 | `deals_before_start` | "Deal again" taps since the home screen appeared |
 | `home_s` | Time on the home screen before starting (time in the background excluded) |
 | `game_over_s` | Time on the previous game-over screen; absent on a session's first run |

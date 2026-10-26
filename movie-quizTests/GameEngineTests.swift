@@ -19,7 +19,8 @@ struct GameEngineTests {
     private let defaults = UserDefaults(suiteName: "GameEngineTests-\(UUID().uuidString)")!
 
     private func makeEngine(_ provider: any MovieDataProvider, collection: CollectionStore? = nil) -> GameEngine {
-        GameEngine(provider: provider, collection: collection, defaults: defaults)
+        // Before the daily start begins, so the home deals from the pool.
+        GameEngine(provider: provider, collection: collection, defaults: defaults, today: { .distantPast })
     }
 
     /// A provider that holds the *first* filmography fetch open until the test

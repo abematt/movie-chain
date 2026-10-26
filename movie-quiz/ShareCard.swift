@@ -16,6 +16,8 @@ import SwiftUI
 struct ShareCard: View {
     let chain: [ChainNode]
     let links: Int
+    /// The daily start's number, when the run was today's daily.
+    var daily: Int?
     var date: Date = .now
 
     /// Points, not pixels: rendered at 3×.
@@ -26,7 +28,7 @@ struct ShareCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Unspool · \(date.formatted(.dateTime.day().month(.abbreviated)))")
+            Text(header)
                 .metaLabel(Self.quiet)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
@@ -103,8 +105,14 @@ struct ShareCard: View {
     }
 
     /// The card as a picture, for the share sheet.
-    @MainActor static func image(chain: [ChainNode], links: Int) -> Image? {
-        let renderer = ImageRenderer(content: ShareCard(chain: chain, links: links))
+    /// "Unspool · 26 Oct", or "Unspool #12 · 26 Oct" for a daily.
+    private var header: String {
+        let title = daily.map { "Unspool #\($0)" } ?? "Unspool"
+        return "\(title) · \(date.formatted(.dateTime.day().month(.abbreviated)))"
+    }
+
+    @MainActor static func image(chain: [ChainNode], links: Int, daily: Int? = nil) -> Image? {
+        let renderer = ImageRenderer(content: ShareCard(chain: chain, links: links, daily: daily))
         renderer.scale = 3
         return renderer.uiImage.map { Image(uiImage: $0) }
     }

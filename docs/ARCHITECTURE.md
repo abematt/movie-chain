@@ -202,6 +202,22 @@ home-screen deal policy is unit-tested with a seeded RNG — no network.
   other kind if the chosen pool is empty). Returns `nil` only if both pools are
   empty. Tunables live in `Config` (`seedActorBias = 0.6`, `seedRecentWindow = 8`).
 
+### Daily start — [`DailyStart.swift`](../movie-quiz/DailyStart.swift)
+One start a day, the same for everyone, from a **fixed hand-picked list** (`entries`),
+not the deal pool (pools differ between phones, so friends wouldn't match). Pure:
+`number(on:calendar:)` turns the player's *local* date into the day's number (#1 is
+`firstDay`; whole calendar days, so DST days count once), and `entry(number:)` picks
+from the list, wrapping when it runs out. The engine owns the rest: `dealDaily()`
+puts today's start on the home (`dealtDaily` = its number) whenever it's unplayed —
+first thing in `prepareSeeds()`, before the pool loads, and on resume (which is also
+how a new day reaches a home left open). `deal()` clears `dealtDaily`, so "Deal again"
+moves off it and the home's Today pill calls `dealDaily()` to come back.
+`startGame(with:daily:)` **writes the day's `DailyResult` at the start** — one attempt,
+and a quit or force-quit still uses it — and `endGame` fills it in. Results persist by
+number in the injected `UserDefaults` (`dailyResults`). A daily is otherwise an
+ordinary run: it can set the best and logs to the Reel. The start is resolved from the
+pool when it's in it (art, popularity, genres), else it's the bare list entry.
+
 ### Scoring & feedback (the gamification layer)
 The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and
@@ -820,7 +836,9 @@ of the login-free core, never a gate in front of it.
   `CollectionStoreTests` locks the "Your Reel" logging rule (length ≥ 2, seed
   counted once a link lands, dedup by id, `timesLogged` per-chain), and
   `SeedDealTests` locks the home-screen deal policy (actor/movie bias, recent-id
-  avoidance with full-pool fallback, other-kind fallback, empty→nil). Run with ⌘U
+  avoidance with full-pool fallback, other-kind fallback, empty→nil), and
+  `DailyStartTests` locks the day numbering (local midnight, DST, time zones, wrap)
+  and the one-attempt rule. Run with ⌘U
   or the `xcodebuild … test` invocation above.
 
 ---
