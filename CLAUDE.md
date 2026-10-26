@@ -185,8 +185,9 @@ The landing page is https://playunspool.com, in its own repo `../unspool-site`
   suggestions, no multiple choice), a card per actor and a frame per film, challenge a
   friend from the same start. Changing any of those means changing the site. It never
   advertises unshipped work.
-- **Privacy**: https://playunspool.com/privacy covers the website only. Before the app goes
-  beyond TestFlight-for-one, its section is written from the app's code.
+- **Privacy**: https://playunspool.com/privacy covers the website only. Its app section is
+  drafted in [unspool-site PR #1](https://github.com/abematt/unspool-site/pull/1) and merges before the first beta invite, after a re-check
+  against the code (the roadmap's "Before the beta" lists what else to settle then).
 
 ## Analytics
 
