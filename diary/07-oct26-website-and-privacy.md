@@ -1,13 +1,13 @@
 ---
 id: website
-label: Site & money
-span: Oct 25 15:41 – Oct 26 21:21
+label: Site, money & service
+span: Oct 25 15:41 – Oct 26 23:38
 versions: after 0.7.0 (unreleased)
 accent: blue
 order: 7
-sessions: 4f948fc0 be4a0e49 716720e0 875718fd
+sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613
 start: 2026-10-25
-end: 2026-10-26T21:21
+end: 2026-10-26T23:38
 ---
 
 ## Era: 0.7.0 is tagged, and the website talks back (2026-10-26)
@@ -238,6 +238,103 @@ The rest of the day was business, not code. The marketing tab found nothing on p
 - **Noticed, not fixed:** "Jean-Claude Van Damme" crowds the START sticker on the pushed-back start card.
 - **Evening update:** Apple Developer enrollment is pending (submitted ~14:40). The bundle ID `abe.movie-quiz` is still undecided and becomes permanent with the app record. `main` is at `45e0165`. Emails are out to TMDB (confirm the free key at launch) and to another solo TMDB developer. The next build is the daily start (ROADMAP *Next up*). The site's attribution wording is stale (`docs/WEBSITE-SYNC.md`). Nothing will be sold until the hint test, the numbers and a legal read on the actor cards say so.
 
+## Era: the daily start, and a backend before launch (2026-10-26 evening)
+
+Item 1 of *Next up* took twenty minutes to build and then raised the bigger question.
+Abraham asked how a daily start is served when there's no server. The answer was that
+it's compiled into the app. That turned into "should we have a database", then "what
+could a database give us", then a decision that reversed Saturday's re-cut: the backend
+comes **before** launch. By 23:38 a Supabase project was live with a TMDB proxy and a
+shared cache, the TMDB token had left release builds, and two PRs were merged.
+
+### 21:25 — "lets start tackling next roadmap mechanics one by one" (b738c613)
+
+- Read *Next up*, GROWTH D5 and the Daily Chain's day-keying decisions (local midnight, numbered days, results stored by number) and reused them.
+- **Four questions, Abraham's answers:**
+  - *Attempts:* **strictly one** (offered: one scored then practice, which was the recommendation, or unlimited);
+  - *Placement:* the daily is the **first deal of the day**, with a Today pill to come back to it;
+  - *Records:* daily runs count toward the best run and the Reel;
+  - *The list:* **"You supply it"**, so a nine-entry placeholder list ships for now.
+- **Built:** pure `DailyStart` (date → day number, wrap-around list) and `DailyResult`, written **at the start** of the run so a quit or force-quit still uses the attempt. The engine deals the daily before the pool loads. The share text and image say "Unspool #N", and analytics gets `source: daily` plus `daily_number`. `mode` is left for the A→B Daily Chain, because this is the same endless game from a chosen start.
+- **Offline:** a first version let the daily hide the "Out of film" screen. Reverted, because a daily you can't play is worse than an honest offline screen.
+- Existing deal tests were pinned to `.distantPast` so they never see a daily. 125 tests passed, then 126.
+
+![The SE home on day #1: Tom Hanks with an ACTOR chip and a black DAILY #1 tag, the first deal of the day](media/b738c613/homeSE.png)
+
+- **The tight spot:** after "Deal again" the header carries three pills on an SE. A throwaway `-tmpDealAgain` hook (never committed) rendered it. It fit with an empty Reel, but the estimate was ~18pt spare with a two-digit Reel count, so the pill's padding was trimmed.
+
+![The SE header with TODAY, Reel and gear pills after a random deal (Keanu Reeves), the cramped case checked before committing](media/b738c613/pillSE.png)
+
+### 22:11 — "how is it being served then, is there a server"
+
+- No server: the list is compiled in, and every phone counts days from `firstDay`. That's how Wordle started too. What follows: changing the list means an app update, the list is append-only, and anyone can read ahead.
+- **22:12, Abraham:** "no i think this is a natural spot to create a database and backend for stuff like this no?" The first answer was **no database yet: a JSON file on playunspool.com** gives remote edits with nothing to run, because a database earns its place when something *writes*.
+- **22:34:** "if we have to do database for head to head stuff, don't we just do it for this too anyway". Agreed on the logic, but head-to-head step one is link-only too. So the real question was *before or after launch*.
+- **22:35:** "Thinking the other way and we're not bound by time for launch, what could a database give us". The list that came back, in order:
+  - **per-day stats for everyone** ("you beat 74% today"), comparison without a leaderboard;
+  - **answer data**: obscurity scored by what players actually remember, dailies picked from data, bad TMDB credits spotted;
+  - content and settings changed without an app release;
+  - the TMDB proxy;
+  - social done properly;
+  - data that survives the phone.
+- **22:39, the honour system:** "wordle is something people can cahtgpt or google and cheat on easily right, it only works people decide to follow by an honour system". Yes. It holds because there's no prize, the audience is friends, and cheaters barely move aggregate stats. Unspool adds a per-turn clock, so cheating means asking ChatGPT every few seconds.
+
+### 22:43 — the decision
+
+- **Abraham:** "1. yes before launch / 2. the order above". Then a design thought: "i'd like to try different gaming mecahnics … like six degrees of seperation or two start and end points … should we think about that when making the backend". **Answer:** a mode's rules and screens ship as app updates. The service keys puzzles and results by `mode`, with the mode's data in a JSON column (no table per mode), and can switch modes on remotely. Nothing more until a second mode is real.
+- **New roadmap section, "Re-cut 2026-10-26: the service before launch":** daily start (built in, kept as the fallback) → TMDB proxy → daily from a table → results table → head-to-head with automatic return → credits and hints.
+- Committed as `b3f3c81`. Then 3: "yeah i mean we build it, (can you put it on my mobile phone also)". All phones showed *unavailable*. "sorry wifi was off nowphone should be available". Installed on the iPhone 16 Pro.
+
+### 22:51 — Supabase, and two notes for later
+
+![Supabase's new-project form: organisation abematt (free), project "unspool", region Americas, with Data API and "automatically expose new tables" ticked and automatic RLS unticked, before the two changes](media/b738c613/pasted-1.png)
+
+- **Two notes from playing it on the phone**, filed in the roadmap's *To come back to*:
+  - "the shrae image doesn't have the actor or movie names". It's spoiler-free by design, but reads as missing on a phone.
+  - "the today button and the daily pill … visually i don't agree with but mechanically it looks like it works".
+- **Form review:** untick "Automatically expose new tables" and tick "Enable automatic RLS", so every new table starts locked. Skip GitHub, and keep the password in a password manager.
+- The publishable key was pasted in at 22:54. It's public by design, but it's kept out of the public repo (in the gitignored plist) for the same reason as the PostHog token.
+
+### 22:55–23:04 — the proxy
+
+- **The design:** an Edge Function `tmdb` that forwards only the five paths the app uses, plus a `tmdb_cache` table (RLS on, no policies). Cache lifetimes: 1 day for searches, 7 for discover and filmographies, 30 for casts. It serves an expired copy if TMDB fails. The app only changes its base URL and sends `apikey` instead of the token.
+- **Gotchas:**
+  - Homebrew refused to install the CLI ("Command Line Tools are too outdated"), so it ran through `npx supabase@2`.
+  - `sb_publishable_` keys aren't JWTs, so the function needs `verify_jwt = false` and checks the key itself.
+  - Abraham ran `login`/`link`/`db push`, because they need a browser and the database password.
+- **First test:** gate 401, wrong path 404, the public key denied on the table. But the second request was another **miss**. The cause: with auto-expose off, **even the service role had no grant**, and the function ignored the error. Fixed with a grant migration and logged cache errors. After the second push: miss 1.99s, then **hit 0.43s, hit 0.67s**.
+- Committed as `5b74459` (first pushed as `16a27d8`, before the branch split).
+
+### 23:06 — "the supabase should be a seperate branch", the token, the advisor
+
+- **Branches split:** `feature_daily-start` and `feature_tmdb-proxy` stacked on top. Only local branches moved.
+- **Security advisor** (`supabase db advisors --linked`): one finding, Supabase's own `rls_auto_enable()` (`SECURITY DEFINER`) callable by the public key. Revoked in a migration, and the advisor came back with "No issues found".
+- **The token leaves Release:** secrets split into `AppSecrets.plist` (service key, PostHog, ships) and `TMDBSecrets.plist` (development only), with `EXCLUDED_SOURCE_FILE_NAMES` on the Release configuration. Verified by searching a built Release app for the token: not there.
+- **Release had never compiled.** Two `#Preview`s called DEBUG-only demo loaders, and the error message was about `return`. This was already on `main`, and would have hit the first TestFlight upload. Fixed by making them DEBUG-only.
+- **Proof the proxy works without the token:** a fresh Release install saved a full pool (76 actors, 100 movies), and its URL cache was all `…supabase.co/functions/v1/tmdb/…`. But the daily had no photo:
+
+![A fresh Release install: Tom Hanks as Daily #1 with a blue placeholder avatar, though the pool it had just loaded held his photo](media/b738c613/release3.png)
+
+- **Two layers of the same bug.** Nodes are equal by TMDB id. `@Observable` skips a set whose new value `==` the old one, so swapping in the pool's copy was never announced. A test that fails without the fix confirmed it. Fixing that wasn't enough: SwiftUI *also* compares a view's inputs with `==`, so the sentence was re-keyed on id plus art path. The pool is now also read before the daily is dealt.
+
+![The same fresh Release install after the fix: Tom Hanks' photo in the avatar](media/b738c613/release4.png)
+
+- Commits `41cf165` (the photo fix, onto the daily branch) and `8b74b0a` (token, previews, advisor), then the proxy branch was rebased.
+
+### 23:21–23:38 — npx, the review, monitoring, merges
+
+- "it always asks me to install supabase?" That's npx's confirmation prompt (`--yes` skips it). The real fix is updating the Command Line Tools and `brew install`. `db push` also warned it will default to local soon, so use `--linked`.
+- Abraham asked for "a high level review of what we did with supabase, how we connected, what all this token stuff is", plus why Release didn't compile and why it's safe. That got a table of every key and where it lives.
+- **23:32:** "is the tmdb_cache per user?" No: it's shared, keyed by request, with no user data. On abuse and the free-plan pause: "should we note that somewhere for … a dashboard that will sort of aggregate all analytics like posthog, website visits, ad campaigns, supabase traking". That became **`docs/MONITORING.md`** (`fbdb185`), the dashboard's spec. Abuse shows as proxy calls per day outpacing PostHog sessions; a paused project must be decided before the beta (Pro, or a keep-alive).
+- **Merges:** #38 merged (`6763823`). **#39 was closed, not retargeted**, when #38's branch was deleted. It was reopened as **#40** from the same branch and merged (`c524212`). A hook then blocked `git branch -D`, and `gh` had already deleted the branches anyway.
+
+### Where things stand (2026-10-26 ~23:38)
+
+- `main` is at `c524212`. The daily start (placeholder list) and the TMDB proxy are merged, and the phone runs the proxy build.
+- **Supabase project `unspool`** (free plan): the `tmdb` function is deployed, with migrations `tmdb_cache`, a service grant, and a lock on `rls_auto_enable`. The advisor is clean.
+- **Next:** the daily start served from a table, the first table the app *reads*.
+- **Owed:** the real start list and `firstDay`; the daily's look; the share image's names; Pro or keep-alive before the beta; the privacy page and App Store label now that data reaches a server; CLT update plus brew for the CLI.
+
 ### Decision log
 
 | Time (local) | Decision | Rationale | Source |
@@ -273,6 +370,30 @@ The rest of the day was business, not code. The marketing tab found nothing on p
 | Oct 26 21:03 | Attribution uses §3's exact wording, also in Settings | The FAQ's line isn't the contract; App Review asks TMDB apps about rights | 875718fd |
 | Oct 26 21:03 | Next up: daily start → challenge + head-to-head → free daily credits and hints | Small to large; the daily start needs no backend or developer account | 875718fd |
 | Oct 26 21:19 | Track the site's drift in `docs/WEBSITE-SYNC.md` | So "how is the website out of step?" has an answer in any new session | 875718fd |
+| Oct 26 21:30 | Daily start: strictly one attempt, used up when the run starts | Abraham's choice over "one scored then practice"; writing at the start closes the force-quit retry | b738c613 |
+| Oct 26 21:30 | The daily is the first deal until played; Today pill to return | Leads with the shared start without hiding random deals | b738c613 |
+| Oct 26 21:30 | Daily runs count toward best and Reel | Same game from a chosen start | b738c613 |
+| Oct 26 21:30 | Placeholder list; Abraham supplies the real one | His call ("You supply it") | b738c613 |
+| Oct 26 21:33 | `source: daily` + `daily_number`, not `mode: daily` | `mode` is reserved for the A→B Daily Chain; this is the endless game | b738c613 |
+| Oct 26 21:35 | Offline still shows "Out of film" over the daily | The daily can't be played offline either | b738c613 |
+| Oct 26 21:38 | Trim the Today pill's padding | Three pills on an SE leave ~18pt with a two-digit Reel | b738c613 |
+| Oct 26 22:12 | First answer: a JSON file on the site, not a database | Read-only data; a database earns its place with writes | b738c613 |
+| Oct 26 22:39 | The honour system is enough | No prizes, friend audience, aggregates resist cheats; global leaderboards stay dropped | b738c613 |
+| Oct 26 22:43 | The backend (Supabase) comes before launch; launch no longer bound to early November | Abraham: "yes before launch"; per-day stats and answer data are what make the game different | b738c613 |
+| Oct 26 22:43 | Order: proxy → daily table → results → head-to-head → credits | Proxy first: no visible change, nobody's data at risk | b738c613 |
+| Oct 26 22:43 | New modes ship as app updates; the service keys by `mode` with JSON data | No table per mode; nothing more until a second mode exists | b738c613 |
+| Oct 26 22:52 | Untick auto-expose, tick automatic RLS | Every new table starts locked; opening one is a written migration | b738c613 |
+| Oct 26 22:57 | Publishable key in the gitignored plist, not code | Public by design, but the repo is public: other builds shouldn't run on this project | b738c613 |
+| Oct 26 22:58 | Supabase CLI via npx | Homebrew needs newer Command Line Tools (sudo) | b738c613 |
+| Oct 26 22:59 | Proxy only the five paths the app uses; gate on the app key | Not an open TMDB mirror | b738c613 |
+| Oct 26 22:59 | Cache 1 day (search) / 7 (discover, filmography) / 30 (cast); serve stale on TMDB failure | Near-static responses; inside TMDB's six-month limit; an old cast beats a frozen turn | b738c613 |
+| Oct 26 23:03 | Grant the service role on `tmdb_cache` | With auto-expose off it had no access; the cache silently missed | b738c613 |
+| Oct 26 23:06 | Separate branches for the daily and the proxy | Abraham: "the supabase should be a seperate branch" | b738c613 |
+| Oct 26 23:10 | Split secrets: `AppSecrets` ships, `TMDBSecrets` excluded from Release | The token was in every build; the service key and PostHog are needed in Release | b738c613 |
+| Oct 26 23:12 | Revoke public execute on `rls_auto_enable()` | The advisor's only finding | b738c613 |
+| Oct 26 23:12 | DEBUG-only previews | Release had never compiled | b738c613 |
+| Oct 26 23:15 | `dealtSeed` always notifies; the sentence keyed on art path | Equal-by-id nodes defeated both Observation and SwiftUI's diffing | b738c613 |
+| Oct 26 23:33 | `docs/MONITORING.md` as the dashboard's spec | Abuse and the free-plan pause need a place to be watched | b738c613 |
 
 ### Story material
 
@@ -291,6 +412,14 @@ The rest of the day was business, not code. The marketing tab found nothing on p
 - **Faces are the real licence question.** It started as a data question and ended as an image one. TMDB doesn't own posters, Wikidata can't supply them, App Review rejects over them, and the Reel's actor cards raise a likeness question no data source answers.
 - **Break-even arithmetic:** $2.99 → ~$2.40 kept → 62 sales a month → somewhere between 1,600 and 9,500 monthly players.
 - **One developer asking another.** The quickest route to an answer turned out to be another solo developer with a TMDB app and a premium tier, found through Reddit.
+- **Twenty minutes, then the real question.** The daily start was built and tested before anyone asked where it lives. "how is it being served then, is there a server" led, in four messages, to moving the backend ahead of launch.
+- **The recommendation that lost, fairly.** The JSON-file answer was sound for the daily alone. What changed it was Abraham widening the frame ("we're not bound by time for launch") and the list of what a database unlocks: per-day stats and answer data, which nobody else has.
+- **Wordle's honesty.** "it only works people decide to follow by an honour system". It works because nothing is at stake but face. Unspool's per-turn clock makes cheating a chore as well as pointless.
+- **The cache that cached nothing.** Locking tables down by default locked out the function too. The test caught it: two misses in a row instead of a hit. After the grant, 1.99s became 0.43s.
+- **Release had never been built.** Five months in, the first Release build failed on two previews. The first TestFlight upload would have found it instead.
+- **Equal, but not the same.** Tom Hanks without a photo `==` Tom Hanks with one, by TMDB id. Swift's observation and SwiftUI's diffing both believed it, so the photo never showed until both layers were told otherwise.
+- **The PR GitHub closed.** Deleting a stacked PR's base branch closed it instead of retargeting it. Nothing was lost; it came back as #40.
+- **A token search as proof.** "The token leaves release builds" was checked by grepping a built app for its first 24 characters. A fresh install with no token loading a full pool proved the proxy.
 
 ### Media index
 
@@ -299,3 +428,10 @@ The rest of the day was business, not code. The marketing tab found nothing on p
 - `media/4f948fc0/shots_settings.png`, `shots_settings-dark.png`: the same two screenshots at full size, before downscaling.
 - `media/4f948fc0/privacy.png`: a render of the draft privacy page at phone width, from the site's working copy, used to check the layout. Not embedded: it's a long image that wouldn't be readable at diary size. ~08:31.
 - Sessions `be4a0e49`, `716720e0` and `875718fd` captured no screenshots or other media. (`875718fd`'s coverage script and results stayed in that session's temporary folder.)
+- `media/b738c613/homeSE.png`: the SE home on day #1 with the DAILY #1 tag. Embedded. Oct 26 ~21:36.
+- `media/b738c613/home16.png`: the same on the iPhone 16. ~21:36.
+- `media/b738c613/pillSE.png`: the SE header with the TODAY pill after a random deal (rendered by a throwaway hook). Embedded. ~21:36.
+- `media/b738c613/pasted-1.png`: Abraham's Supabase new-project form, before the two changes. Embedded. ~22:51.
+- `media/b738c613/release.png`, `release2.png`: a fresh Release install, 12s and 27s in, the daily with a placeholder avatar while the pool loaded. ~23:11.
+- `media/b738c613/release3.png`: after the first fix (observation only), still no photo. Embedded. ~23:14.
+- `media/b738c613/release4.png`: after the second fix, Tom Hanks' photo shows. Embedded. ~23:16.
