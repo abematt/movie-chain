@@ -18,7 +18,7 @@
 |---|---|---|
 | 0.5.0 | [Design overhaul](#050--design-overhaul) — **landed 2026-10-22** (motion re-tuned in 0.5.1) | — |
 | 0.6.0 | [Unspool — the rebrand](#060--unspool) — **landed 2026-10-23** | 0.5.0 |
-| 0.7.0 | [Foundations & safety net](#070--foundations--safety-net) | — |
+| 0.7.0 | [Ground & Object](#ground--object--the-10-look) and the first of [Foundations](#070--foundations--safety-net) — **landed 2026-10-26** (logging, crash reporting, the build pipeline still to come) | — |
 | 0.8.0 | [The service — TMDB proxy first](#080--the-service) | — |
 | 0.9.0 | [Accounts](#090--accounts) | 0.7.0 (device id), 0.8.0 (a backend) |
 | 0.10.0 | [The Daily Chain](#0100--the-daily-chain) | 0.8.0 (generation job) |
@@ -256,7 +256,7 @@ than renaming before.
 
 ## Ground & Object — the 1.0 look
 
-Landed on `main` 2026-10-24 ([PR #20](https://github.com/abematt/movie-chain/pull/20)); takes the next minor version when it is cut. Cream Neobrutalist read
+Landed on `main` 2026-10-24 ([PR #20](https://github.com/abematt/movie-chain/pull/20)); shipped in 0.7.0 (2026-10-26). Cream Neobrutalist read
 as "vibe coded" and too close to Claude's ivory, serif and clay. The new direction is
 **Ground & Object**, drawn from Bakers Studio's Pera identity and Tinyman visuals: a
 paper ground, heavy objects with an ink edge and a hard ink side, blue and yellow living

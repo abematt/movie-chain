@@ -49,7 +49,7 @@ never are.
 | `03-oct22-swift-and-motion.md` | Oct 22 11:42 → 13:18 | 0.5.1 |
 | `04-oct22-reel-cards.md` | Oct 22 13:17 → 18:08 | 0.5.2, 0.5.3 |
 | `05-oct22-unspool.md` | Oct 22 18:21 → 23:55 | 0.6.0 |
-| `06-oct23-design-resync.md` | Oct 23 10:35 → Oct 25 12:28 | 0.7.0 (unreleased) |
+| `06-oct23-design-resync.md` | Oct 23 10:35 → Oct 25 15:07 | 0.7.0 |
 
 ## Gaps worth filling by hand
 
