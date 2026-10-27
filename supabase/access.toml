@@ -1,0 +1,39 @@
+# What the public keys may do on the service. `scripts/supabase-check.py` holds the
+# live project, the migrations and a probe with the app's publishable key to this
+# file, and fails on any difference: more access is a leak, less is a broken app.
+#
+# The publishable key ships in the app, so treat `anon` as "anyone on the internet".
+# While signups are on, anyone can also get an `authenticated` session, so until
+# accounts land (0.9.0) give `authenticated` nothing `anon` doesn't have.
+#
+# Access is a list of privileges per role: "select", "insert", "update", "delete",
+# or a column-scoped "insert(a, b)" / "update(a, b)". A table-wide "update" lets a
+# player rewrite every column of a row they can reach (scores included), so name
+# the columns. A table that isn't listed may be touched by no one but the service
+# role. Tables are in `public` unless named "schema.table".
+
+[tables.puzzles]
+# Published content; every row is meant to be public, and immutable once out.
+anon = ["select"]
+authenticated = ["select"]
+
+[tables.results]
+# Written by the `results` Edge Function with the service role. No public access.
+
+[tables.tmdb_cache]
+# Read and written by the `tmdb` Edge Function with the service role. No public access.
+
+[rpc]
+# Functions `anon` or `authenticated` may call over /rest/v1/rpc. Supabase ships
+# graphql_public.graphql (a stub that errors while pg_graphql is off). Anything
+# else, and above all a SECURITY DEFINER function, has execute revoked.
+callable = ["graphql_public.graphql"]
+
+[buckets]
+# Storage buckets, name = "public" or "private". None yet.
+
+[auth]
+# The app has no sign-in before 0.9.0; flip this then, along with the checklist in
+# .claude/skills/supabase-audit/SKILL.md.
+accounts = false
+anonymous_sign_ins = false

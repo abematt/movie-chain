@@ -22,3 +22,6 @@ diary/media/
 diary/inbox/
 diary/index.html
 diary/.venv/
+
+# Python
+__pycache__/
