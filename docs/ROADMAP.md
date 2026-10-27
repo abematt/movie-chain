@@ -126,7 +126,15 @@ where its detail lives; update this list as they land (move a landed one to the 
   and replace 3–9 with new revisions if the placeholders shouldn't run.
 - [ ] **Decide what the stats panel shows** on the daily's game over. Wordle's model is a
   fixed panel (your own stats, plus how everyone did today, e.g. the average), not "you
-  beat N%". `results` keeps raw rows, so any of these works.
+  beat N%". `results` keeps raw rows, so any of these works. **Anyone can post forged
+  runs** under invented device ids (accepted for now; `/supabase-audit` → *Accepted*), so
+  whatever it shows has to hold up to that, in order of cost:
+  1. **The median, not the mean**, without `-debug` runs: a flood has to outnumber real
+     players to move it. Nearly free.
+  2. **Re-check each link against `tmdb_cache`** in the `results` function before storing
+     (the response `MONITORING.md` already names): forged runs then need real chains.
+  3. **App Attest** (DeviceCheck), proving a request came from the app on a real device:
+     the real fix for invented ids. Free, but a medium build; only if forging shows up.
 - [ ] **Decide whether results go behind the analytics opt-out.** They're sent regardless
   today, treated as game data. Either the privacy page says so, or the opt-out covers them.
 

@@ -62,8 +62,7 @@ The script checks that grants match `access.toml` and catches `using (true)` on 
 It can't tell whether a read policy shows the right rows. For every policy:
 - Who does it apply to, and which rows does its condition let through? Write the
   condition out in words.
-- Is any row readable before it should be? (`puzzles` is `using (true)`: a daily
-  inserted ahead of its day is readable by anyone the moment it's inserted.)
+- Is any row readable before it should be? (`puzzles` is, on purpose; see *Accepted*.)
 - With accounts: does every owner check use `auth.uid()` against a column the player
   can't change, and does UPDATE's `with check` stop moving a row to someone else?
 
@@ -89,8 +88,24 @@ Lead with what a stranger can do today, worst first. For each finding: the reque
 that does it (method, path, body), what happens, and the smallest fix. Separate:
 - **Fix now:** a leak, a write path, or unbounded cost.
 - **Before the beta / before 0.9.0:** real but not yet reachable or not yet costly.
-- **Accepted:** deliberate trade-offs (say why, so the next audit doesn't re-raise
-  them), e.g. points can't be verified because speed is measured on the phone.
+- **Accepted:** deliberate trade-offs. Don't re-raise the ones below unless what they
+  rest on has changed; add new ones here with the date and the reason.
 
 Anything that should become a mechanical check goes into `supabase-check.py`; a new
 way for the service to fail goes into `docs/MONITORING.md`.
+
+## Accepted
+
+- **Future dailies are readable** (2026-10-27). `puzzles` is `using (true)`, so a day
+  inserted ahead is public at once. The design needs that: phones fetch a week ahead
+  (ROADMAP *Client-side rules*; MONITORING keeps seven days published), and whatever the
+  app can read, its extracted key can read. Spoilers across time zones are already
+  accepted (DAILY-CHAIN.md), and the start is a prompt, not an answer. Re-raise only if
+  days are published far more than a week ahead, then cap the policy at ~8 days.
+- **Results can be forged** (2026-10-27). `results` trusts the client's `device_id`, so
+  anyone can post unlimited well-formed runs under invented devices; per-device dedup
+  doesn't stop them. There's no prize or rank to win (ROADMAP: anti-cheat is motive, not
+  detection), and nothing reads `results` yet. Re-raise when the stats panel or answer
+  data ships: its decision (ROADMAP *For Abraham, 2026-10-27*) carries the mitigations.
+- **Points can't be verified** (2026-10-27). Speed is measured on the phone; the
+  function only checks points fall in the possible range for the link count.
