@@ -1,13 +1,13 @@
 ---
 id: website
 label: Site, money & service
-span: Oct 25 15:41 – Oct 27 00:27
+span: Oct 25 15:41 – Oct 27 08:41
 versions: after 0.7.0 (unreleased)
 accent: blue
 order: 7
 sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc
 start: 2026-10-25
-end: 2026-10-27T00:27
+end: 2026-10-27T08:41
 ---
 
 ## Era: 0.7.0 is tagged, and the website talks back (2026-10-26)
@@ -442,6 +442,31 @@ points**, quit, `0.7.0-debug`. The first real player row.
   shows; whether results sit behind the analytics opt-out; the privacy page now covering
   `results`.
 
+### 00:31 – 08:41 — loose ends, the time zone, and tidy-up
+
+- **00:31 "put that for me to deal with tomorrow."** The four open items became a
+  checklist, "For Abraham, 2026-10-27", under *Next up* in the roadmap, each with what to
+  do (the probe-row `delete`, the Nov 4 deadline for real starts, the Wordle comparison
+  for the stats panel, the opt-out choice). PR #45 (`01283f8`). It's a list in the repo,
+  not a reminder.
+- **08:37, the morning after: "why does the results table have null for some numbers
+  columns"** `number` is the daily's day; ordinary (`endless`) runs have none, and a
+  check constraint enforces it.
+- **"it should be decided per device's timezone"** It already is. `DailyStart.number`
+  counts calendar days between the phone's local midnights from Oct 26, with the phone's
+  calendar. The server only refuses a day that hasn't begun anywhere (UTC+14). One catch
+  came up: the engine keeps the calendar it launched with, so a traveller keeps the old
+  zone until a relaunch. That matches `DAILY-CHAIN.md` ("read when the app opens");
+  `Calendar.autoupdatingCurrent` is the one-line change if that should follow the phone
+  live. Left as is.
+- **08:38 "did i see tom hanks already because it was past 12 yesterday for me"** Yes:
+  Tom Hanks was #1 on Oct 26 in Spain. The 00:26 run was already Oct 27 locally, so #2,
+  The Dark Knight, which the results function confirmed when it accepted the row.
+- **08:41, tidy-up:** three old local branches (`docs/architecture-overview`,
+  `feature_cream-neobrutalist`, `gamification-and-fixes`) were checked first: no commits
+  missing from `main`. Deleted, locally and on GitHub. A `fetch --prune` then dropped
+  ~28 stale remote-tracking refs for branches GitHub had already deleted.
+
 ### Decision log
 
 | Time (local) | Decision | Rationale | Source |
@@ -511,6 +536,9 @@ points**, quit, `0.7.0-debug`. The first real player row.
 | Oct 27 00:16 | Collect results now, decide the on-screen stats later | Abraham asked how Wordle does it first; raw rows support any panel | e81853bc |
 | Oct 27 00:18 | Results are game data, not analytics: sent regardless of the opt-out, for now | Flagged for the privacy pass to confirm or put behind the opt-out | e81853bc |
 | Oct 27 00:18 | An outbox keeps undelivered runs (newest 50) and drops ones the server refuses | Offline game overs still count; a refused run would fail forever | e81853bc |
+| Oct 27 00:31 | Tomorrow's loose ends go in the roadmap as a checklist | It's where the next session looks before planning; no reminder system is set up | e81853bc |
+| Oct 27 08:37 | Keep the day decided by the phone's time zone as read at launch | Matches DAILY-CHAIN.md; `autoupdatingCurrent` is a one-line switch if travel matters | e81853bc |
+| Oct 27 08:41 | Delete three old branches after checking they're fully merged | Nothing on them was missing from `main`; the repo rule is to ask only for unmerged work | e81853bc |
 
 ### Story material
 
@@ -544,6 +572,8 @@ points**, quit, `0.7.0-debug`. The first real player row.
 - **Obscurity, measured honestly.** The bonus is real but small (up to 30 a link, ties only), and it measures TMDB page views. The fix is counting what players actually name.
 - **The overruled recommendation.** Re-checking every link was the roadmap's own rule. Abraham chose shape checks, and the roadmap's anti-cheat paragraph had already said why that's fine.
 - **The 500 that meant "not yet".** The wrong-start check failed with 500 before the push, because the function's role couldn't read `puzzles`. After the push it returned the intended 422.
+- **The morning check.** Abraham opened the table eight hours later and asked about the nulls before anything else. The schema answered: a null number is an ordinary run.
+- **Midnight in Spain.** "did i see tom hanks already because it was past 12 yesterday for me": the per-device day worked exactly as specced on its first night, and the results function's start check is what proved it.
 
 ### Media index
 
