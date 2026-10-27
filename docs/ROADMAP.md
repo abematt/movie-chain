@@ -38,8 +38,8 @@ and the head-to-head's automatic return. In order:
 2. **The TMDB proxy** ([0.8.0 Job 1](#job-1--the-tmdb-proxy)) — *landed 2026-10-26*
    (`supabase/functions/tmdb`, cache table `tmdb_cache`). Release builds leave the TMDB
    token out (`TMDBSecrets.plist` is development-only); the security advisor is clean
-   once `rls_auto_enable` is locked down. **Run `supabase db advisors --linked` before
-   every schema change ships.**
+   once `rls_auto_enable` is locked down. **Run `scripts/supabase-check.py` (the advisors
+   plus the checks against `supabase/access.toml`) before and after every `db push`.**
 3. **The daily start served from a table** — *built 2026-10-27* (`puzzles`, mode
    `daily_start`; `DailyStartFeed.swift`). Publish a day with an insert in the SQL
    editor ([`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)); the list
@@ -549,7 +549,8 @@ it. So:
   is re-validated server-side before it's stored (the anti-cheat already planned for
   friend groups).
 - **Run Supabase's security advisor** before every schema change ships, and keep a test
-  that tries to read and write each table with only the public key.
+  that tries to read and write each table with only the public key. *Both are
+  `scripts/supabase-check.py` (2026-10-27), held to `supabase/access.toml`.*
 
 **Why it's the first backend:** the proxy job is small, well-defined, genuinely needed,
 and **nobody's data is at risk if it falls over.** It's the right place to learn hosting,

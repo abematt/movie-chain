@@ -15,6 +15,7 @@ Add a signal here whenever a feature brings a new way to fail.
 | PostHog | App sessions and runs (`run_started`, `run_ended`; [`ANALYTICS.md`](ANALYTICS.md)) | PostHog project |
 | Supabase | Edge Function invocations, status codes and logs; database size; project status | [Project dashboard](https://supabase.com/dashboard/project/hqdcmuxownykfzmnhmbb) → Edge Functions → `tmdb` |
 | Supabase advisors | Security and performance issues in the database | `npx --yes supabase@2 db advisors --linked` |
+| `scripts/supabase-check.py` | The advisors, plus what the publishable key can actually do, against `supabase/access.toml`; secrets; auth settings | Run it locally |
 | Website analytics | Visits to playunspool.com | The site's host |
 | Ad platforms | Campaign spend, installs | Each platform (none yet) |
 
@@ -72,5 +73,7 @@ that day can then only reach players through a new row.
   TMDB cache before storing, or drop the device's rows.
 
 ### A schema change opened something
-- **Watch:** the advisors, before every schema change ships ([`ROADMAP.md`](ROADMAP.md)
-  0.8.0's safety rules). Clean as of 2026-10-26.
+- **Watch:** `scripts/supabase-check.py` (the advisors and the access table), before and
+  after every schema change ships ([`ROADMAP.md`](ROADMAP.md) 0.8.0's safety rules).
+  Clean as of 2026-10-27, with two auth warnings (signups on before accounts; 6-character
+  passwords).

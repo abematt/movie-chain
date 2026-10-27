@@ -1,5 +1,8 @@
 #!/bin/sh
-# Block a commit whose staged Swift breaks the conventions in CLAUDE.md
-# ("Swift conventions"). Enabled per clone with:
+# Block a commit whose staged Swift breaks the conventions in CLAUDE.md ("Swift
+# conventions"), or whose migrations or staged files break the service's safety
+# rules (scripts/supabase-check.py --offline). Enabled per clone with:
 #   git config core.hooksPath .githooks
-exec "$(git rev-parse --show-toplevel)/scripts/swift-check.py" --staged
+root="$(git rev-parse --show-toplevel)"
+"$root/scripts/swift-check.py" --staged || exit 1
+out="$("$root/scripts/supabase-check.py" --offline 2>&1)" || { echo "$out" >&2; exit 1; }

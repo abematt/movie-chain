@@ -175,6 +175,20 @@ has actually been bitten by, and how they're enforced.
 - **`/swift-review [base]`** — the judgment pass a script can't do (value vs reference,
   `some`/`any`, reentrancy, structure, test coverage). Run it on a branch before merging.
 
+## The service's safety rules
+
+The publishable key ships in the app, so anyone has it. **`supabase/access.toml` says
+what it (and `authenticated`) may do on every table, RPC function and bucket**; a new
+table, grant, policy or function changes that file in the same commit.
+- **`scripts/supabase-check.py`** holds the service to it: migrations lint, a secret scan
+  (tracked files, git history, the newest Release build), the advisors, the live catalog,
+  a probe with the publishable key, and the auth settings. **Run it before every
+  `db push` and after it**; it must be green. `--offline` (no network) runs in the
+  pre-commit hook.
+- **`/supabase-audit`** — the judgment pass: Edge Function abuse paths, what each policy
+  lets through, and the checklist that gates accounts (0.9.0). Run it before a milestone
+  that touches the service.
+
 ## The website
 
 The landing page is https://playunspool.com, in its own repo `../unspool-site`
