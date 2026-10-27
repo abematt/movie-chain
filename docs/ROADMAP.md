@@ -149,6 +149,23 @@ these together in one pass:
   The head-to-head's automatic return is a send the player chooses, so the toggle doesn't
   cover it.
 - **The daily's look** and **the share image naming no one** (above).
+- **The head-to-head's UX** (first pass landed 2026-10-27; `/swift-review` findings
+  included):
+  - **One owner for sheets.** A link opened while the Reel, Settings or Rivals sheet is
+    up shows nothing (the match is still recorded): the root's sheet and alert can't
+    present over a child's. Lift the screens' sheets into one root `enum`
+    (reel / settings / rivals / match), so a link replaces whatever is up.
+  - **Keep sent challenges on the phone**, keyed by `challengeKey`, and take your side of
+    a reply from there, ignoring replies to nothing you sent. Today "you" comes from the
+    reply's `r`, so a forged reply can set your score.
+  - **One win rule**: build `Outcome` from `Scoring.isNewRecord` rather than restating it.
+  - **Tests**: a challenge arriving during the home's first pool load; `PlayerName.current`.
+  - **Resume with a challenge on the home** still refreshes the dailies
+    (`dealFreshOnResume` returns before it).
+  - **"vs you"** in a reply's share text when the challenger had no name → "vs them".
+  - **Persist a challenge that arrives mid-run** (lost if the app is killed first).
+  - The screens themselves: the four-pill header overflows on the SE, and the challenge
+    line, result, reply sheet, Rivals list and name prompt all need the design pass.
 
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
