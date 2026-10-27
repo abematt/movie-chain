@@ -118,25 +118,36 @@ where its detail lives; update this list as they land (move a landed one to the 
   it should reveal — at least the start, maybe the chain once played.
 
 **For Abraham, 2026-10-27** (left over from building the two tables):
-- [ ] **Delete the two probe rows** from `results`, in the SQL editor:
-  `delete from public.results where app_version = 'probe-debug';`
+- [x] ~~Delete the two probe rows~~: already gone (checked 2026-10-27; ids 4 and 5 are
+  real runs and stay).
 - [ ] **Publish the real starts before day 10 (4 November).** Days 1–9 are the placeholder
   list; with no row for day 10 the app wraps back to the start of its list. Insert days 10
   onward (the statement is under *Daily start* in [`ARCHITECTURE.md`](ARCHITECTURE.md#daily-start--dailystartswift)),
   and replace 3–9 with new revisions if the placeholders shouldn't run.
-- [ ] **Decide what the stats panel shows** on the daily's game over. Wordle's model is a
-  fixed panel (your own stats, plus how everyone did today, e.g. the average), not "you
-  beat N%". `results` keeps raw rows, so any of these works. **Anyone can post forged
-  runs** under invented device ids (accepted for now; `/supabase-audit` → *Accepted*), so
-  whatever it shows has to hold up to that, in order of cost:
+
+**Tweak run**: small polish, parked so the mechanics come first (set 2026-10-27). Do
+these together in one pass:
+- **The daily's game over gets a flourish, not a stats panel.** Same treatment as New
+  best: the points line adds how everyone did today ("14 links · 620 pts · today 8") and
+  a tag in New best's spot when you beat it (wording open: "Above today" / "Beat the
+  room"; New best wins if both). Hidden until a day has 5+ results. Needs a
+  `daily_stats(number)` function returning only the count and the figure, so `results`
+  stays unreadable to the app's key. Undecided: that figure, or "you beat N%".
+  **Anyone can post forged runs** under invented device ids (accepted for now;
+  `/supabase-audit` → *Accepted*), so the figure has to hold up to that, in order of cost:
   1. **The median, not the mean**, without `-debug` runs: a flood has to outnumber real
      players to move it. Nearly free.
   2. **Re-check each link against `tmdb_cache`** in the `results` function before storing
      (the response `MONITORING.md` already names): forged runs then need real chains.
   3. **App Attest** (DeviceCheck), proving a request came from the app on a real device:
      the real fix for invented ids. Free, but a medium build; only if forging shows up.
-- [ ] **Decide whether results go behind the analytics opt-out.** They're sent regardless
-  today, treated as game data. Either the privacy page says so, or the opt-out covers them.
+- **Results go behind the analytics opt-out** (decided 2026-10-27). The toggle promises to
+  stop "your turns, what you type", and a result is exactly that. Check
+  `Telemetry.enabledKey` before `RunResults` sends; note it in [`ANALYTICS.md`](ANALYTICS.md)
+  and the privacy draft (unspool-site PR #1). Opted-out players still see today's figure.
+  The head-to-head's automatic return is a send the player chooses, so the toggle doesn't
+  cover it.
+- **The daily's look** and **the share image naming no one** (above).
 
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
