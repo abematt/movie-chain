@@ -10,15 +10,17 @@
 import Foundation
 
 extension Telemetry {
-    enum StartSource: String { case dealt, picked, daily }
+    enum StartSource: String { case dealt, picked, daily, challenge }
 
     struct RunState {
         var id: UUID?
         var startedAt: Date?
     }
 
-    /// `daily` is the daily start's number, for a `.daily` run.
-    func runStarted(seed: ChainNode, source: StartSource, daily: Int? = nil) {
+    /// `daily` is the daily start's number, for a `.daily` run; `challenge` the
+    /// run being answered, for a `.challenge` run.
+    func runStarted(seed: ChainNode, source: StartSource, daily: Int? = nil,
+                    challenge: SharedChain? = nil) {
         let id = UUID()
         runs = RunState(id: id, startedAt: now())
         var properties: [String: AnyHashable] = [
@@ -30,6 +32,10 @@ extension Telemetry {
             "home_s": seconds(since: screen.since),
         ]
         if let daily { properties["daily_number"] = daily }
+        if let challenge {
+            properties["rival_links"] = challenge.linkCount
+            properties["rival_points"] = challenge.points
+        }
         if let gameOver = screen.lastGameOverSeconds { properties["game_over_s"] = gameOver }
         screen.lastGameOverSeconds = nil
         send(.runStarted, properties)
@@ -73,6 +79,7 @@ extension Telemetry {
         }
         if let last = summary.chain.last { properties["final_prompt_id"] = last.tmdbID }
         if let missed = summary.missedAnswer { properties["near_miss_id"] = missed.tmdbID }
+        if let outcome = summary.outcome { properties["challenge_outcome"] = outcome.rawValue }
         send(.runEnded, inRun(properties))
         runs = RunState()
     }

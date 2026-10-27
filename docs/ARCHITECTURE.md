@@ -272,6 +272,37 @@ against TMDB, and speed can't be. One daily per device (a unique index): a resen
 answers `200` and stores nothing. The table has RLS on, no policies and no public
 grants.
 
+### Head-to-head — [`Rivals.swift`](../movie-quiz/Rivals.swift) + [`HeadToHead.swift`](../movie-quiz/HeadToHead.swift)
+
+Challenges between two players, with no server: the link is the state
+([ROADMAP](ROADMAP.md#head-to-head--same-start-both-sides-see-the-score) has the rules).
+
+- **Every share is a challenge.** Game over's link is a `SharedChain` with your
+  `SharerID` and `PlayerName` (asked on the first share). A daily shares no link.
+- **Opening a link** (`ContentView.open`, from `onOpenURL`) goes through
+  `RivalStore.receive`, which answers an `Arrival`: `.challenge` (deal it), `.played`
+  (one try: show the result), `.reply` (recorded), `.own`, `.needsUpdate`, `.invalid`.
+  The root only routes the answer.
+- **Dealt like the daily.** `GameEngine.receiveChallenge` deals it on the home
+  (`dealtChallenge`, over the daily) or holds it until the next visit home if a run is
+  on. "Deal again" deals it away. `startGame(with:challenge:)` uses up the try at the
+  start (`RivalStore.began`); `endGame` records the score (`finished`) and puts the
+  challenge on `Summary.challenge`, which is all game over needs for the result and the
+  reply.
+- **A reply** is the replier's run with the challenger's under `replyTo` (wire key
+  `r`). Matches are keyed by `SharedChain.challengeKey` (sender, start, links), so the
+  same run shared twice is one challenge, and a reply opened twice is one match.
+- **One-to-one.** `Rival`s are keyed by sharer id; a name updates whenever a newer
+  link from that id arrives. A group post comes back as one reply, one match, per
+  friend. Persisted as JSON in `UserDefaults` (injected).
+- **Testing without universal links.** Debug builds set `Config.shareBaseURL` to
+  `unspool-debug://playunspool.com`, a scheme registered only in
+  `Support/Debug-Info.plist` (the app's Debug configuration). `SharedChain.open`
+  checks the host, not the scheme, so the same links work once the base becomes
+  `https://playunspool.com`. `scripts/sim-challenge.sh` carries a copied link from one
+  simulator to another (`--launch` skips iOS's "Open in Unspool?" via `-uiOpenLink`).
+  `-uiDemoChallenge` deals a made-up challenge; `-uiDemoHeadToHead` shows its game over.
+
 ### Scoring & feedback (the gamification layer)
 The engine stays pure; all "juice" is layered on top and fired from the **view**
 in reaction to engine state (never from the engine — that keeps it UIKit-free and
@@ -765,6 +796,8 @@ scratch:
 > custom scheme (`Config.shareBaseURL`, `nil` until the domain exists): a custom scheme
 > is dead for anyone without the app. `open` answers `.chain` / `.needsUpdate` /
 > `.invalid` and never throws. Pass & Play's per-link owners would be a version 2.
+> Challenges (2026-10-27) added an optional `r`, the run a reply answers, without a
+> version bump: older apps ignore it. See *Head-to-head* above.
 
 - **Transport is a deep link, not a backend.** A finished chain encodes into a
   `moviechain://` link shared via the system share sheet (the same surface as

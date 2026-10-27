@@ -9,7 +9,8 @@
 //
 //  Layout: this file is the core — the sink, the clock, shared context, screens,
 //  identity. Each area of the game adds its own extension file
-//  (`Telemetry+Runs.swift`, `Telemetry+Reel.swift`) with its own state struct,
+//  (`Telemetry+Runs.swift`, `Telemetry+Reel.swift`, `Telemetry+Challenges.swift`)
+//  with its own state struct,
 //  stored here as one property. A new mode adds `Telemetry+<Mode>.swift` the same
 //  way rather than growing an existing file.
 //
@@ -117,8 +118,11 @@ final class Telemetry {
         send(.dealFailed, ["retries": retries, "home_s": seconds(since: screen.since)])
     }
 
-    func shared(from screen: Screen) {
-        send(.shareTapped, ["from": screen.rawValue])
+    /// What a share carried: a challenge link, a reply to one, or no link.
+    enum ShareLinkKind: String { case challenge, reply, none }
+
+    func shared(from screen: Screen, link: ShareLinkKind = .none) {
+        send(.shareTapped, ["from": screen.rawValue, "link": link.rawValue])
     }
 
     // MARK: For the extensions

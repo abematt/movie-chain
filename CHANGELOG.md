@@ -54,6 +54,20 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
   and for scoring obscurity by what players actually remember rather than TMDB's
   popularity. A run that ends without signal waits on the phone and goes on a later
   visit home. Nothing on screen uses it yet.
+- **Challenges and the head-to-head.** Every share is now a challenge: the link carries
+  your run, and a friend who opens it gets "Sam challenged you · 4 links · 96 pts to
+  beat" over the same start on their home. They get one try (used up when the run
+  starts, like the daily). Their game over shows who won (most links, points break a
+  tie) and the share button becomes **Send it back**, a reply carrying both runs, so you
+  see the result too, with no server. A Rivals pill on the home keeps the record per
+  friend ("You vs Sam, 3–2"). It's strictly one-to-one: a challenge posted to a group
+  chat comes back as one match per friend. Your first share asks what friends should
+  call you (a display name, not unique, editable in Settings). Dailies aren't
+  challengeable; their share stays the plain brag. Until now a share was a score with
+  nowhere to go: this gives it a reason to be answered. **Debug builds only for now**:
+  links use a private `unspool-debug://` scheme between simulators
+  (`scripts/sim-challenge.sh`); Release shares carry no link until playunspool.com
+  serves universal links.
 
 ### Changed
 - **The daily start comes from Unspool's service**, from a `puzzles` table, so a day can

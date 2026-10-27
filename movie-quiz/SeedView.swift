@@ -13,6 +13,10 @@
 //  the foot of the screen. There's no instruction: the sentence is the rule, and the blank
 //  nudges once, ever, to show it's the way in.
 //
+//  A friend's challenge is dealt here too: their name and score sit above the
+//  start (`ChallengeLine`), and the blank plays it. The Rivals pill, once you've
+//  had a match, opens the head-to-head record.
+//
 //  The dealt seed is owned by the engine (`engine.dealtSeed`, refreshed on every
 //  appearance and on resume). Once a start has sat on screen for a moment, the
 //  engine prefetches its candidates, so its first turn is ready the moment the
@@ -29,7 +33,9 @@ import SwiftUI
 struct SeedView: View {
     var engine: GameEngine
     var collection: CollectionStore
+    var rivals: RivalStore
     @Binding var introDone: Bool
+    @State private var showRivals = false
 
     @State private var query = ""
     @State private var results: [ChainNode] = []
@@ -85,9 +91,10 @@ struct SeedView: View {
     /// prefetched — so a run of quick Deal agains doesn't fetch every one.
     private static let prefetchDelay: Duration = .milliseconds(400)
 
-    init(engine: GameEngine, collection: CollectionStore, introDone: Binding<Bool>) {
+    init(engine: GameEngine, collection: CollectionStore, rivals: RivalStore, introDone: Binding<Bool>) {
         self.engine = engine
         self.collection = collection
+        self.rivals = rivals
         self._introDone = introDone
         let done = introDone.wrappedValue
         _playsIntro = State(initialValue: !done)
@@ -147,6 +154,9 @@ struct SeedView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showRivals) {
+            RivalsView(store: rivals)
         }
         // Deal a fresh start on every appearance (cold launch and "Play again"),
         // and again on each "Reconnect" after a failed deal.
@@ -253,6 +263,7 @@ struct SeedView: View {
             .overlay(alignment: .trailing) {
                 HStack(spacing: Theme.Spacing.sm) {
                     if showsTodayPill { todayButton.transition(.opacity) }
+                    if !rivals.isEmpty { rivalsButton }
                     reelButton
                     settingsButton
                 }
@@ -301,6 +312,21 @@ struct SeedView: View {
         .opacity(pillsVisible ? 1 : 0)
         .disabled(!pillsVisible)
         .accessibilityLabel("Today's start")
+    }
+
+    /// The head-to-head record. Icon-only, since four pills can share the SE's header.
+    private var rivalsButton: some View {
+        Button { showRivals = true } label: {
+            Image(systemName: "person.2")
+                .font(Theme.Font.bodyStrong)
+                .foregroundStyle(Theme.Color.ink)
+                .frame(width: 40, height: 40)
+                .neoSurface(radius: Theme.Radius.pill, shadow: Theme.Shadow.small)
+        }
+        .buttonStyle(.pressScale)
+        .opacity(pillsVisible ? 1 : 0)
+        .disabled(!pillsVisible)
+        .accessibilityLabel("Rivals")
     }
 
     private var reelCount: Int { reelDisplayed ?? collection.total }
@@ -406,13 +432,14 @@ struct SeedView: View {
     private var sentenceHead: some View {
         ZStack(alignment: .bottomLeading) {
             if let seed = engine.dealtSeed {
-                SentenceHead(seed: seed, daily: engine.dealtDaily, stage: stage)
+                SentenceHead(seed: seed, daily: engine.dealtDaily, challenge: engine.dealtChallenge,
+                             stage: stage)
                     // The art path is in the identity because SwiftUI compares a
                     // view's inputs with `==`, and nodes are equal by TMDB id: the
                     // pool's copy of the daily (same id, now with art) would
                     // otherwise never redraw. It swaps in place — the animation
                     // below is keyed on the same `==`, so it doesn't deal again.
-                    .id("\(seed.id)|\(seed.imagePath ?? "")")
+                    .id("\(seed.id)|\(seed.imagePath ?? "")|\(engine.dealtChallenge?.challengeKey ?? "")")
                     .transition(reduceMotion ? .opacity : .dealSentence)
             } else {
                 DealingSentence()
@@ -581,9 +608,11 @@ struct SeedView: View {
     private func play() {
         guard let seed = engine.dealtSeed else { return }
         let daily = engine.dealtDaily
+        let challenge = engine.dealtChallenge
         searchTask?.cancel()
-        telemetry?.runStarted(seed: seed, source: daily == nil ? .dealt : .daily, daily: daily)
-        Task { await engine.startGame(with: seed, daily: daily) }
+        let source: Telemetry.StartSource = challenge != nil ? .challenge : daily != nil ? .daily : .dealt
+        telemetry?.runStarted(seed: seed, source: source, daily: daily, challenge: challenge)
+        Task { await engine.startGame(with: seed, daily: daily, challenge: challenge) }
     }
 
     // MARK: Search section — the demoted "pick your own start" flow
@@ -849,10 +878,16 @@ private struct SentenceHead: View {
     let seed: ChainNode
     /// Today's daily number, when this is it.
     let daily: Int?
+    /// A friend's challenge, when this is one.
+    let challenge: SharedChain?
     let stage: HandoffStage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            if let challenge {
+                ChallengeLine(challenge: challenge)
+                    .padding(.bottom, Theme.Spacing.xs)
+            }
             HStack(spacing: Theme.Spacing.sm + 4) {
                 // An actor's face in a circle; a movie's poster as a poster.
                 HandoffArt(node: seed, radius: seed.kind == .movie ? Theme.Radius.sm : SentenceType.artSize / 2)
@@ -1043,6 +1078,8 @@ private struct ControlReveal: ViewModifier {
 }
 
 #Preview {
-    SeedView(engine: GameEngine(), collection: CollectionStore(fileURL: nil), introDone: .constant(true))
+    SeedView(engine: GameEngine(), collection: CollectionStore(fileURL: nil),
+             rivals: RivalStore(defaults: UserDefaults(suiteName: "preview-rivals")!),
+             introDone: .constant(true))
         .environment(HandoffStage())
 }

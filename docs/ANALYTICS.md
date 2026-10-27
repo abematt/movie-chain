@@ -20,6 +20,7 @@ stats and answer data, not analytics; nothing in it is sent to PostHog or from i
 | `Telemetry.swift` | The core views call: sink, clock, shared context, screens (incl. `deal_failed`), identity, `send`. |
 | `Telemetry+Runs.swift` | `run_started`, `link_landed`, `turn_load_failed`, `run_ended`. |
 | `Telemetry+Reel.swift` | `card_viewed`, `reel_closed`. |
+| `Telemetry+Challenges.swift` | `challenge_opened`. A challenge run reuses the run events. |
 | `GameEngine.Turn`, `Summary` | Plain facts the engine records (think time, misses, load time). **The engine never calls `Telemetry`.** |
 
 `swift-check` enforces both bold rules.
@@ -82,8 +83,9 @@ A run began. Every event until `run_ended` carries the same `run_id`.
 |---|---|
 | `run_id` | New for each run |
 | `seed_id`, `seed_kind` | The start (TMDB id, `actor` / `movie`) |
-| `source` | `dealt` (the home deal), `daily` (today's daily start) or `picked` (searched for) |
+| `source` | `dealt` (the home deal), `daily` (today's daily start), `challenge` (a friend's challenge) or `picked` (searched for) |
 | `daily_number` | The daily start's number, on a `daily` run only |
+| `rival_links`, `rival_points` | The score to beat, on a `challenge` run only |
 | `deals_before_start` | "Deal again" taps since the home screen appeared |
 | `home_s` | Time on the home screen before starting (time in the background excluded) |
 | `game_over_s` | Time on the previous game-over screen; absent on a session's first run |
@@ -136,11 +138,28 @@ A run is over, by timeout or Quit. Sent once, from the phase change.
 | `final_prompt_id`, `final_misses` | The turn the run ended on, and what was tried there |
 | `near_miss_id` | The answer shown as "you were one away" (timeouts only) |
 | `retries` | Manual retries after failed loads |
+| `challenge_outcome` | `win`, `loss` or `tie`, on a `challenge` run only |
 
 ### `share_tapped`
 
 The Share button was tapped (whether the share was sent isn't knowable). `from`:
-`game_over` or `reel`.
+`game_over` or `reel`. `link`: what the share carried — `challenge` (every game-over
+share outside a daily), `reply` (Send it back, after a challenge run) or `none` (a
+daily, or no link domain yet). On the first challenge the tap opens the name prompt,
+not the sheet.
+
+### `challenge_opened`
+
+A chain link was opened, and what it turned out to be. The head-to-head's one moment
+no run sees: a reply lands, or a link is refused, without a run starting. Low volume
+(one per link opened).
+
+| Property | Meaning |
+|---|---|
+| `result` | `new` (dealt on the home), `played` (already played here: shows the result), `reply` (a reply to your challenge, recorded), `own`, `needs_update`, `invalid` |
+| `rival_links` | On `new`: the score to beat, in links |
+| `outcome` | On `played` and `reply`: `win`, `loss` or `tie`, from your side |
+| `rival_matches` | On `reply`: matches against that rival so far, this one included |
 
 ### `card_viewed`
 

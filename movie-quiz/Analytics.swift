@@ -26,6 +26,7 @@ enum EventName: String, CaseIterable {
     case shareTapped = "share_tapped"
     case cardViewed = "card_viewed"
     case reelClosed = "reel_closed"
+    case challengeOpened = "challenge_opened"
 }
 
 nonisolated struct AnalyticsEvent: Equatable {

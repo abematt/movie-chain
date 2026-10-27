@@ -399,6 +399,12 @@ run only while a coin moves, and **a coin is never drawn above the one on it** a
 top and chosen coins show a face; keep both rules if you change it. App-wide
 tint (ink) is set once in `movie_quizApp`. Prefer reusing these over hardcoded values.
 
+**Head-to-head** (`Rivals.swift`, `HeadToHead.swift`): every share is a challenge
+link; a friend plays the same start once and replies with both runs; a Rivals pill
+keeps the record per sharer id. Debug-only until universal links exist — links use
+`unspool-debug://` (`Support/Debug-Info.plist`), carried between simulators by
+`scripts/sim-challenge.sh`; `-uiDemoChallenge` / `-uiDemoHeadToHead` show its screens.
+
 Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall
 every Nth link) all layer on this same engine — keep the engine/provider split clean.
 Accounts arrive at 0.9.0 (Apple, Google or email one-time code via Supabase, over a

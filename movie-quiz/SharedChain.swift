@@ -45,6 +45,18 @@ nonisolated struct SharedChain: Equatable, Sendable {
     var sharer: UUID?
     /// The name the sender goes by, when there is one.
     var senderName: String?
+    /// When this run answers a challenge: the challenger's run, from the same
+    /// start. A reply carries both runs, so the challenger sees the head-to-head
+    /// without a server.
+    var replyTo: Original?
+
+    /// The run a reply answers. The start is the reply's own, so it isn't repeated.
+    struct Original: Equatable, Sendable {
+        var links: [Int]
+        var points: Int
+        var sharer: UUID
+        var senderName: String?
+    }
 
     /// The score: links after the start (the dealt start isn't a link).
     var linkCount: Int { links.count }
@@ -52,19 +64,44 @@ nonisolated struct SharedChain: Equatable, Sendable {
     /// A finished run as a shareable chain. `nil` for an empty chain.
     /// `@MainActor` because `ChainNode` is (the project's default isolation).
     @MainActor
-    init?(chain: [ChainNode], points: Int, sharer: UUID? = nil, senderName: String? = nil) {
+    init?(chain: [ChainNode], points: Int, sharer: UUID? = nil, senderName: String? = nil,
+          replyTo: Original? = nil) {
         guard let first = chain.first else { return nil }
         self.init(start: Start(kind: first.kind, id: first.tmdbID, name: first.matchText),
                   links: chain.dropFirst().map(\.tmdbID),
-                  points: points, sharer: sharer, senderName: senderName)
+                  points: points, sharer: sharer, senderName: senderName, replyTo: replyTo)
     }
 
-    init(start: Start, links: [Int], points: Int, sharer: UUID? = nil, senderName: String? = nil) {
+    init(start: Start, links: [Int], points: Int, sharer: UUID? = nil, senderName: String? = nil,
+         replyTo: Original? = nil) {
         self.start = start
         self.links = links
         self.points = points
         self.sharer = sharer
         self.senderName = senderName
+        self.replyTo = replyTo
+    }
+
+    // MARK: Challenges
+
+    /// Names one challenge: who sent it, from which start, with which run. The
+    /// same run shared twice is the same challenge (one try covers both links).
+    var challengeKey: String {
+        let kind = start.kind == .actor ? "a" : "m"
+        let run = links.map(String.init).joined(separator: ",")
+        return "\(sharer?.uuidString ?? "-")|\(kind)\(start.id)|\(run)"
+    }
+
+    /// This run as the original a reply to it carries. `nil` without a sharer:
+    /// a reply has to find its way back to someone.
+    var asOriginal: Original? {
+        sharer.map { Original(links: links, points: points, sharer: $0, senderName: senderName) }
+    }
+
+    /// For a reply: the challenge it answers, as it was sent.
+    var originalChallenge: SharedChain? {
+        replyTo.map { SharedChain(start: start, links: $0.links, points: $0.points,
+                                  sharer: $0.sharer, senderName: $0.senderName) }
     }
 
     /// The node to start a run from — what a challenge plays.
@@ -116,7 +153,9 @@ nonisolated struct SharedChain: Equatable, Sendable {
     private var encoded: String {
         let wire = Wire(v: Self.version, k: start.kind == .actor ? "a" : "m", s: start.id,
                         n: start.name, l: links, p: points,
-                        u: sharer?.uuidString, f: senderName)
+                        u: sharer?.uuidString, f: senderName,
+                        r: replyTo.map { WireOriginal(l: $0.links, p: $0.points,
+                                                      u: $0.sharer.uuidString, f: $0.senderName) })
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         // Encoding a struct of strings and ints can't fail.
@@ -127,7 +166,7 @@ nonisolated struct SharedChain: Equatable, Sendable {
     private struct VersionOnly: Decodable { var v: Int }
 
     /// Short keys keep the link short: version, kind, start id, name, links,
-    /// points, sharer, from.
+    /// points, sharer, from, and the run it replies to.
     private struct Wire: Codable {
         var v: Int
         var k: String
@@ -137,6 +176,7 @@ nonisolated struct SharedChain: Equatable, Sendable {
         var p: Int
         var u: String?
         var f: String?
+        var r: WireOriginal?
 
         /// The checked chain, or `nil` if anything is out of bounds.
         var chain: SharedChain? {
@@ -151,12 +191,40 @@ nonisolated struct SharedChain: Equatable, Sendable {
                   l.count <= SharedChain.maxLinks, l.allSatisfy({ $0 > 0 }),
                   p >= 0
             else { return nil }
-            let sender = f.map { String($0.trimmingCharacters(in: .whitespacesAndNewlines)
-                .prefix(SharedChain.maxSenderLength)) }
+            // A reply that doesn't check out spoils the whole link, rather than
+            // arriving as a challenge it was never meant to be.
+            var original: Original?
+            if let r {
+                guard let checked = r.original else { return nil }
+                original = checked
+            }
             return SharedChain(start: Start(kind: kind, id: s, name: name), links: l, points: p,
                                sharer: u.flatMap(UUID.init(uuidString:)),
-                               senderName: sender?.isEmpty == false ? sender : nil)
+                               senderName: SharedChain.sender(f), replyTo: original)
         }
+    }
+
+    /// The challenger's run inside a reply: links, points, sharer, from.
+    private struct WireOriginal: Codable {
+        var l: [Int]
+        var p: Int
+        var u: String
+        var f: String?
+
+        var original: Original? {
+            guard let sharer = UUID(uuidString: u), l.count <= SharedChain.maxLinks,
+                  l.allSatisfy({ $0 > 0 }), p >= 0
+            else { return nil }
+            return Original(links: l, points: p, sharer: sharer, senderName: SharedChain.sender(f))
+        }
+    }
+
+    /// A sender's name, trimmed and capped; `nil` when there's nothing left.
+    private static func sender(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxSenderLength),
+              !trimmed.isEmpty
+        else { return nil }
+        return String(trimmed)
     }
 }
 

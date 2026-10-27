@@ -25,6 +25,12 @@ struct GameOverView: View {
     @State private var scorePop = 0
     /// The share card, drawn once the screen has settled.
     @State private var shareImage: Image?
+    /// The first share asks your name before the share sheet opens.
+    @AppStorage(PlayerName.askedKey) private var nameAsked = false
+    @AppStorage(PlayerName.key) private var playerName = ""
+    @State private var askingName = false
+    @State private var nameDraft = ""
+    @State private var sharingAfterName = false
 
     private var best: Bool { summary.isNewBest }
     /// How much of the recap shows above the actions on the first screen.
@@ -80,6 +86,26 @@ struct GameOverView: View {
         }
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .gameOver)
+        }
+        .alert("What should friends call you?", isPresented: $askingName) {
+            TextField("Your name", text: $nameDraft)
+                .textInputAutocapitalization(.words)
+            Button("Share") {
+                playerName = String(nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .prefix(PlayerName.maxLength))
+                nameAsked = true
+                sharingAfterName = true
+            }
+            Button("Skip", role: .cancel) {
+                nameAsked = true
+                sharingAfterName = true
+            }
+        } message: {
+            Text("It goes on your challenges, so friends know who sent them. Change it in Settings.")
+        }
+        .sheet(isPresented: $sharingAfterName) {
+            ActivityShareSheet(items: [summary.shareText(link: shareLink)])
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -145,6 +171,13 @@ struct GameOverView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(summary.links) \(linkWord), \(summary.points) points\(best ? ", a new best" : "")")
+
+            if let challenge = summary.challenge {
+                HeadToHeadPanel(challenge: challenge,
+                                mine: RunScore(links: summary.links, points: summary.points),
+                                fg: fg, sub: sub)
+                    .padding(.top, Theme.Spacing.lg)
+            }
 
             CoinStack(chain: summary.chain, labelColor: fg)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -230,14 +263,25 @@ struct GameOverView: View {
 
     // MARK: Actions
 
-    /// This run as a chain link, once `Config.shareBaseURL` is set.
+    /// This run as a challenge link, once `Config.shareBaseURL` is set — or, on a
+    /// challenge run, the reply carrying both runs back. A daily shares no link:
+    /// dailies aren't challengeable, so the share stays the plain brag.
     private var shareLink: URL? {
-        guard let base = Config.shareBaseURL,
+        guard let base = Config.shareBaseURL, summary.daily == nil,
               let shared = SharedChain(chain: summary.chain, points: summary.points,
-                                       sharer: SharerID.current(in: .standard))
+                                       sharer: SharerID.current(in: .standard),
+                                       senderName: PlayerName.current(in: .standard),
+                                       replyTo: summary.challenge?.asOriginal)
         else { return nil }
         return shared.url(base: base)
     }
+
+    private var shareKind: Telemetry.ShareLinkKind {
+        guard shareLink != nil else { return .none }
+        return summary.challenge == nil ? .challenge : .reply
+    }
+
+    private var shareLabel: String { summary.challenge == nil ? "Share" : "Send it back" }
 
     // Play again is the one slab: Go lime with a white side on Night, a night
     // slab on the holo sky. Share and the Reel are quiet words beneath it.
@@ -257,7 +301,7 @@ struct GameOverView: View {
                 // ShareLink has no action of its own; a tap opening the sheet is
                 // the signal (whether they then sent it isn't knowable).
                 .simultaneousGesture(TapGesture().onEnded {
-                    telemetry?.shared(from: .gameOver)
+                    telemetry?.shared(from: .gameOver, link: shareKind)
                 })
                 Button { showReel = true } label: {
                     Text("Your Reel").frame(maxWidth: .infinity)
@@ -288,14 +332,22 @@ private extension GameOverView {
     /// the text alone until then.
     @ViewBuilder var shareButton: some View {
         let text = summary.shareText(link: shareLink)
-        if let shareImage {
+        if shareLink != nil, !nameAsked {
+            // The first challenge asks your name; the sheet opens after.
+            Button {
+                nameDraft = playerName
+                askingName = true
+            } label: {
+                Text(shareLabel).frame(maxWidth: .infinity)
+            }
+        } else if let shareImage {
             ShareLink(item: shareImage, message: Text(text),
                       preview: SharePreview("Unspool · \(summary.links) \(linkWord)", image: shareImage)) {
-                Text("Share").frame(maxWidth: .infinity)
+                Text(shareLabel).frame(maxWidth: .infinity)
             }
         } else {
             ShareLink(item: text) {
-                Text("Share").frame(maxWidth: .infinity)
+                Text(shareLabel).frame(maxWidth: .infinity)
             }
         }
     }

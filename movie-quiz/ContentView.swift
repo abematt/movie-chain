@@ -2,7 +2,8 @@
 //  ContentView.swift
 //  movie-quiz
 //
-//  Root router: swaps between the seed, playing, and game-over screens.
+//  Root router: swaps between the seed, playing, and game-over screens, and
+//  routes an opened chain link (a challenge, or a reply to yours).
 //
 
 import SwiftUI
@@ -12,6 +13,13 @@ struct ContentView: View {
     /// The collection ("Your Reel"), owned at the root and shared with the engine
     /// (which records into it) and the screens that display it.
     @State private var collection: CollectionStore
+    /// The head-to-head record, owned here like the collection: the engine records
+    /// challenge runs into it, and opened links are checked against it.
+    @State private var rivals: RivalStore
+    /// A reply to your challenge, or one you'd already played, opened from a link.
+    @State private var openedMatch: OpenedMatch?
+    /// A link that couldn't become a challenge: why, in a sentence.
+    @State private var linkNotice: String?
     /// Whether the branded seed intro has already played. Persisted, so the full
     /// reveal is a genuine first-run moment — it plays once *ever*, and every later
     /// launch (and every "Play again" re-entry, since `SeedView` is recreated on
@@ -36,6 +44,14 @@ struct ContentView: View {
         let store = CollectionStore()
         #endif
         _collection = State(initialValue: store)
+        #if DEBUG
+        // Demo launches never touch the saved head-to-head record.
+        let rivals = ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("-uiDemo") })
+            ? RivalStore.demo() : RivalStore()
+        #else
+        let rivals = RivalStore()
+        #endif
+        _rivals = State(initialValue: rivals)
         // The deal pools persist only for the live provider: the stub's demo graph
         // must never be saved and dealt from once a real token is added.
         let poolCache = Config.hasTMDB
@@ -48,10 +64,11 @@ struct ContentView: View {
         let offline = ProcessInfo.processInfo.arguments.contains("-uiOffline")
         let engine = offline
             ? GameEngine(provider: OfflineProvider(), collection: store)
-            : GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed, results: results)
+            : GameEngine(collection: store, rivals: rivals, poolCache: poolCache, dailyFeed: dailyFeed,
+                         results: results)
         #else
-        let engine = GameEngine(collection: store, poolCache: poolCache, dailyFeed: dailyFeed,
-                                results: results)
+        let engine = GameEngine(collection: store, rivals: rivals, poolCache: poolCache,
+                                dailyFeed: dailyFeed, results: results)
         #endif
         // The play screen releases the first turn's clock once the keyboard is up.
         engine.holdsFirstTurnClock = true
@@ -84,7 +101,7 @@ struct ContentView: View {
             // later, so the two never sit half-faded over each other. Every other
             // change pushes.
             case .seed:
-                SeedView(engine: engine, collection: collection, introDone: $seedIntroDone)
+                SeedView(engine: engine, collection: collection, rivals: rivals, introDone: $seedIntroDone)
                     .transition(.asymmetric(insertion: .screenPush(reduceMotion: reduceMotion),
                                             removal: .opacity.animation(Theme.Motion.layoutOut)))
             case .playing:
@@ -101,6 +118,16 @@ struct ContentView: View {
         .overlay { HandoffFlight().dynamicTypeSize(...Theme.Font.gameTypeCap) }
         .coordinateSpace(.named(HandoffStage.space))
         .environment(handoff)
+        // Chain links: universal links in Release (once the domain serves the
+        // file), the private `unspool-debug://` scheme in Debug.
+        .onOpenURL { open($0) }
+        .sheet(item: $openedMatch) { opened in
+            MatchSheet(match: opened.match, rival: opened.rival)
+        }
+        .alert(linkNotice ?? "", isPresented: Binding(get: { linkNotice != nil },
+                                                      set: { if !$0 { linkNotice = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
         // A run that ends mid-flight (Quit is live during it) takes the copies
         // with it, rather than leaving them over the game-over screen.
         .onChange(of: engine.phase) { _, phase in
@@ -144,12 +171,56 @@ struct ContentView: View {
             if args.contains("-uiDemoGameOver") {
                 engine.loadDemoGameOver(newBest: !args.contains("-uiDemoNoBest"), worstCase: worstCase,
                                         clean: args.contains("-uiDemoClean"))
+            } else if args.contains("-uiDemoHeadToHead") {
+                engine.loadDemoGameOver(newBest: false, worstCase: worstCase,
+                                        challenge: GameEngine.demoChallenge(worstCase: worstCase))
             } else if args.contains("-uiDemoChain") {
                 engine.loadDemoChain(worstCase: worstCase)
+            } else if args.contains("-uiDemoChallenge") {
+                engine.receiveChallenge(GameEngine.demoChallenge(worstCase: worstCase))
+            }
+            // Open a chain link at launch, skipping the system's "Open in Unspool?"
+            // that `simctl openurl` raises (`scripts/sim-challenge.sh --launch`).
+            if let flag = args.firstIndex(of: "-uiOpenLink"), args.indices.contains(flag + 1),
+               let url = URL(string: args[flag + 1]) {
+                open(url)
             }
             #endif
         }
     }
+}
+
+extension ContentView {
+    /// A link opened while the app runs, or that launched it.
+    private func open(_ url: URL) {
+        guard let base = Config.shareBaseURL else { return }
+        let arrival = rivals.receive(SharedChain.open(url, base: base),
+                                     me: SharerID.current(in: .standard), at: .now)
+        telemetry?.challengeOpened(arrival)
+        switch arrival {
+        case .challenge(let challenge):
+            // On the home it's dealt now; mid-run or on game over, on the next visit home.
+            engine.receiveChallenge(challenge)
+            if engine.phase != .seed {
+                linkNotice = "\(challenge.senderName ?? "A friend")’s challenge is waiting on the home screen."
+            }
+        case .played(let match, let rival), .reply(let match, let rival):
+            openedMatch = OpenedMatch(match: match, rival: rival)
+        case .own:
+            linkNotice = "That’s your own challenge. Send it to a friend."
+        case .needsUpdate:
+            linkNotice = "This challenge needs a newer Unspool. Update from the App Store."
+        case .invalid:
+            linkNotice = "That link didn’t work."
+        }
+    }
+}
+
+/// A match a link opened, for the sheet.
+struct OpenedMatch: Identifiable {
+    let match: Match
+    let rival: Rival
+    var id: String { match.id }
 }
 
 #Preview {

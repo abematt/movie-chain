@@ -149,4 +149,37 @@ struct SharedChainTests {
         #expect(SharerID.current(in: defaults) == first)
         #expect(DeviceID.current(in: defaults) != first)
     }
+
+    // MARK: Replies
+
+    @Test func aReplyCarriesTheRunItAnswers() throws {
+        let original = try #require(SharedChain(chain: run, points: 420, sharer: sharer, senderName: "Abe"))
+        let replier = UUID()
+        let reply = try #require(SharedChain(chain: run + [.movie(Movie(id: 13, title: "Big", year: 1988))],
+                                             points: 500, sharer: replier, senderName: "Sam",
+                                             replyTo: original.asOriginal))
+
+        #expect(SharedChain.open(reply.url(base: base), base: base) == .chain(reply))
+        #expect(reply.replyTo == .init(links: [8358, 7], points: 420, sharer: sharer, senderName: "Abe"))
+        #expect(reply.originalChallenge == original)
+        #expect(reply.originalChallenge?.challengeKey == original.challengeKey)
+    }
+
+    @Test func aDamagedReplySpoilsTheLink() {
+        let json = #"{"v":1,"k":"a","s":31,"n":"Tom Hanks","l":[8358],"p":10,"u":"\#(UUID().uuidString)","r":{"l":[8358],"p":5,"u":"not-a-uuid"}}"#
+        #expect(SharedChain.open(link(json: json), base: base) == .invalid)
+    }
+
+    @Test func aChallengeIsNamedBySenderStartAndRun() throws {
+        let one = try #require(SharedChain(chain: run, points: 420, sharer: sharer))
+        let samePointsAside = try #require(SharedChain(chain: run, points: 1, sharer: sharer, senderName: "New name"))
+        let otherSender = try #require(SharedChain(chain: run, points: 420, sharer: UUID()))
+        let otherRun = try #require(SharedChain(chain: Array(run.prefix(2)), points: 420, sharer: sharer))
+
+        #expect(one.challengeKey == samePointsAside.challengeKey)
+        #expect(one.challengeKey != otherSender.challengeKey)
+        #expect(one.challengeKey != otherRun.challengeKey)
+        #expect(SharedChain(start: one.start, links: one.links, points: 0).asOriginal == nil,
+                "a reply needs someone to go back to")
+    }
 }
