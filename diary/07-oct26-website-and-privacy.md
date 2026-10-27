@@ -1,13 +1,13 @@
 ---
 id: website
 label: Site, money & service
-span: Oct 25 15:41 – Oct 27 08:41
+span: Oct 25 15:41 – Oct 27 22:45
 versions: after 0.7.0 (unreleased)
 accent: blue
 order: 7
-sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc
+sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc 466221d3 034f113f
 start: 2026-10-25
-end: 2026-10-27T08:41
+end: 2026-10-27T22:45
 ---
 
 ## Era: 0.7.0 is tagged, and the website talks back (2026-10-26)
@@ -467,6 +467,141 @@ points**, quit, `0.7.0-debug`. The first real player row.
   missing from `main`. Deleted, locally and on GitHub. A `fetch --prune` then dropped
   ~28 stale remote-tracking refs for branches GitHub had already deleted.
 
+## Era: what can a stranger do with the key? (2026-10-27)
+
+Two tabs opened at 08:47. One asked what was next and came back with the loose ends and
+two decisions. The other started with a link to someone else's open-source Supabase
+auditor. Reading it showed most of its checks were already covered by Supabase's own
+advisors, but it did one thing nothing here did: it actually tried the public key. By
+09:04 Unspool had its own version: a checked-in table of what the app's key may do, a
+script that holds the live service to it, and a skill for the judgment on top. The
+evening settled what to do about the two weaknesses it turned up.
+
+### 08:47 — "found this open source tool or whatever it is for auditing supabase" (034f113f)
+
+- Abraham pasted a GitHub link to Database Sentinel, a one-person project about a month
+  old: a Claude skill, a read-only MCP server and a CLI agent, with 27 Supabase patterns
+  and a hosted paid version.
+- **Read before running:** cloned into the scratchpad and read, never executed. The
+  read-only claims held up. Its role sets `default_transaction_read_only`, has no
+  `SELECT` on any table, and the server opens every connection read-only on its own side
+  too. Its one network call is a `HEAD` request as anon against your own REST URL. The fix
+  SQL is printed, never run. The caveats: the role needs `BYPASSRLS` (a real credential
+  in the prod database), and the server code is AGPL.
+- **Against Unspool's migrations it would find little:** RLS with a revoke on every
+  table, `puzzles` readable through one select policy, and both functions with execute
+  revoked. The real exposure is the two Edge Functions, which run with the service role,
+  and Sentinel doesn't read function logic.
+
+### 08:49 — "Or should we make our own skill or some sub set version of this"
+
+- Abraham (verbatim): "Or should we make our own skill or some sub set version of this
+  that we can run repeatedly? anything from here that we miss so we cna run this along
+  with the supabase analyist or doctor or whatever we run?"
+- **The comparison:** the advisors (`db advisors --linked`, already the rule before every
+  schema change) cover most of Sentinel's list: RLS off, definer views and functions,
+  search paths, `user_metadata` in policies, sensitive columns. Five things they don't do:
+  1. **Try the public key** — the roadmap already asked for "a test that tries to read
+     and write each table with only the public key", and it had never been built;
+  2. **Judge what a policy allows** — `using (true)` on a write passes the advisors;
+  3. **Column grants** — a table-wide `update` lets a player rewrite their own score;
+  4. **Secrets in what ships** — the repo, its history and the Release `.app`;
+  5. **Auth settings** — signups, confirmation, redirects (matters at 0.9.0).
+- **08:52, Abraham: "no lets do all 5".**
+
+### 08:53–09:04 — building it (034f113f)
+
+- **No password needed.** `supabase db query --linked` goes through the Management API,
+  so the live catalog checks run in a `begin transaction read only` with only the CLI
+  login. `supabase config diff` gives the live auth settings as differences from the
+  local `config.toml`, so the script overlays the two.
+- **`supabase/access.toml`** declares what `anon` and `authenticated` may do on every
+  table, RPC function and bucket. Any difference fails: more access is a leak, less is a
+  broken app. Column-scoped grants are written `update(a, b)`.
+- **`scripts/supabase-check.py`**, the same split as `swift-check.py` /
+  `/swift-review`: migrations lint, secret scan, advisors, live catalog, a probe with the
+  publishable key, auth. `--offline` runs in the pre-commit hook.
+- **How the probe writes without writing:** an insert of `[]` (zero rows, but the
+  privilege check still runs), and update/delete filtered by `col=is.null&col=not.is.null`,
+  which matches nothing. Its first run failed on `results`: `PATCH {id: null}` hit the
+  identity column's validation before the privilege check, so the probe now picks a
+  plain column.
+- **Advisor noise:** at `info` level the advisors flag `rls_enabled_no_policy` on
+  `results` and `tmdb_cache`. That's the deny-by-default design, so it's skipped for
+  tables access.toml says have no public access, rather than leaving three warnings
+  everyone learns to ignore.
+- **Proving it can fail:** every check was fed planted problems (a table without RLS, a
+  `to public` write policy, a callable `SECURITY DEFINER` function, a view running as
+  its owner, fake service-role and TMDB tokens, wildcard redirects), and caught each one.
+  A legacy anon JWT correctly wasn't flagged. Against a deliberately wrong access table,
+  the live probe reported the real 200s and 401s in both directions. A Release build
+  for the simulator was made for the app scan: it ships only `AppSecrets.plist`; pointed
+  at the Debug build, the scan flagged `TMDBSecrets.plist` and the token inside it.
+- **`/supabase-audit`**, the skill: run the script, then go through each Edge Function
+  (gate, input bounds, client-chosen identity, amplification, upstream exposure, rate
+  limits), each policy by meaning, and the checklist that gates accounts.
+- A `__pycache__` from the test imports slipped into the first commit; dropped and
+  ignored before the push. Commit `9dd0732`, PR #47.
+- **The live result:** green, with two real auth warnings. Signups are on though the
+  app has no accounts (anyone can mint an `authenticated` session; harmless while it gets
+  exactly anon's access), and the minimum password is 6. Both are dashboard switches,
+  left for Abraham.
+- **Three things a script can't decide**, found reading the functions:
+  1. the `tmdb` proxy's cache key takes any query parameter, so `?x=1`, `?x=2`… each
+     make a row and a TMDB call: a cheap way to fill the free plan's 500MB;
+  2. `results` trusts the `device_id` the app sends, so unlimited invented devices can
+     skew "today's average";
+  3. a daily inserted ahead of its day is readable at once.
+
+### 08:47–09:01 — the other tab: "Alright whats next on our list" (466221d3)
+
+- The four loose ends from the night before were all still open.
+- **"What did we decide on accounts or account names so we cna be like John challenged
+  you"** Recap of Oct 26's decision: no usernames, a display name asked for the first
+  time you challenge someone, not unique and not searchable, carried inside the link,
+  with a hidden sharer id telling two Sams apart. `SharedChain.senderName` exists;
+  nothing sets it yet.
+- **08:59, Abraham's answers:** "1. go ahead / 2. okay i'll think about that / 3. i think
+  it just needs a little bit of a flourish similar to how we added a flourish for new
+  best / 4. what do you think".
+  - *The probe rows* were already gone; `results` held two real runs from his phone
+    (daily #2 last night, and an endless run at 07:35), left alone.
+  - *The stats panel* became a proposal shaped like New best: "today 8.2" on the points
+    line, a tag beside "Time's up at" when you beat the day, hidden under ~5 players, and
+    a `daily_stats(number)` function returning only a count and an average. The tag's
+    wording is Abraham's call. (That evening the other tab tied forged results to this
+    same panel: accepted until it ships.)
+  - *The opt-out:* the recommendation is that the toggle covers results too, because
+    its own text promises to stop "your turns, what you type", and a run is exactly that.
+- **22:42 "what is 4"**, explained again; then **22:45 "what were we trying to do in
+  this chat again"**. Unanswered when the day ended: the opt-out is still open.
+
+### 22:37–22:45 — "what is the decision on 2 and 3?" (034f113f)
+
+- Neither was written down as decided, but the docs had already settled most of both.
+- **Future dailies readable: accepted.** The design needs it: phones fetch a week ahead
+  and MONITORING says keep seven days published, so whatever the app can read, its
+  extracted key can read. DAILY-CHAIN.md already accepts spoilers across time zones, and
+  the start is a prompt, not an answer.
+- **Forged results: accepted for now, settled with the stats panel.** The roadmap's
+  anti-cheat stance is motive, not detection: no prize, no ranks. What's left is
+  vandalism of the average. The mitigations, cheapest first: the median, not the mean;
+  re-check links against `tmdb_cache`; App Attest only if forging shows up.
+- **22:42 "yes"** — both recorded: an *Accepted* section in `/supabase-audit` (with what
+  would reopen each), and the three mitigations on the roadmap's stats-panel item.
+  Commit `6a52ebd`.
+- **22:45 "merge and run /diary"** — PR #47 merged (`abade44`), branch deleted.
+
+### Where things stand (2026-10-27 ~22:45)
+
+- `main` is at `abade44`. `scripts/supabase-check.py` is green against the live project,
+  with the two auth warnings, and runs offline in the pre-commit hook.
+- **Abraham's, in the dashboard:** turn off signups until 0.9.0 (or accept the warning);
+  the password length only matters if passwords ever ship.
+- **Open:** the proxy's query parameters (offered, not built); whether results go behind
+  the opt-out (recommended yes, not answered); the stats panel's tag wording; publishing
+  the real starts before day 10 on Nov 4.
+
 ### Decision log
 
 | Time (local) | Decision | Rationale | Source |
@@ -539,6 +674,16 @@ points**, quit, `0.7.0-debug`. The first real player row.
 | Oct 27 00:31 | Tomorrow's loose ends go in the roadmap as a checklist | It's where the next session looks before planning; no reminder system is set up | e81853bc |
 | Oct 27 08:37 | Keep the day decided by the phone's time zone as read at launch | Matches DAILY-CHAIN.md; `autoupdatingCurrent` is a one-line switch if travel matters | e81853bc |
 | Oct 27 08:41 | Delete three old branches after checking they're fully merged | Nothing on them was missing from `main`; the repo rule is to ask only for unmerged work | e81853bc |
+| Oct 27 08:48 | Don't install Database Sentinel; build a subset | The advisors already cover most of its patterns; it needs a `BYPASSRLS` role in prod; its unique value is a handful of checks | 034f113f |
+| Oct 27 08:52 | Build all five missing checks | Abraham: "no lets do all 5" | 034f113f |
+| Oct 27 08:53 | Run live catalog checks through `db query --linked` | The Management API needs only the CLI login, no database password; read-only transaction | 034f113f |
+| Oct 27 08:57 | Hold the service to a checked-in `access.toml`; any difference fails | More access is a leak, less is a broken app; a new table must be declared in the same commit | 034f113f |
+| Oct 27 09:00 | Probe writes with zero-row requests | Privileges are checked even when nothing matches, so the real key can be tested without changing data | 034f113f |
+| Oct 27 09:00 | Skip `rls_enabled_no_policy` for service-only tables | It's the deny-by-default design; permanent warnings get ignored | 034f113f |
+| Oct 27 09:01 | Results go behind the analytics opt-out (recommended, not decided) | The toggle promises to stop "your turns, what you type"; a run is that | 466221d3 |
+| Oct 27 09:01 | The daily's stats are a flourish like New best, not a panel | Abraham: "a little bit of a flourish similar to how we added a flourish for new best" | 466221d3 |
+| Oct 27 22:38 | Accept that future dailies are readable | Phones fetch a week ahead, so the app's key must read them; spoilers already accepted | 034f113f |
+| Oct 27 22:38 | Accept forgeable results until the stats panel ships | No prize, no ranks; nothing reads `results` yet; median, link re-check, App Attest are the mitigations | 034f113f |
 
 ### Story material
 
@@ -574,6 +719,12 @@ points**, quit, `0.7.0-debug`. The first real player row.
 - **The 500 that meant "not yet".** The wrong-start check failed with 500 before the push, because the function's role couldn't read `puzzles`. After the push it returned the intended 422.
 - **The morning check.** Abraham opened the table eight hours later and asked about the nulls before anything else. The schema answered: a null number is an ordinary run.
 - **Midnight in Spain.** "did i see tom hanks already because it was past 12 yesterday for me": the per-device day worked exactly as specced on its first night, and the results function's start check is what proved it.
+- **Someone else's auditor, read and not run.** The useful part of a 27-pattern tool turned out to be one idea: stop reading the configuration and try the key. That was already a line in the roadmap, unbuilt for a day.
+- **"no lets do all 5".** Offered a small first step with the rest later, Abraham took the whole list. Eleven minutes from that to a green run against the live project.
+- **The probe that writes nothing.** An insert of an empty array, an update matching no rows: the database still checks permission, so the real key gets tested and no data changes.
+- **A check is only worth something once you've seen it fail.** Every rule was fed a planted problem before it was trusted, and the probe was pointed at a wrong table to show it could tell allowed from denied.
+- **Two tabs, one question.** The morning tab proposed a stats flourish; the evening tab decided forged results are fine *until* that flourish ships. The same day, without either tab seeing the other.
+- **"what were we trying to do in this chat again"** — the last message of the day, from the tab that sat open for fourteen hours.
 
 ### Media index
 
@@ -590,3 +741,4 @@ points**, quit, `0.7.0-debug`. The first real player row.
 - `media/b738c613/release3.png`: after the first fix (observation only), still no photo. Embedded. ~23:14.
 - `media/b738c613/release4.png`: after the second fix, Tom Hanks' photo shows. Embedded. ~23:16.
 - Session `e81853bc` captured no screenshots or other media.
+- Sessions `466221d3` and `034f113f` captured no screenshots or other media.
