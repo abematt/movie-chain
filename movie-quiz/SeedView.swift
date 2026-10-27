@@ -163,6 +163,10 @@ struct SeedView: View {
         .task(id: dealRetries) {
             await engine.prepareSeeds()
             guard !Task.isCancelled else { return }
+            #if DEBUG
+            // Screenshot hook: a random deal in place of the daily.
+            if ProcessInfo.processInfo.arguments.contains("-uiDealRandom") { engine.shuffleSeed() }
+            #endif
             dealRetrying = false
             // Each failed attempt reports, a repeat failure on "Reconnect" included.
             if engine.dealFailed { telemetry?.dealFailed(retries: dealRetries) }
@@ -204,6 +208,7 @@ struct SeedView: View {
             // Screenshot hook: open straight onto the Reel sheet.
             if ProcessInfo.processInfo.arguments.contains("-uiOpenReel") { showReel = true }
             if ProcessInfo.processInfo.arguments.contains("-uiOpenSettings") { showSettings = true }
+            if ProcessInfo.processInfo.arguments.contains("-uiOpenRivals") { showRivals = true }
             #endif
         }
         .onChange(of: searching) { _, now in

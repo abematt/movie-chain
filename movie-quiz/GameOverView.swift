@@ -87,6 +87,15 @@ struct GameOverView: View {
         .sheet(isPresented: $showReel) {
             CollectionView(store: collection, bestChain: engine.bestChain, openedFrom: .gameOver)
         }
+        #if DEBUG
+        // Screenshot hook: the first share's name prompt, without tapping Share.
+        .task {
+            guard ProcessInfo.processInfo.arguments.contains("-uiAskName") else { return }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            askingName = true
+        }
+        #endif
         .alert("What should friends call you?", isPresented: $askingName) {
             TextField("Your name", text: $nameDraft)
                 .textInputAutocapitalization(.words)
