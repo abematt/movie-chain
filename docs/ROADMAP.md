@@ -213,6 +213,25 @@ better as the service and accounts land — not blocked on them.
 ("what should friends call you?"), not unique, not searchable; people find each other by
 link. The sharer id already tells two Sams apart.
 
+**Decided 2026-10-27** (talked through before building):
+- **Every share is a challenge.** There's no separate Challenge button. The name prompt
+  comes on your first share.
+- **B sees A's links *and* points before playing**, not the route. Points are part of
+  the score to chase. Most links wins; points break a tie.
+- **One try per challenge.** Opening the same link again shows the result, not a replay.
+- **Dailies aren't challengeable.** A daily's share stays the plain brag (no challenge
+  link), so the daily and challenges stay separate modes.
+- **Strictly one-to-one.** A posts once to a group chat; A gets B, C and D as separate
+  matches; B, C and D each see only A. Nothing to build for groups; the screens just
+  have to take several replies arriving at once.
+- **No rematch feature.** A new challenge on a new start is the rematch.
+- **Challenge runs count** toward your best and your Reel, like any Hardcore run.
+- **The rivalry list is a "Rivals" pill on the home header**, next to the Reel and the
+  gear, shown once you've had a match. Not in the Reel, which stays the collection.
+- **Names update by link.** B's phone keeps the latest name it saw from A's sharer id,
+  so a rename shows when A's next link arrives. A live, synced name is what accounts
+  ([0.9.0](#090--accounts)) add; not worth pulling accounts forward for.
+
 **Upgrades as the platform grows:** the service ([0.8.0](#080--the-service)) returns B's
 result automatically with a push ("Sam beat your chain"); accounts
 ([0.9.0](#090--accounts)) carry the list across phones; friend groups
