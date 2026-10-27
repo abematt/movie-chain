@@ -169,10 +169,18 @@ enum Config {
     /// day fixed after it went out reaches players within the hour.
     static let dailyRefreshInterval: TimeInterval = 60 * 60
 
-    /// Where chain links live: `<base>/c?d=…` (`SharedChain`). `nil` until the
-    /// domain exists and serves the universal-links file; while it's `nil`, shares
-    /// carry no link. `nonisolated` so the pure `SharedChain` code can use it.
+    /// Where chain links live: `<base>/c?d=…` (`SharedChain`). `nil` in Release
+    /// until playunspool.com serves the universal-links file; while it's `nil`,
+    /// shares carry no link. Debug builds use the private `unspool-debug://`
+    /// scheme (registered in `Support/Debug-Info.plist`, Debug only), so a whole
+    /// challenge can be played between two simulators: `scripts/sim-challenge.sh`.
+    /// Only the host is checked when a link opens, so the scheme can change
+    /// without breaking links. `nonisolated` so the pure `SharedChain` code can use it.
+    #if DEBUG
+    nonisolated static let shareBaseURL: URL? = URL(string: "unspool-debug://playunspool.com")
+    #else
     nonisolated static let shareBaseURL: URL? = nil
+    #endif
 
     /// The website's pages Settings links to. The site is `abematt/unspool-site`;
     /// its `docs/handover-app.md` lists what the app owes it.

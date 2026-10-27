@@ -8,7 +8,7 @@
 //  `@AppStorage`, the app's existing lightweight-preference idiom (the sound
 //  toggle used to live inline in the game chrome; it now has a home here too).
 //
-//  Sound, the analytics opt-out, links out to the website (privacy policy, the
+//  Sound, your name on challenges, the analytics opt-out, links out to the website (privacy policy, the
 //  feature board, contact), and the version.
 //
 
@@ -20,6 +20,8 @@ struct SettingsView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
     /// Read at launch by `movie_quizApp` too, so the choice holds from the first event.
     @AppStorage(Telemetry.enabledKey) private var analyticsEnabled = true
+    /// What friends see on your challenges (`PlayerName`); first asked on a share.
+    @AppStorage(PlayerName.key) private var playerName = ""
     @Environment(\.telemetry) private var telemetry
     @Environment(\.openURL) private var openURL
 
@@ -28,6 +30,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     soundSection
+                    nameSection
                     privacySection
                     feedbackSection
                     aboutSection
@@ -60,6 +63,31 @@ struct SettingsView: View {
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
             .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+        }
+    }
+
+    // MARK: Name — what friends see on your challenges
+
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("Your name")
+            TextField("What friends call you", text: $playerName)
+                .font(Theme.Font.bodyStrong)
+                .foregroundStyle(Theme.Color.ink)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.done)
+                .onChange(of: playerName) { _, name in
+                    if name.count > PlayerName.maxLength { playerName = String(name.prefix(PlayerName.maxLength)) }
+                }
+                .padding(.horizontal, Theme.Spacing.md)
+                .frame(minHeight: 44)
+                .padding(.vertical, Theme.Spacing.xs)
+                .neoSurface(radius: Theme.Radius.card, shadow: Theme.Shadow.small)
+
+            Text("On the challenges you send, so friends know who they’re playing. It isn’t unique and nobody can search for it.")
+                .font(Theme.Font.sentence(.footnote))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, Theme.Spacing.xs)
         }
     }
 

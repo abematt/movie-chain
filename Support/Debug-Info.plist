@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Debug builds only (INFOPLIST_FILE is set on the app's Debug configuration):
+	     the private scheme challenge links use until universal links exist.
+	     See Config.shareBaseURL and scripts/sim-challenge.sh. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>abe.movie-quiz.debug-links</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>unspool-debug</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

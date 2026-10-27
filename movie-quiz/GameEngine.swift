@@ -54,6 +54,14 @@ final class GameEngine {
         var retries = 0
         /// The daily start's number, when this run was today's daily.
         var daily: Int?
+        /// The challenge this run answered, when it was one.
+        var challenge: SharedChain?
+
+        /// How this run did against the challenge it answered.
+        var outcome: Outcome? {
+            challenge.map { Outcome(mine: RunScore(links: links, points: points),
+                                    theirs: RunScore(links: $0.linkCount, points: $0.points)) }
+        }
 
         /// Spoiler-free share card: each link as a coloured square, never a name,
         /// plus the run as a link when there's somewhere for links to go. A daily
@@ -62,9 +70,16 @@ final class GameEngine {
             let squares = chain.map { $0.kind == .actor ? "🟦" : "🟨" }.joined()
             let linkWord = links == 1 ? "link" : "links"
             let title = daily.map { "Unspool #\($0)" } ?? "Unspool"
-            let card = "\(title) 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            var card = "\(title) 🎬\n\(links) \(linkWord) · \(points) pts\n\(squares)"
+            // A reply names the run it answers; the challenger has played it, so
+            // their score spoils nothing.
+            if let challenge {
+                let name = challenge.senderName ?? "you"
+                card += "\nvs \(name): \(challenge.linkCount) · \(challenge.points) pts"
+            }
             guard let link else { return card }
-            return card + "\n" + link.absoluteString
+            let dare = challenge == nil ? "Beat it: " : ""
+            return card + "\n" + dare + link.absoluteString
         }
     }
 
@@ -182,6 +197,13 @@ final class GameEngine {
     /// Daily starts the service has published, by number, kept from today on.
     /// A day missing here falls back to `DailyStart.entries`.
     private var servedDailies: [Int: DailyStart.Entry]
+    /// A friend's challenge while it's the start on the home. "Deal again" deals
+    /// it away; opening the link again brings it back.
+    private(set) var dealtChallenge: SharedChain?
+    /// A challenge that arrived mid-run or on game over, dealt on the next visit home.
+    private var pendingChallenge: SharedChain?
+    /// The challenge the run in progress answers.
+    private var runChallenge: SharedChain?
 
     // MARK: Private
 
@@ -221,6 +243,8 @@ final class GameEngine {
     /// The registry every completed chain is logged into. Optional so previews
     /// and tests can run without touching disk.
     private let collection: CollectionStore?
+    /// Where head-to-heads are recorded; `nil` records none (tests, previews).
+    private let rivals: RivalStore?
     /// Valid next nodes for the current turn (cast or filmography), pre-wrapped.
     private var candidates: [ChainNode] = []
     /// The dealt start's candidates, fetched while the player is still looking at
@@ -272,6 +296,7 @@ final class GameEngine {
     private var dailiesFetchedAt: Date?
 
     init(provider: (any MovieDataProvider)? = nil, collection: CollectionStore? = nil,
+         rivals: RivalStore? = nil,
          poolCache: SeedPoolCache? = nil, defaults: UserDefaults = .standard,
          now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
          calendar: Calendar = .current, today: @escaping () -> Date = Date.init,
@@ -282,6 +307,7 @@ final class GameEngine {
         // the project's MainActor-default isolation.
         self.provider = provider ?? Config.makeProvider()
         self.collection = collection
+        self.rivals = rivals
         self.poolCache = poolCache
         self.defaults = defaults
         self.now = now
@@ -335,7 +361,16 @@ final class GameEngine {
         // still loads for "Deal again". A saved pool is read first (it's
         // synchronous), so the daily has its art from the first frame.
         readPoolCacheOnce()
-        let dealtTheDaily = dealDaily()
+        // A challenge that arrived while away leads; then today's daily. One that
+        // arrived on the home already (a link can open the app before this runs)
+        // stays.
+        let dealtTheDaily: Bool
+        if let pendingChallenge {
+            dealChallenge(pendingChallenge)
+            dealtTheDaily = false
+        } else {
+            dealtTheDaily = dealtChallenge == nil && dealDaily()
+        }
         // The published days load alongside the pool; a different start for today
         // replaces the fallback on the home as soon as it lands.
         async let dailiesRefreshed: Void = refreshDailies()
@@ -354,10 +389,15 @@ final class GameEngine {
             if Task.isCancelled { return }
         }
         guard !Task.isCancelled else { return }   // don't deal into an abandoned screen
-        if !dealtTheDaily {
+        // Still on a challenge (one may have arrived during the load) or the daily:
+        // the pool may have brought its art and popularity. Otherwise this visit's
+        // first random deal.
+        if let dealtChallenge {
+            dealtSeed = resolved(kind: dealtChallenge.start.kind, id: dealtChallenge.start.id)
+                ?? dealtChallenge.startNode
+        } else if !dealtTheDaily {
             deal()
         } else if let entry = dealtDaily.flatMap(dailyEntry) {
-            // Still on the daily: the pool may have brought its art and popularity.
             dealtSeed = resolved(entry)
         }
         dealFailed = !poolReady
@@ -381,7 +421,8 @@ final class GameEngine {
     /// screen — "a fresh start every open/resume". No-op mid-game or before a pool
     /// side has landed (cold launch is handled by `prepareSeeds`).
     func dealFreshOnResume() {
-        guard phase == .seed else { return }
+        // A challenge on the home stays put: it's what the player came back for.
+        guard phase == .seed, dealtChallenge == nil else { return }
         // Leads with the daily until it's played — also how a new day's start
         // reaches a home left open overnight.
         Task { await refreshDailies() }
@@ -475,6 +516,7 @@ final class GameEngine {
         ) else { return }
         dealtSeed = node
         dealtDaily = nil
+        dealtChallenge = nil
         recentSeedIds.append(node.id)
         if recentSeedIds.count > Config.seedRecentWindow {
             recentSeedIds.removeFirst(recentSeedIds.count - Config.seedRecentWindow)
@@ -538,15 +580,41 @@ final class GameEngine {
         guard let number = unplayedDaily, let entry = dailyEntry(number) else { return false }
         dealtSeed = resolved(entry)
         dealtDaily = number
+        dealtChallenge = nil
         return true
     }
 
     /// The daily as the pool knows it (art, popularity, genres), or bare.
     private func resolved(_ entry: DailyStart.Entry) -> ChainNode {
-        switch entry.kind {
-        case .actor: actorPool.first { $0.id == entry.id }.map(ChainNode.actor) ?? entry.node
-        case .movie: moviePool.first { $0.id == entry.id }.map(ChainNode.movie) ?? entry.node
+        resolved(kind: entry.kind, id: entry.id) ?? entry.node
+    }
+
+    /// A start as the pool knows it, if the pool has it.
+    private func resolved(kind: NodeKind, id: Int) -> ChainNode? {
+        switch kind {
+        case .actor: actorPool.first { $0.id == id }.map(ChainNode.actor)
+        case .movie: moviePool.first { $0.id == id }.map(ChainNode.movie)
         }
+    }
+
+    // MARK: Challenges
+
+    /// A friend's challenge, opened from a link (not one played here already —
+    /// the root checks). On the home it's dealt at once; otherwise it waits for
+    /// the next visit home, so a run in progress is never interrupted.
+    func receiveChallenge(_ challenge: SharedChain) {
+        if phase == .seed {
+            dealChallenge(challenge)
+        } else {
+            pendingChallenge = challenge
+        }
+    }
+
+    private func dealChallenge(_ challenge: SharedChain) {
+        pendingChallenge = nil
+        dealtChallenge = challenge
+        dealtDaily = nil
+        dealtSeed = resolved(kind: challenge.start.kind, id: challenge.start.id) ?? challenge.startNode
     }
 
     private func saveDailyResults() {
@@ -568,13 +636,19 @@ final class GameEngine {
     /// Start a run from `seed`. Pass `daily` when the seed is today's daily
     /// (`dealtDaily`): the attempt is used up here, at the start, so quitting or
     /// closing the app mid-run doesn't buy a second go. A day already played
-    /// starts as an ordinary run.
-    func startGame(with seed: ChainNode, daily: Int? = nil) async {
+    /// starts as an ordinary run. A `challenge` (`dealtChallenge`) is used up
+    /// the same way.
+    func startGame(with seed: ChainNode, daily: Int? = nil, challenge: SharedChain? = nil) async {
         resetRun()
+        dealtChallenge = nil
         if let daily, dailyResults[daily] == nil {
             runDaily = daily
             dailyResults[daily] = DailyResult()
             saveDailyResults()
+        }
+        if let challenge, rivals?.match(for: challenge) == nil {
+            runChallenge = challenge
+            rivals?.began(challenge, at: today())
         }
         let token = generation
         chain = [seed]
@@ -713,6 +787,7 @@ final class GameEngine {
         playTime = .zero
         retries = 0
         runDaily = nil
+        runChallenge = nil
         candidates = []
         score = 0
         points = 0
@@ -847,7 +922,10 @@ final class GameEngine {
         stopCountdown()
         var summary = Summary(chain: chain, links: score, points: points, endedByQuit: quit,
                               turns: turns, finalMisses: turnMisses, playTime: playTime,
-                              retries: retries, daily: runDaily)
+                              retries: retries, daily: runDaily, challenge: runChallenge)
+        if let runChallenge {
+            rivals?.finished(runChallenge, mine: RunScore(links: score, points: points), at: today())
+        }
         if let runDaily {
             dailyResults[runDaily] = DailyResult(links: score, points: points, finished: true)
             saveDailyResults()
@@ -930,7 +1008,8 @@ final class GameEngine {
     /// a movie so the film spool shows. `clean` (`-uiDemoClean`) is for the
     /// landing page's screenshots: both end on the same five links, with no near
     /// miss, so the two screens tell one run.
-    func loadDemoGameOver(newBest: Bool = true, worstCase: Bool = false, clean: Bool = false) {
+    func loadDemoGameOver(newBest: Bool = true, worstCase: Bool = false, clean: Bool = false,
+                          challenge: SharedChain? = nil) {
         loadDemoChain(worstCase: worstCase)
         if !newBest || clean, !worstCase {
             chain.append(.movie(Movie(id: 1003, title: "Inception", year: 2010)))
@@ -938,7 +1017,17 @@ final class GameEngine {
             points = score * 24
         }
         phase = .gameOver(Summary(isNewBest: newBest, previousBest: 2, missedAnswer: clean ? nil : candidates.first,
-                                  chain: chain, links: score, points: points))
+                                  chain: chain, links: score, points: points, challenge: challenge))
+    }
+
+    /// A made-up challenge from "Sam", for `-uiDemoChallenge` (dealt on the home)
+    /// and `-uiDemoHeadToHead` (its game over). `worstCase` gives Sam the longest
+    /// name a link allows.
+    static func demoChallenge(worstCase: Bool = false) -> SharedChain {
+        SharedChain(start: .init(kind: .actor, id: 287, name: "Brad Pitt"),
+                    links: [1001, 2, 1002, 3], points: 96,
+                    sharer: UUID(uuidString: "00000000-0000-0000-0000-00000000005A"),
+                    senderName: worstCase ? String(repeating: "Maximiliana ", count: 4) : "Sam")
     }
     #endif
 }

@@ -168,6 +168,47 @@ struct AnalyticsTests {
 
     // MARK: Shared context and identity
 
+    // MARK: Challenges
+
+    @Test mutating func aChallengeRunCarriesTheScoreToBeatAndTheOutcome() throws {
+        let challenge = SharedChain(start: .init(kind: .actor, id: 1, name: "Actor 1"), links: [100, 2],
+                                    points: 90, sharer: UUID(), senderName: "Sam")
+        telemetry.runStarted(seed: actor1, source: .challenge, challenge: challenge)
+        let started = try recorder.last("run_started")
+        #expect(started["source"] == AnyHashable("challenge"))
+        #expect(started["rival_links"] == AnyHashable(2) && started["rival_points"] == AnyHashable(90))
+
+        telemetry.runEnded(GameEngine.Summary(chain: [actor1, film100], links: 1, points: 30,
+                                              challenge: challenge))
+        #expect(try recorder.last("run_ended")["challenge_outcome"] == AnyHashable("loss"))
+    }
+
+    @Test mutating func anOpenedLinkSaysWhatItWas() throws {
+        let challenge = SharedChain(start: .init(kind: .actor, id: 1, name: "Actor 1"), links: [100],
+                                    points: 40, sharer: UUID())
+        telemetry.challengeOpened(.challenge(challenge))
+        let opened = try recorder.last("challenge_opened")
+        #expect(opened["result"] == AnyHashable("new") && opened["rival_links"] == AnyHashable(1))
+
+        let match = Match(id: "s|x", direction: .sent, startKind: .actor, startID: 1, startName: "Actor 1",
+                          theirs: RunScore(links: 1, points: 1), mine: RunScore(links: 2, points: 1),
+                          date: clock.time)
+        telemetry.challengeOpened(.reply(match, Rival(id: UUID(), name: "Sam", matches: [match])))
+        let reply = try recorder.last("challenge_opened")
+        #expect(reply["result"] == AnyHashable("reply") && reply["outcome"] == AnyHashable("win"))
+        #expect(reply["rival_matches"] == AnyHashable(1))
+
+        telemetry.challengeOpened(.own)
+        #expect(try recorder.last("challenge_opened")["result"] == AnyHashable("own"))
+    }
+
+    @Test mutating func aShareSaysWhatLinkItCarried() throws {
+        telemetry.shared(from: .gameOver, link: .reply)
+        #expect(try recorder.last("share_tapped")["link"] == AnyHashable("reply"))
+        telemetry.shared(from: .reel)
+        #expect(try recorder.last("share_tapped")["link"] == AnyHashable("none"))
+    }
+
     @Test mutating func everyEventCarriesTheSharedContext() throws {
         telemetry.context.soundOn = false
         telemetry.shared(from: .reel)

@@ -99,11 +99,12 @@ where its detail lives; update this list as they land (move a landed one to the 
    between friends), so everyone plays the same start on the same day and the share card
    compares. GROWTH.md D5. Small; no backend, no developer account. Not the A→B Daily
    Chain — that's [0.10.0](#0100--the-daily-chain), after launch.
-2. **Challenge links + the head-to-head (step one).** The challenge link, B's head-to-head
-   at game over, the reply link back to A, and the rivalry list — see
-   [Head-to-head](#head-to-head--same-start-both-sides-see-the-score). `SharedChain` is
-   already built; it waits on universal links (playunspool.com + the Apple Developer
-   account), and the site needs a fallback page ([`WEBSITE-SYNC.md`](WEBSITE-SYNC.md)).
+2. **Challenge links + the head-to-head (step one).** *Built 2026-10-27, Debug builds
+   only:* the challenge link, B's head-to-head at game over, the reply link back to A, and
+   the Rivals list — see [Head-to-head](#head-to-head--same-start-both-sides-see-the-score).
+   Left: universal links (playunspool.com + the Apple Developer account) to switch it on
+   in Release, the site's fallback page ([`WEBSITE-SYNC.md`](WEBSITE-SYNC.md)), and a
+   design pass on its screens alongside the daily's.
 3. **Free daily credits + the hint ladder.** A credit balance with a free daily grant,
    spent on the escalating hint ([`ASSISTED-MODE.md`](ASSISTED-MODE.md#if-assistance-returns-preserve-the-recall-act)),
    built with the `Entitlements` check, assisted-run marking and analytics events from
@@ -148,6 +149,23 @@ these together in one pass:
   The head-to-head's automatic return is a send the player chooses, so the toggle doesn't
   cover it.
 - **The daily's look** and **the share image naming no one** (above).
+- **The head-to-head's UX** (first pass landed 2026-10-27; `/swift-review` findings
+  included):
+  - **One owner for sheets.** A link opened while the Reel, Settings or Rivals sheet is
+    up shows nothing (the match is still recorded): the root's sheet and alert can't
+    present over a child's. Lift the screens' sheets into one root `enum`
+    (reel / settings / rivals / match), so a link replaces whatever is up.
+  - **Keep sent challenges on the phone**, keyed by `challengeKey`, and take your side of
+    a reply from there, ignoring replies to nothing you sent. Today "you" comes from the
+    reply's `r`, so a forged reply can set your score.
+  - **One win rule**: build `Outcome` from `Scoring.isNewRecord` rather than restating it.
+  - **Tests**: a challenge arriving during the home's first pool load; `PlayerName.current`.
+  - **Resume with a challenge on the home** still refreshes the dailies
+    (`dealFreshOnResume` returns before it).
+  - **"vs you"** in a reply's share text when the challenger had no name → "vs them".
+  - **Persist a challenge that arrives mid-run** (lost if the app is killed first).
+  - The screens themselves: the four-pill header overflows on the SE, and the challenge
+    line, result, reply sheet, Rivals list and name prompt all need the design pass.
 
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
@@ -231,6 +249,15 @@ link. The sharer id already tells two Sams apart.
 - **Names update by link.** B's phone keeps the latest name it saw from A's sharer id,
   so a rename shows when A's next link arrives. A live, synced name is what accounts
   ([0.9.0](#090--accounts)) add; not worth pulling accounts forward for.
+
+**Built 2026-10-27** (`Rivals.swift`, `HeadToHead.swift`; see
+[`ARCHITECTURE.md`](ARCHITECTURE.md#head-to-head--rivalsswift--headtoheadswift)). The
+mechanic works end to end between two simulators. **To switch it on in Release:** set
+`Config.shareBaseURL` to `https://playunspool.com`, add the associated-domains
+entitlement (`applinks:playunspool.com`), and have the site serve
+`apple-app-site-association` for `/c` plus a fallback page. **Then a design pass**:
+the challenge line on the home, the result on game over, the reply sheet, the Rivals
+list and the name prompt are first-pass, built for the mechanic.
 
 **Upgrades as the platform grows:** the service ([0.8.0](#080--the-service)) returns B's
 result automatically with a push ("Sam beat your chain"); accounts
