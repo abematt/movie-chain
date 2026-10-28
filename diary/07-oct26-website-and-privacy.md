@@ -1,13 +1,13 @@
 ---
 id: website
 label: Site, money & service
-span: Oct 25 15:41 – Oct 27 22:45
+span: Oct 25 15:41 – Oct 28 20:20
 versions: after 0.7.0 (unreleased)
 accent: blue
 order: 7
 sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc 466221d3 034f113f
 start: 2026-10-25
-end: 2026-10-27T22:45
+end: 2026-10-28T20:20
 ---
 
 ## Era: 0.7.0 is tagged, and the website talks back (2026-10-26)
@@ -602,6 +602,182 @@ evening settled what to do about the two weaknesses it turned up.
   the opt-out (recommended yes, not answered); the stats panel's tag wording; publishing
   the real starts before day 10 on Nov 4.
 
+## Era: the head-to-head, built in one evening (2026-10-27 late)
+
+The four loose ends turned out to be small, so they were parked as a "tweak run".
+Then came the biggest social feature on the list. Between 22:55 and 23:36 the
+head-to-head was talked through, written into the roadmap, built, tested on two
+simulators against Abraham's own play, reviewed and merged. The night ended with a
+map of every screen, as the base for a design pass on the head-to-head and the
+daily.
+
+### 2026-10-27 ~22:48 — "lets note these down to come back to on a tweak run" (466221d3)
+
+- Abraham, after the daily's flourish and the results opt-out had been explained twice:
+  "okay these minute things are under flourishes we're trying to get major mechanics
+  out so lets note these down to come back to on a tweak run, so lets document and tell
+  me whats a bigger chunk i can tackle now".
+- **Decision:** a **Tweak run** list in the roadmap. It holds the daily's flourish,
+  results behind the opt-out, the daily's look and the share image that names no one.
+  **Why:** they're polish, and the goal for the week is mechanics. PR #48 (`23da39e`).
+- **Gotcha:** the first edit didn't apply, because PR #47 from the other tab had changed
+  the same section a minute earlier. The rewrite kept that tab's defences (the median
+  rather than the mean, re-checking links against the cache, App Attest). Deleting the
+  stale branch with `-D` was blocked by the history guard; `-d` worked, since it held
+  nothing.
+- **Recommended next chunk:** challenges and the head-to-head over credits and hints,
+  because the site already promises "challenge a friend from the same start", while hints
+  are a bet on whether stuck players want them at all.
+
+### ~22:55–23:03 — talking the head-to-head through
+
+The proposal was a five-step loop: A shares, B opens a challenge card, B plays, B's
+game over shows who won, and "Send it back" returns both runs. Eight decisions came
+with it. Abraham's answers, verbatim:
+
+> how does B know A's name is John?
+> 1. yes im thinking every share is a challenge
+> 2. nah points don't stay hidden, we want to build towards that
+> 3. one
+> 4. no daily is not challengeable, keep them seperate, you can share your daily like that without any challenge aspect to it
+> 5. you'll have to explain that
+> 6. i guess not
+> 7. no reel stays seperate i think
+> 8. yes
+
+- **Decisions:**
+  - **Every share is a challenge.** No separate button.
+  - **B sees A's links *and* points.** The recommendation was to hide points so B chases
+    one number. Abraham overruled it: points are something to build towards.
+  - **One try per challenge.** Opening the link again shows the result instead.
+  - **Dailies can't be challenged.** The recommendation was to let a daily challenge
+    double as B's daily. Abraham kept them apart: a daily's share stays the plain brag,
+    with no link.
+  - **No rematch feature.** You send a new challenge.
+  - **Challenge runs count** toward the best run and the Reel.
+- **The name:** asked the first time you share ("What should friends call you?") and
+  carried in the link. It's a display name, not a username, with a hidden random id
+  behind it.
+- Abraham on names updating: "this to me is a case for some sort of sign in or account
+  system". **Decision:** don't pull accounts (0.9.0) forward. A name that's stale until
+  the next link costs nothing; accounts would hold up the whole feature. The first answer
+  had overstated it as "B's list just updates": it updates only when a link arrives.
+- **Group chats:** "I guess head to head makes sense, A sends group, in the group everyone
+  answers, A sees B, C ,D as seperate ones and then B sees only A, C sees only A etc".
+  Strictly one-to-one, with nothing extra to build.
+- **Where the record lives:** "(a) i tthink": a Rivals pill on the home header, shown
+  once you've had a match. Not in the Reel, and not only on game over.
+- All of it written into the roadmap's Head-to-head section: PR #50 (`bb5d8c6`).
+
+### ~23:07 — "How would we test this btw?"
+
+Three levels. Unit tests for the rules. Then two simulators playing each other, through
+a **debug-only link scheme** (`unspool-debug://`) that Release builds never include.
+Real phones over Messages wait for universal links, which need the Apple Developer
+account and a file on playunspool.com.
+
+Abraham: "alright lets build it out and i think after this is a good place to tweak and
+refine both the daily plan and head to head screens, but lets get the mechanic and
+functionality working".
+
+### ~23:10–23:25 — the build (PR #51, `f372c93`)
+
+- **The link format** gained one optional field, `r`: the challenger's run that a reply
+  answers. A damaged reply makes the whole link invalid rather than half-reading it.
+  Every link has a `challengeKey` (sharer, start, links) so the one-try rule can be
+  checked.
+- **`Rivals.swift`:** the outcome (most links wins, points break a tie), a match, a rival
+  with a "3–2" record, and a store. Opening a link resolves to one of six things: a new
+  challenge, one already played, a reply, your own challenge, one that needs an app
+  update, or a broken one.
+- **The engine** deals a challenge the way it deals the daily. It sits on the home until
+  it's played or dealt away, and its one try is used up when the run starts, so quitting
+  doesn't buy a retry.
+- **`HeadToHead.swift`:** the challenge line on the home, the result on game over, the
+  sheet a reply opens, the Rivals list and the name prompt. It's a deliberate first pass
+  on existing tokens, with design to come.
+- **Debug links:** a `Support/Debug-Info.plist` on the Debug configuration only registers
+  the scheme. `scripts/sim-challenge.sh` carries a copied link from one simulator to
+  another. `-uiOpenLink` opens one at launch, because `simctl openurl` raises iOS's
+  "Open in Unspool?" prompt, which can't be tapped from a script.
+- **Analytics:** one new event, `challenge_opened`, because a reply arrives without any
+  run starting. Everything else rides on events that already fire.
+- **Bugs the tests caught:**
+  - The home re-dealt a daily already played. A refactor had swapped a "dealt the daily"
+    flag for a check on stale state (`quittingUsesUpTheOneAttempt` failed).
+  - A link that opens the app cold could be replaced by the daily, because it arrived
+    before the home's first deal.
+- 171 tests green.
+
+![The iPhone 16 simulator's home after opening Abraham's real challenge: "ABRAHAM CHALLENGED YOU · 7 links · 360 pts to beat" over Forrest Gump. The TODAY pill already crowds the wordmark, the four-pill header problem.](media/466221d3/a-abraham.png)
+
+### ~23:28–23:31 — Abraham vs Joe, for real
+
+- Abraham played a run on the SE and pasted the share: "7 links · 360 pts … Beat it:
+  unspool-debug://…". It opened on the iPhone 16 (above). He played it there as "Joe",
+  scored 10 links and 484 pts, and pasted the reply: "vs Abraham: 7 · 360 pts".
+- **Gotcha:** the first check couldn't find which simulator held Abraham's sharer id;
+  reading it with `simctl spawn defaults` failed on the SE. Grepping the simulators'
+  preference plists found it.
+- The reply opened on the SE and recorded the match: **You vs Joe, 0–1.**
+- **Open question:** the reply's "Joe replied" sheet was seen starting to slide up, and
+  two seconds later the Rivals list was showing instead (inferred: the result sheet was
+  swapped out on a cold launch). It became review finding #1.
+
+![The SE's Rivals sheet after Joe's reply: "You vs Joe 0–1", from Forrest Gump, Joe wins, 7 links · 360 pts against 10 links · 484 pts.](media/466221d3/b-joe2.png)
+
+![The head-to-head game over (demo flag): "You win", 5 links · 120 pts against Sam's 4 · 96, with SEND IT BACK in place of Share.](media/466221d3/a-h2h.png)
+
+### ~23:32–23:36 — "ux wise a lot of problems but its a good first pass"
+
+- Abraham: "okay i guess it works but ux wise a lot of problems but its a good first
+  pass, yes lets run a /swift-review".
+- **`/swift-review`: nothing blocking.** Seven findings went into the Tweak run (`860d013`):
+  1. A link opened while another sheet is up shows nothing. Fix: the root owns every sheet.
+  2. A reply sets *your* score from the link, so it could be forged. Fix: keep the
+     challenges you send on the phone.
+  3. The win rule restates `Scoring.isNewRecord`.
+  4. Untested: a challenge arriving mid-load, and the name helper.
+  5. Coming back to a challenge skips the daily refresh.
+  6. "vs you" should be "vs them".
+  7. A challenge that arrives mid-run isn't saved.
+- The review was of code the same session had written, and it said so.
+- PR #51 merged (`3178435`).
+
+### ~23:39–23:52 — "the equivalent of an ERD diagram for all the screens"
+
+- Abraham: "no before that we're going to tweak the experience and design of the head to
+  head as well as daily , their scores and all that i wonder what ist he equivalent of an
+  ERD diagram for all the screens of the app".
+- The answer: a **screen flow** or navigation map, or a **wireflow** when every node
+  carries a screenshot. A Mermaid version came first. It already showed four home states
+  and three sheets competing for one header, links landing on any screen, four
+  game-overs bolted onto one screen, and the daily and the challenge as siblings that
+  behave differently at game over.
+- "i logged in to my personal account so do a full pass ofscreen flow diagram on a canvas
+  in claud design and use real screenshots , use clean nodes and lines and use clear
+  titles, make it as clean as possible".
+- **Built:** 16 states shot on the iPhone 16 simulator with the clock at 9:41, laid out
+  on a Claude Design canvas in five bands: Home, Sheets, Play, Game over and sharing,
+  Arriving by link. Three states couldn't be reached without tapping, so three debug
+  flags were added (`-uiDealRandom`, `-uiOpenRivals`, `-uiAskName`): PR #52 (`f416d24`).
+- **Decision:** the random-deal screenshot was kept with its Today pill sitting on the
+  wordmark, because it's a real bug for the design pass.
+- On Oct 28 the canvas went "not found" for the session, after Abraham switched back to
+  the work account. Abraham: "this page serves as a guide jsut for me to guide and
+  overhaul things one by one". It stays on the personal account.
+
+![Contact sheet of the 16 screen-flow screenshots: game overs (new best, head-to-head, ordinary), the five home states, the link notice, the match sheet, the name prompt, play, the Reel and a lifted card, Rivals and Settings.](media/466221d3/flow_contact.png)
+
+### Where things stand (2026-10-28 ~20:20)
+
+- `main` is at `2cd84e4`, clean. Head-to-head works end to end in Debug builds only.
+- **Next:** a day of tweaking the head-to-head and daily screens, in another tab, from
+  the Tweak run list and the screen-flow canvas.
+- **Owed before Release carries links:** the Apple Developer account, the
+  associated-domains setting, and the site's file and `/c` fallback page. A line in the
+  privacy draft about the display name. The real daily starts before Nov 4.
+
 ### Decision log
 
 | Time (local) | Decision | Rationale | Source |
@@ -684,6 +860,23 @@ evening settled what to do about the two weaknesses it turned up.
 | Oct 27 09:01 | The daily's stats are a flourish like New best, not a panel | Abraham: "a little bit of a flourish similar to how we added a flourish for new best" | 466221d3 |
 | Oct 27 22:38 | Accept that future dailies are readable | Phones fetch a week ahead, so the app's key must read them; spoilers already accepted | 034f113f |
 | Oct 27 22:38 | Accept forgeable results until the stats panel ships | No prize, no ranks; nothing reads `results` yet; median, link re-check, App Attest are the mitigations | 034f113f |
+| Oct 27 22:48 | Park the small daily items in a Tweak run | Abraham: "these minute things are under flourishes we're trying to get major mechanics out" | 466221d3 |
+| Oct 27 22:50 | Head-to-head next, over credits and hints | It's the main social feature, the site already promises it, and hints are a bet | 466221d3 |
+| Oct 27 23:00 | Every share is a challenge | One button; a share already has a start | 466221d3 |
+| Oct 27 23:00 | B sees A's points, not only links | Abraham: "we want to build towards that"; overruled hiding them | 466221d3 |
+| Oct 27 23:00 | One try per challenge | Makes "you win" mean something; matches the daily's one shot | 466221d3 |
+| Oct 27 23:00 | Dailies can't be challenged; their share has no link | Abraham: "keep them seperate"; overruled the daily doubling as a challenge | 466221d3 |
+| Oct 27 23:00 | No rematch feature | A reply closes a match; a new challenge starts the next | 466221d3 |
+| Oct 27 23:00 | Challenge runs count toward the best and the Reel | You still recalled every link yourself | 466221d3 |
+| Oct 27 23:03 | Rivals pill on the home header | Abraham picked (a); the Reel stays separate | 466221d3 |
+| Oct 27 23:03 | Names update by link; don't pull accounts forward | A stale name costs nothing; accounts would hold up the feature | 466221d3 |
+| Oct 27 23:03 | Strictly one-to-one: a group post returns one match per friend | Falls out of matches being per sharer id; nothing to build | 466221d3 |
+| Oct 27 23:15 | Test links through a Debug-only `unspool-debug://` scheme | Real links need the developer account; Release must never carry the scheme | 466221d3 |
+| Oct 27 23:15 | One new event (`challenge_opened`); the rest as properties | A property before an event; a reply arrives with no run | 466221d3 |
+| Oct 27 23:22 | `-uiOpenLink` launch flag | `simctl openurl` raises a prompt a script can't tap | 466221d3 |
+| Oct 27 23:36 | Merge PR #51; the review's seven findings go into the Tweak run | Nothing blocking; finding #1 is a UX fix anyway | 466221d3 |
+| Oct 27 23:42 | Screen flow as a wireflow canvas on the personal account | Real screenshots per state are the base for the design pass | 466221d3 |
+| Oct 27 23:46 | Keep the overflowing header in the screenshot | It's a real bug the design pass should see | 466221d3 |
 
 ### Story material
 
@@ -726,6 +919,14 @@ evening settled what to do about the two weaknesses it turned up.
 - **Two tabs, one question.** The morning tab proposed a stats flourish; the evening tab decided forged results are fine *until* that flourish ships. The same day, without either tab seeing the other.
 - **"what were we trying to do in this chat again"** — the last message of the day, from the tab that sat open for fourteen hours.
 
+- **Forty-one minutes.** From "Yeah lets talk through head to head tho" (22:55) to the merge (23:36): eight decisions, the roadmap, two new files, tests, a two-simulator run and a review.
+- **Abraham vs Joe.** The first real head-to-head was Abraham against himself on two simulators. Joe won 10–7 on Forrest Gump, so the first rivalry on record is a loss: You vs Joe, 0–1.
+- **Two overrules.** The design came with recommendations, and Abraham reversed two: points stay visible ("we want to build towards that"), and dailies stay out of challenges ("keep them seperate").
+- **"A case for some sort of sign in."** Live names would need accounts. They were held back, because a name a little stale until the next link is cheaper than sign-in screens.
+- **The review that graded its own homework.** `/swift-review` ran on code the same session had written, said so, and still found seven things, one of them a forgeable score.
+- **ERD for screens.** The question that led to the wireflow, and the map that showed the four-pill header was already broken on the iPhone 16, not just the SE.
+- **The canvas that vanished.** The next afternoon the canvas was "not found": the session had switched back to the work account. The canvas was fine, but it's the third time the two accounts have tangled around this project.
+
 ### Media index
 
 - `media/4f948fc0/shots_s-settings.png`: Settings in light mode with the new Privacy policy, Suggest a feature and Contact rows. Embedded. Oct 26 ~08:28.
@@ -741,4 +942,13 @@ evening settled what to do about the two weaknesses it turned up.
 - `media/b738c613/release3.png`: after the first fix (observation only), still no photo. Embedded. ~23:14.
 - `media/b738c613/release4.png`: after the second fix, Tom Hanks' photo shows. Embedded. ~23:16.
 - Session `e81853bc` captured no screenshots or other media.
-- Sessions `466221d3` and `034f113f` captured no screenshots or other media.
+- Session `034f113f` captured no screenshots or other media.
+- `media/466221d3/b-challenge.png`: the SE home with a scripted test challenge ("Abe", Tom Hanks), the first look at the challenge line. Oct 27 ~23:22. Not embedded.
+- `media/466221d3/a-reply.png`: the iPhone 16 opening a scripted reply ("Sam replied"). ~23:23. Not embedded.
+- `media/466221d3/a-h2h.png`: the head-to-head game over from `-uiDemoHeadToHead`. Embedded. ~23:23.
+- `media/466221d3/a-abraham.png`: Abraham's real challenge on the iPhone 16 home. Embedded. ~23:29.
+- `media/466221d3/b-joe.png`: the SE right after Joe's reply opened, a sheet just starting to rise. ~23:31. Not embedded.
+- `media/466221d3/b-joe2.png`: two seconds later, the Rivals sheet: You vs Joe 0–1. Embedded. ~23:31.
+- `media/466221d3/flow_contact.png`: contact sheet of the 16 screen-flow states. Embedded. ~23:48.
+- `media/466221d3/flow_raw_*.png` (16): the full-size screen-flow screenshots (iPhone 16, 9:41). ~23:47.
+- `media/466221d3/flow_up_*.png` (16): the same downscaled to 1006px for upload to the canvas. ~23:48.
