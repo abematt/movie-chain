@@ -177,7 +177,7 @@ these together in one pass:
   - **"vs you"** in a reply's share text when the challenger had no name → "vs them".
   - **Persist a challenge that arrives mid-run** (lost if the app is killed first).
   - The screens themselves: see *Mode identity* above. The reply sheet and the Rivals
-    list need the design pass too; the name prompt doesn't (it goes at 0.9.0).
+    list and the name prompt need the design pass too (the prompt stays: it writes the profile).
 
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
@@ -273,28 +273,31 @@ list and the name prompt are first-pass, built for the mechanic.
 
 **Rethink 2026-10-28** (Abraham, after seeing all sixteen screens on the flow canvas:
 "I don't like a lot of it"):
-- **The name prompt is interim.** Accounts ([0.9.0](#090--accounts)) replace it: the
-  display name comes from the account, and the "what should friends call you?" alert
-  goes. Don't polish it in the design pass; it's scaffolding.
-- **Sending a challenge needs an account; receiving one never does.** B opens a link,
-  plays, sees the head-to-head, and can send it back without signing in; A, to create a
-  challenge, signs in. The first share is the moment of highest intent, so it's where the
-  gate sits — the trade is friction at the start of the loop against an identity that
-  carries. This narrows 0.9.0's "signing in is a migration, never a gate" to *playing* is
-  never gated; *challenging* is. Open: whether B's reply also needs an account (it's a
-  share too), and whether Release waits for 0.9.0 to switch challenges on, or ships them
-  on the name prompt first and adds the gate when accounts land.
-- **It doesn't complicate the tables, if identity is one id from day one.** Today
-  nothing about a challenge touches the service: the link carries everything and the
-  sharer id is a random UUID on the phone; `results` is keyed by `device_id`. The clean
-  shape is **Supabase anonymous sign-in at first launch**: every player holds an
-  `auth.users` id from the start, that id *is* the sharer id and the `device_id` column,
-  and signing in later links a provider to the same user — no merge, no second id, and
-  0.9.0's "migration must merge, not clobber" trap mostly disappears. B's anonymous
-  Rivals list is keyed by A's real id already, so B converting later changes nothing on
-  A's side. The only table rule to carry forward: anything that stores a player stores
-  that one id, never an email or a device fingerprint. Decide this before `results`
-  has many real rows, since it's cheapest while `device_id` can just become the auth id.
+- **No gate on challenging** (settled the same evening, after a first pass that gated
+  sending): sharing is what brings people in, so neither sending nor receiving a
+  challenge needs an account. The pattern stands: every share is a challenge, the name
+  asked on the first share.
+- **Identity: one id from day one, and the name lives on a profile.** The thing to nail
+  down before the service holds more data. Today nothing about a challenge touches the
+  service: the link carries everything, the sharer id is a random UUID on the phone, and
+  `results` is keyed by `device_id`. The shape that makes accounts a non-event:
+  1. **Supabase anonymous sign-in at first launch**, silently. Every player holds an
+     `auth.users` id from the start; it replaces the local sharer id and
+     `results.device_id`. Signing in at 0.9.0 *links* Apple, Google or email to that
+     same id, so A's id on B's phone is still A's id afterwards — nothing to track back.
+  2. **A `profiles` table** keyed by that id: `display_name`, and later anything an
+     account carries. "What should friends call you?" writes it, for anonymous players
+     too, so the prompt isn't scaffolding: it's the profile, and sign-in adds a credential,
+     not a name. Once the app reads names from `profiles`, a rename shows everywhere;
+     until then names update by link, as now.
+  3. **`profiles.merged_into`** for the one real merge: a person who played anonymously
+     on a second phone (id A2) and then signs in with an Apple identity already attached
+     to A1. The device switches to A1, its local data merges up, and A2's profile points
+     at A1 so any rival row or link still holding A2 resolves. The only schema beyond
+     `profiles`.
+  Everything else (results, matches, groups) stores the user id and nothing else: never
+  an email, never a device fingerprint. Decide this while `results` is small, since
+  `device_id` can simply become the auth id.
 - **The screens need to be *theirs*, not the normal screen with different text.** The
   daily and a challenge are the two things the game is sold on, and right now each is a
   pill and a line of copy. The design pass (below) treats them as distinct modes with
@@ -759,13 +762,14 @@ prerequisite for friend groups (0.11.0).
    - **Email with a one-time code** (magic link / OTP) — no passwords, so no password
      storage, resets or breach exposure.
 
-You can play forever without an account; signing in is a migration, never a gate on
-*playing*. **Amended 2026-10-28:** creating a challenge is gated (receiving and playing
-one isn't) — see the [head-to-head rethink](#head-to-head--same-start-both-sides-see-the-score).
-**Preferred shape: Supabase anonymous sign-in at first launch**, so every player has an
-`auth.users` id from day one (it replaces the local sharer id and `results.device_id`)
-and signing in links a provider to that same user instead of migrating data between two
-ids. Decide before `results` fills up.
+You can play forever without an account; signing in is a migration, never a gate.
+**Preferred shape (2026-10-28): Supabase anonymous sign-in at first launch**, so every
+player has an `auth.users` id from day one (it replaces the local sharer id and
+`results.device_id`) and signing in *links* a provider to that same user instead of
+migrating data between two ids; the display name lives on a `profiles` row from the
+first share. The identity model is spelled out under the
+[head-to-head rethink](#head-to-head--same-start-both-sides-see-the-score). Decide before
+`results` fills up.
 Accounts also give the community email list (see the
 [launch track](#the-launch-track--runs-alongside-the-milestones)) — with **a separate,
 unticked opt-in**, because signing in is not consent to marketing.
