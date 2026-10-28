@@ -290,11 +290,11 @@ list and the name prompt are first-pass, built for the mechanic.
      too, so the prompt isn't scaffolding: it's the profile, and sign-in adds a credential,
      not a name. Once the app reads names from `profiles`, a rename shows everywhere;
      until then names update by link, as now.
-  3. **`profiles.merged_into`** for the one real merge: a person who played anonymously
-     on a second phone (id A2) and then signs in with an Apple identity already attached
-     to A1. The device switches to A1, its local data merges up, and A2's profile points
-     at A1 so any rival row or link still holding A2 resolves. The only schema beyond
-     `profiles`.
+  3. **Second phone: sign in, pull the account down, discard that phone's anonymous id.**
+     The standard pattern; nothing more. A rival row someone holds for the discarded id
+     goes stale, which is cosmetic and rare (the app asks "already have an account?" on
+     a fresh device before it matters). If it ever shows up as a complaint, a
+     `merged_into` forwarding column on `profiles` fixes it later.
   Everything else (results, matches, groups) stores the user id and nothing else: never
   an email, never a device fingerprint. Decide this while `results` is small, since
   `device_id` can simply become the auth id.
