@@ -148,7 +148,19 @@ these together in one pass:
   and the privacy draft (unspool-site PR #1). Opted-out players still see today's figure.
   The head-to-head's automatic return is a send the player chooses, so the toggle doesn't
   cover it.
-- **The daily's look** and **the share image naming no one** (above).
+- **Mode identity** (Abraham, 2026-10-28: "the daily should not just be a pill", "the
+  daily's end should not just be a normal screen with random text, same for the
+  head-to-head"). The daily and a challenge each get:
+  - **their own home state** — the daily is a dealt *thing* with a presence (the day,
+    the fact that everyone plays it, how many have), not a Today pill in the header; a
+    received challenge is the challenger's dare, front and centre, not a caption line;
+  - **their own game over** — the daily's ends against the room (the flourish, below);
+    the head-to-head's ends as a bout: the two runs faced off, the verdict, and Send it
+    back as the only act. Night stays the ground; what's on it differs per mode. Neither
+    is the ordinary game over plus a tag.
+  Settle this on the design canvas first (the screen-flow canvas is the base), then build.
+  This absorbs **the daily's look** and **the share image naming no one** (above), and
+  the header-overflow bug (the four pills), since the Today pill goes.
 - **The head-to-head's UX** (first pass landed 2026-10-27; `/swift-review` findings
   included):
   - **One owner for sheets.** A link opened while the Reel, Settings or Rivals sheet is
@@ -164,8 +176,8 @@ these together in one pass:
     (`dealFreshOnResume` returns before it).
   - **"vs you"** in a reply's share text when the challenger had no name → "vs them".
   - **Persist a challenge that arrives mid-run** (lost if the app is killed first).
-  - The screens themselves: the four-pill header overflows on the SE, and the challenge
-    line, result, reply sheet, Rivals list and name prompt all need the design pass.
+  - The screens themselves: see *Mode identity* above. The reply sheet and the Rivals
+    list need the design pass too; the name prompt doesn't (it goes at 0.9.0).
 
 **Meanwhile, no code:** playtest the A→B Daily Chain with two people and index cards
 ([`DAILY-CHAIN.md`](DAILY-CHAIN.md)) — it's the gate on 0.10.0.
@@ -258,6 +270,35 @@ entitlement (`applinks:playunspool.com`), and have the site serve
 `apple-app-site-association` for `/c` plus a fallback page. **Then a design pass**:
 the challenge line on the home, the result on game over, the reply sheet, the Rivals
 list and the name prompt are first-pass, built for the mechanic.
+
+**Rethink 2026-10-28** (Abraham, after seeing all sixteen screens on the flow canvas:
+"I don't like a lot of it"):
+- **The name prompt is interim.** Accounts ([0.9.0](#090--accounts)) replace it: the
+  display name comes from the account, and the "what should friends call you?" alert
+  goes. Don't polish it in the design pass; it's scaffolding.
+- **Sending a challenge needs an account; receiving one never does.** B opens a link,
+  plays, sees the head-to-head, and can send it back without signing in; A, to create a
+  challenge, signs in. The first share is the moment of highest intent, so it's where the
+  gate sits — the trade is friction at the start of the loop against an identity that
+  carries. This narrows 0.9.0's "signing in is a migration, never a gate" to *playing* is
+  never gated; *challenging* is. Open: whether B's reply also needs an account (it's a
+  share too), and whether Release waits for 0.9.0 to switch challenges on, or ships them
+  on the name prompt first and adds the gate when accounts land.
+- **It doesn't complicate the tables, if identity is one id from day one.** Today
+  nothing about a challenge touches the service: the link carries everything and the
+  sharer id is a random UUID on the phone; `results` is keyed by `device_id`. The clean
+  shape is **Supabase anonymous sign-in at first launch**: every player holds an
+  `auth.users` id from the start, that id *is* the sharer id and the `device_id` column,
+  and signing in later links a provider to the same user — no merge, no second id, and
+  0.9.0's "migration must merge, not clobber" trap mostly disappears. B's anonymous
+  Rivals list is keyed by A's real id already, so B converting later changes nothing on
+  A's side. The only table rule to carry forward: anything that stores a player stores
+  that one id, never an email or a device fingerprint. Decide this before `results`
+  has many real rows, since it's cheapest while `device_id` can just become the auth id.
+- **The screens need to be *theirs*, not the normal screen with different text.** The
+  daily and a challenge are the two things the game is sold on, and right now each is a
+  pill and a line of copy. The design pass (below) treats them as distinct modes with
+  their own home state and their own game over — see the Tweak run's *Mode identity*.
 
 **Upgrades as the platform grows:** the service ([0.8.0](#080--the-service)) returns B's
 result automatically with a push ("Sam beat your chain"); accounts
@@ -718,7 +759,13 @@ prerequisite for friend groups (0.11.0).
    - **Email with a one-time code** (magic link / OTP) — no passwords, so no password
      storage, resets or breach exposure.
 
-You can play forever without an account; signing in is a migration, never a gate.
+You can play forever without an account; signing in is a migration, never a gate on
+*playing*. **Amended 2026-10-28:** creating a challenge is gated (receiving and playing
+one isn't) — see the [head-to-head rethink](#head-to-head--same-start-both-sides-see-the-score).
+**Preferred shape: Supabase anonymous sign-in at first launch**, so every player has an
+`auth.users` id from day one (it replaces the local sharer id and `results.device_id`)
+and signing in links a provider to that same user instead of migrating data between two
+ids. Decide before `results` fills up.
 Accounts also give the community email list (see the
 [launch track](#the-launch-track--runs-alongside-the-milestones)) — with **a separate,
 unticked opt-in**, because signing in is not consent to marketing.
