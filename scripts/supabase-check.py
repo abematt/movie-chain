@@ -128,7 +128,7 @@ def relation_name(raw):
 
 def check_migrations(report, tables):
     report.section("migrations")
-    created, rls_on, revoked = {}, set(), {}
+    created, rls_on, revoked, net = {}, set(), {}, {}
     for file, sql in migration_statements():
         low = sql.lower()
 
@@ -143,22 +143,28 @@ def check_migrations(report, tables):
             for name in m[1].split(","):
                 revoked.setdefault(relation_name(name.strip()), set()).update(roles)
 
-        if m := re.match(r"grant (.+?) on (?:table )?([\w.\", ]+?) to (.+)", low):
-            if m[1].startswith(("usage", "execute")) or " on function " in f" {low} ":
+        # Grants are tracked net of later revokes, in migration order: what
+        # access.toml must match is what the last migration leaves.
+        if m := re.match(r"(grant|revoke) (.+?) on (?:table )?([\w.\", ]+?) (?:to|from) (.+)", low):
+            verb, privileges, names, role_list = m.groups()
+            if privileges.startswith(("usage", "execute")) or " on function " in f" {low} ":
                 continue
-            roles = {r.strip() for r in m[3].split(",")} & {*PUBLIC_ROLES, "public"}
-            granted = {normalize_privilege(p) for p in re.split(r",(?![^(]*\))", m[1])}
-            if "all" in granted or "all privileges" in granted:
-                granted = set(PRIVILEGES)
-            for name in m[2].split(","):
+            roles = {r.strip() for r in role_list.split(",")} & {*PUBLIC_ROLES, "public"}
+            listed = {normalize_privilege(p) for p in re.split(r",(?![^(]*\))", privileges)}
+            everything = bool(listed & {"all", "all privileges"})
+            for name in names.split(","):
                 table = relation_name(name.strip())
                 for role in roles:
-                    allowed = tables.get(table, {}).get(role if role != "public" else "anon", set())
-                    extra = granted - allowed
-                    if role == "public" or extra:
-                        report.fail("grant-not-declared",
-                                    f"{file}: grants {describe(extra or granted)} on {table} "
-                                    f"to {role}; access.toml allows {describe(allowed)}")
+                    held = net.setdefault((table, role), {})
+                    if verb == "revoke":
+                        # Revoking a table privilege revokes it on every column too.
+                        bases = {p.split("(")[0] for p in listed}
+                        for privilege in list(held):
+                            if everything or privilege.split("(")[0] in bases:
+                                del held[privilege]
+                    else:
+                        for privilege in (set(PRIVILEGES) if everything else listed):
+                            held[privilege] = file
 
         if low.startswith("create policy"):
             check_policy_sql(report, file, low)
@@ -179,6 +185,14 @@ def check_migrations(report, tables):
                 report.fail("definer-callable",
                             f"{file}: SECURITY DEFINER {name}() keeps its default execute grant; "
                             "revoke it from public, anon, authenticated")
+
+    for (table, role), held in net.items():
+        allowed = tables.get(table, {}).get(role if role != "public" else "anon", set())
+        extra = {p: f for p, f in held.items() if role == "public" or p not in allowed}
+        if extra:
+            report.fail("grant-not-declared",
+                        f"{', '.join(sorted(set(extra.values())))}: grants {describe(set(extra))} "
+                        f"on {table} to {role}; access.toml allows {describe(allowed)}")
 
     for table, file in created.items():
         if table not in rls_on:

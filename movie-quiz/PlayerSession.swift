@@ -162,7 +162,7 @@ final class PlayerSession {
     func syncProfile(name: String?) async {
         guard let name, name != defaults.string(forKey: Self.syncedNameKey) else { return }
         for attempt in 0..<2 {
-            guard let token = await accessToken(forceRefresh: attempt > 0), let userID else { return }
+            guard let token = await accessToken(forceRefresh: attempt > 0) else { return }
             var request = URLRequest(url: baseURL.appending(path: "rest/v1/profiles")
                 .appending(queryItems: [URLQueryItem(name: "on_conflict", value: "id")]))
             request.httpMethod = "POST"
@@ -171,8 +171,9 @@ final class PlayerSession {
             request.setValue(key, forHTTPHeaderField: "apikey")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("resolution=merge-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
-            request.httpBody = try? JSONEncoder().encode(["id": userID.uuidString.lowercased(),
-                                                          "display_name": name])
+            // The row's id is the caller's own (a default of auth.uid()); sending
+            // it would make the upsert update `id`, which players can't.
+            request.httpBody = try? JSONEncoder().encode(["display_name": name])
             guard let (_, response) = try? await transport(request),
                   let status = (response as? HTTPURLResponse)?.statusCode
             else { return }
