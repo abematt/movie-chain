@@ -25,9 +25,9 @@ authenticated = ["select"]
 
 [tables.profiles]
 # A player's display name. Each player reads and writes only their own row (the
-# policies); nobody reads anyone else's yet. Insert names the row's id, which the
-# insert policy holds to auth.uid().
-authenticated = ["select", "insert(id, display_name)", "update(display_name)"]
+# policies); nobody reads anyone else's yet. The id defaults to auth.uid(), so a
+# player only ever sends the name.
+authenticated = ["select", "insert(display_name)", "update(display_name)"]
 
 [tables.tmdb_cache]
 # Read and written by the `tmdb` Edge Function with the service role. No public access.

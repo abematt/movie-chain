@@ -166,7 +166,7 @@ struct PlayerSessionTests {
         #expect(write.value(forHTTPHeaderField: "Authorization") == "Bearer a1")
         #expect(write.value(forHTTPHeaderField: "Prefer")?.contains("resolution=merge-duplicates") == true)
         let body = try #require(write.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] })
-        #expect(body == ["id": alice.uuidString.lowercased(), "display_name": "Abe"])
+        #expect(body == ["display_name": "Abe"], "the id comes from the session, never the body")
 
         await session.syncProfile(name: "Abe")
         #expect(service.requests.count == 2, "an unchanged name isn't resent")
