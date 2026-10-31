@@ -4,8 +4,9 @@
 //
 //  Every finished run goes to the service's `results` table, for per-day stats
 //  and the answer data (which actors and films players actually name). Not
-//  analytics: that's PostHog, and stays there (docs/ANALYTICS.md). A run is
-//  identified by the device id only, and carries TMDB ids, never typed text.
+//  analytics: that's PostHog, and stays there (docs/ANALYTICS.md). A run belongs
+//  to the player the service reads from the session token (`PlayerSession`),
+//  never to an id in the body, and carries TMDB ids, never typed text.
 //
 //  The outbox keeps a run until the service has it, so a game over without
 //  signal is delivered on a later visit home.
@@ -22,7 +23,6 @@ nonisolated struct RunResult: Codable, Equatable, Sendable {
         var seconds: Double?
     }
 
-    var deviceID: UUID
     /// `daily_start` for a daily, else `endless`.
     var mode: String
     var number: Int?
@@ -33,14 +33,13 @@ nonisolated struct RunResult: Codable, Equatable, Sendable {
     var appVersion: String
 
     private enum CodingKeys: String, CodingKey {
-        case deviceID = "device_id", mode, number, chain, links, points
+        case mode, number, chain, links, points
         case endedByQuit = "ended_by_quit", appVersion = "app_version"
     }
 
     // `number` is sent as null on an endless run, not left out.
     func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(deviceID, forKey: .deviceID)
         try c.encode(mode, forKey: .mode)
         try c.encode(number, forKey: .number)
         try c.encode(chain, forKey: .chain)
@@ -53,13 +52,12 @@ nonisolated struct RunResult: Codable, Equatable, Sendable {
 
 extension RunResult {
     /// The run in `summary`: the start, then each link with the time it took.
-    init(summary: GameEngine.Summary, deviceID: UUID, appVersion: String) {
+    init(summary: GameEngine.Summary, appVersion: String) {
         let seconds = summary.turns.map { turn in
             let parts = turn.answerTime.components
             return ((Double(parts.seconds) + Double(parts.attoseconds) / 1e18) * 10).rounded() / 10
         }
         self.init(
-            deviceID: deviceID,
             mode: summary.daily == nil ? "endless" : "daily_start",
             number: summary.daily,
             chain: summary.chain.enumerated().map { i, node in
@@ -91,16 +89,16 @@ final class ResultsOutbox {
     private static let key = "pendingResults"
 
     private let defaults: UserDefaults
-    private let deviceID: UUID
     private let appVersion: String
     private let send: (RunResult) async -> Delivery
     private(set) var pending: [RunResult]
     private var flushing: Task<Void, Never>?
 
-    init(defaults: UserDefaults, deviceID: UUID, appVersion: String,
+    /// Runs saved by earlier versions carried a `device_id`; it's ignored on
+    /// decode, and the service takes the player from the token instead.
+    init(defaults: UserDefaults, appVersion: String,
          send: @escaping (RunResult) async -> Delivery) {
         self.defaults = defaults
-        self.deviceID = deviceID
         self.appVersion = appVersion
         self.send = send
         self.pending = defaults.data(forKey: Self.key)
@@ -109,7 +107,7 @@ final class ResultsOutbox {
 
     /// Keep the run and try to deliver everything waiting.
     func record(_ summary: GameEngine.Summary) {
-        pending.append(RunResult(summary: summary, deviceID: deviceID, appVersion: appVersion))
+        pending.append(RunResult(summary: summary, appVersion: appVersion))
         if pending.count > Self.limit { pending.removeFirst(pending.count - Self.limit) }
         save()
         Task { await flush() }
@@ -139,30 +137,41 @@ final class ResultsOutbox {
     }
 }
 
-/// Posts a run to the service's `results` function.
+/// Posts a run to the service's `results` function, as the session's player.
 struct ServiceResultsTransport {
-    private let session: URLSession
+    /// A token for the player; `true` asks for a fresh one after a 401.
+    typealias Token = (_ forceRefresh: Bool) async -> String?
 
-    init(session: URLSession = .shared) {
+    private let session: URLSession
+    private let token: Token
+
+    init(session: URLSession = .shared, token: @escaping Token) {
         self.session = session
+        self.token = token
     }
 
     func send(_ result: RunResult) async -> ResultsOutbox.Delivery {
-        var req = URLRequest(url: Config.serviceURL.appending(path: "functions/v1/results"))
-        req.httpMethod = "POST"
-        req.timeoutInterval = Config.requestTimeout
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Config.serviceKey, forHTTPHeaderField: "apikey")
         guard let body = try? JSONEncoder().encode(result) else { return .rejected }
-        req.httpBody = body
-        guard let (_, response) = try? await session.data(for: req),
-              let status = (response as? HTTPURLResponse)?.statusCode
-        else { return .failed }
-        return Self.delivery(status: status)
+        // A token can expire between being handed out and arriving: one retry.
+        for attempt in 0..<2 {
+            guard let bearer = await token(attempt > 0) else { return .failed }
+            var req = URLRequest(url: Config.serviceURL.appending(path: "functions/v1/results"))
+            req.httpMethod = "POST"
+            req.timeoutInterval = Config.requestTimeout
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(Config.serviceKey, forHTTPHeaderField: "apikey")
+            req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+            req.httpBody = body
+            guard let (_, response) = try? await session.data(for: req),
+                  let status = (response as? HTTPURLResponse)?.statusCode
+            else { return .failed }
+            if status != 401 { return Self.delivery(status: status) }
+        }
+        return .failed
     }
 
     /// 2xx is delivered. A 4xx means the run itself was refused — except the
-    /// ones that are about the moment (wrong key, timeout, too many requests).
+    /// ones that are about the moment (wrong key or token, timeout, too many requests).
     static func delivery(status: Int) -> ResultsOutbox.Delivery {
         switch status {
         case 200..<300: .delivered

@@ -73,14 +73,16 @@ Flip `[auth] accounts = true` in `access.toml` only when these hold:
   the plan: Apple, Google, email one-time code); leaked-password protection on if the
   plan allows it.
 - Redirect URLs: exact, no wildcards; `site_url` is the real app/site, not localhost.
-- Anonymous sign-ins: decided and declared.
+- Anonymous sign-ins: on since 2026-10-31 (every install is one), declared in
+  `access.toml`. Linking a provider must keep the anonymous user's id.
 - Every table a player owns: an owner column set by default from `auth.uid()`, insert
   and update policies checking it, column-scoped `update(...)` grants in `access.toml`
   (never a table-wide `update`, or a player can rewrite their own score or owner).
 - Anything privileged (friend-group membership, results) still goes through an Edge
   Function, not a direct table write.
-- The device-id data merges into the account without letting one device claim
-  another's history.
+- Linking keeps the anonymous user's id (no data moves). The one merge is a second
+  phone's anonymous player signing in to an existing account: its local data goes up
+  under the account without letting it claim anyone else's.
 
 ## 5. Report
 
@@ -102,9 +104,9 @@ way for the service to fail goes into `docs/MONITORING.md`.
   app can read, its extracted key can read. Spoilers across time zones are already
   accepted (DAILY-CHAIN.md), and the start is a prompt, not an answer. Re-raise only if
   days are published far more than a week ahead, then cap the policy at ~8 days.
-- **Results can be forged** (2026-10-27). `results` trusts the client's `device_id`, so
-  anyone can post unlimited well-formed runs under invented devices; per-device dedup
-  doesn't stop them. There's no prize or rank to win (ROADMAP: anti-cheat is motive, not
+- **Results can be forged** (2026-10-27; narrowed 2026-10-31). `results` takes the
+  player from the caller's token now, so each forged player needs an anonymous session
+  (30 an hour per IP), but anyone can still post well-formed runs as themselves. There's no prize or rank to win (ROADMAP: anti-cheat is motive, not
   detection), and nothing reads `results` yet. Re-raise when the stats panel or answer
   data ships: its decision (ROADMAP *For Abraham, 2026-10-27*) carries the mitigations.
 - **Points can't be verified** (2026-10-27). Speed is measured on the phone; the

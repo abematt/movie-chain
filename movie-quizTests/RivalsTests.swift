@@ -55,21 +55,21 @@ struct RivalsTests {
     @Test func aNewChallengeIsDealtNotRecorded() {
         let store = store
         let link = challenge(from: sam)
-        #expect(store.receive(.chain(link), me: me, at: now) == .challenge(link))
+        #expect(store.receive(.chain(link), me: [me], at: now) == .challenge(link))
         #expect(store.isEmpty, "nothing is recorded until it's played")
     }
 
     @Test func yourOwnLinkIsYours() {
-        #expect(store.receive(.chain(challenge(from: me)), me: me, at: now) == .own)
+        #expect(store.receive(.chain(challenge(from: me)), me: [me], at: now) == .own)
     }
 
     @Test func aLinkWithNoSharerIsNoChallenge() {
-        #expect(store.receive(.chain(challenge(from: nil)), me: me, at: now) == .invalid)
+        #expect(store.receive(.chain(challenge(from: nil)), me: [me], at: now) == .invalid)
     }
 
     @Test func refusalsPassThrough() {
-        #expect(store.receive(.needsUpdate, me: me, at: now) == .needsUpdate)
-        #expect(store.receive(.invalid, me: me, at: now) == .invalid)
+        #expect(store.receive(.needsUpdate, me: [me], at: now) == .needsUpdate)
+        #expect(store.receive(.invalid, me: [me], at: now) == .invalid)
     }
 
     // MARK: One try
@@ -79,7 +79,7 @@ struct RivalsTests {
         let link = challenge(from: sam)
         store.began(link, at: now)
 
-        guard case .played(let match, let rival) = store.receive(.chain(link), me: me, at: now)
+        guard case .played(let match, let rival) = store.receive(.chain(link), me: [me], at: now)
         else { Issue.record("a started challenge opens as played"); return }
         #expect(match.mine == nil, "closing the app mid-run still uses the try")
         #expect(rival.displayName == "Sam")
@@ -91,7 +91,7 @@ struct RivalsTests {
         store.began(link, at: now)
         store.finished(link, mine: RunScore(links: 3, points: 50), at: now)
 
-        guard case .played(let match, let rival) = store.receive(.chain(link), me: me, at: now)
+        guard case .played(let match, let rival) = store.receive(.chain(link), me: [me], at: now)
         else { Issue.record("a played challenge opens as played"); return }
         #expect(match.outcome == .win)
         #expect(match.direction == .received)
@@ -102,7 +102,7 @@ struct RivalsTests {
         let store = store
         store.finished(challenge(from: sam, links: [8358, 7]), mine: RunScore(links: 1, points: 10), at: now)
         let rematch = challenge(from: sam, links: [8358, 7, 13])
-        #expect(store.receive(.chain(rematch), me: me, at: now) == .challenge(rematch))
+        #expect(store.receive(.chain(rematch), me: [me], at: now) == .challenge(rematch))
     }
 
     // MARK: Replies
@@ -112,7 +112,7 @@ struct RivalsTests {
         let mine = challenge(from: me, name: "Abe", links: [8358, 7], points: 90)
         let answer = reply(to: mine, from: sam, links: [8358, 7, 13], points: 120)
 
-        guard case .reply(let match, let rival) = store.receive(.chain(answer), me: me, at: now)
+        guard case .reply(let match, let rival) = store.receive(.chain(answer), me: [me], at: now)
         else { Issue.record("a reply to my challenge is a reply"); return }
         #expect(match.direction == .sent)
         #expect(match.mine == RunScore(links: 2, points: 90))
@@ -126,8 +126,8 @@ struct RivalsTests {
         let store = store
         let mine = challenge(from: me, links: [8358])
         let answer = reply(to: mine, from: sam, links: [8358, 7], points: 50)
-        _ = store.receive(.chain(answer), me: me, at: now)
-        _ = store.receive(.chain(answer), me: me, at: now.addingTimeInterval(60))
+        _ = store.receive(.chain(answer), me: [me], at: now)
+        _ = store.receive(.chain(answer), me: [me], at: now.addingTimeInterval(60))
 
         #expect(store.rivals[sam]?.matches.count == 1)
         #expect(store.rivals[sam]?.matches.first?.date == now, "it keeps when it first came")
@@ -142,7 +142,7 @@ struct RivalsTests {
         for (id, name, links) in friends {
             let answer = reply(to: mine, from: id, name: name, links: Array([8358, 7, 13].prefix(links)),
                                points: 40)
-            _ = store.receive(.chain(answer), me: me, at: now)
+            _ = store.receive(.chain(answer), me: [me], at: now)
         }
 
         #expect(store.rivals.count == 3)
@@ -157,7 +157,7 @@ struct RivalsTests {
 
         var expected = forwarded
         expected.replyTo = nil
-        #expect(store.receive(.chain(forwarded), me: me, at: now) == .challenge(expected))
+        #expect(store.receive(.chain(forwarded), me: [me], at: now) == .challenge(expected))
     }
 
     // MARK: Names and storage
@@ -165,11 +165,11 @@ struct RivalsTests {
     @Test func aRivalsNameUpdatesByLink() {
         let store = store
         store.finished(challenge(from: sam, name: "Sam"), mine: RunScore(links: 1, points: 1), at: now)
-        _ = store.receive(.chain(challenge(from: sam, name: "Sammy", links: [99])), me: me, at: now)
+        _ = store.receive(.chain(challenge(from: sam, name: "Sammy", links: [99])), me: [me], at: now)
         #expect(store.rivals[sam]?.name == "Sammy")
 
         // A link with no name keeps the one we have.
-        _ = store.receive(.chain(challenge(from: sam, name: nil, links: [98])), me: me, at: now)
+        _ = store.receive(.chain(challenge(from: sam, name: nil, links: [98])), me: [me], at: now)
         #expect(store.rivals[sam]?.name == "Sammy")
     }
 

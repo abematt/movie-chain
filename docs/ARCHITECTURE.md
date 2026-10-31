@@ -255,22 +255,46 @@ pool when it's in it (art, popularity, genres), else it's the bare list entry.
 ### Run results — [`RunResults.swift`](../movie-quiz/RunResults.swift)
 Every finished run goes to the service's `results` table, for per-day stats and the
 answer data (which actors and films players name, to score obscurity by recall rather
-than TMDB popularity). `RunResult(summary:deviceID:appVersion:)` is the payload: the
+than TMDB popularity). `RunResult(summary:appVersion:)` is the payload: the
 chain as TMDB ids with each link's clock time, links, points, the daily's number (mode
 `daily_start`, else `endless`) and whether it was quit — **never typed text**.
 `GameEngine.endGame` hands the summary to the injected `ResultsOutbox`, which keeps
 undelivered runs in `UserDefaults` (newest `limit`), sends them in order through
-`ServiceResultsTransport`, and stops at the first failure; `prepareSeeds()` flushes it
-again. A 4xx other than 401/408/429 means the run was refused and is dropped. Demo
+`ServiceResultsTransport` with the player's bearer token (one retry with a fresh token
+on a `401`), and stops at the first failure; `prepareSeeds()` flushes it again. A 4xx other than 401/408/429 means the run was refused and is dropped. Demo
 launches send nothing, and DEBUG builds tag `app_version` with `-debug`.
 
 The **`results` function** (`supabase/functions/results`) checks shape only — kinds
 alternate, ids are positive and unrepeated, `links` matches the chain, points sit in
 `Scoring`'s range (10–70 a link), a daily's number isn't in the future and its start
 matches the published one — and inserts with the service role. Links aren't re-checked
-against TMDB, and speed can't be. One daily per device (a unique index): a resend
+against TMDB, and speed can't be. The row's `player_id` is the user in the caller's
+token, never anything in the body. One daily per player (a unique index): a resend
 answers `200` and stores nothing. The table has RLS on, no policies and no public
 grants.
+
+### The player — [`PlayerSession.swift`](../movie-quiz/PlayerSession.swift)
+Every install is an **anonymous Supabase user**, made silently the first time the app
+needs the service (`ContentView` warms it at launch; the results outbox would otherwise
+make it at the first game over). That user's id is the player id everywhere: challenge
+links, `results.player_id`, the `profiles` row, and `player_id` on analytics events.
+Signing in at 0.9.0 links Apple, Google or email to this same user, so no data moves.
+- **`PlayerSession`** signs in (`POST /auth/v1/signup`), refreshes a token within a
+  minute of expiry, and joins a second caller onto a sign-in or refresh in flight (a
+  refresh token spent twice would revoke the session). Offline or rate-limited means no
+  token, never a new player; only a refresh the service *refuses* starts a new anonymous
+  user. The session lives in the Keychain (`…ThisDeviceOnly`), so a reinstall is the
+  same player and a second phone is a different one until sign-in. `live()` is `nil`
+  with no service key, in the test host, previews and demo launches.
+- **`PlayerID`** is the synchronous view of it, in `UserDefaults`: the service id once
+  there is one, else the local `SharerID` a phone that hasn't reached the service shares
+  under. `PlayerID.all` keeps every id the install has gone by, and `RivalStore.receive`
+  checks a reply against all of them, so a challenge sent under an older id still
+  comes home.
+- **The profile.** `syncProfile(name:)` upserts the `profiles` row's `display_name`
+  when `PlayerName` changes (the root watches it, a second after the last keystroke).
+  Each player can read and write only their own row; links still carry the name, so
+  nobody reads anyone else's yet.
 
 ### Head-to-head — [`Rivals.swift`](../movie-quiz/Rivals.swift) + [`HeadToHead.swift`](../movie-quiz/HeadToHead.swift)
 
@@ -278,7 +302,7 @@ Challenges between two players, with no server: the link is the state
 ([ROADMAP](ROADMAP.md#head-to-head--same-start-both-sides-see-the-score) has the rules).
 
 - **Every share is a challenge.** Game over's link is a `SharedChain` with your
-  `SharerID` and `PlayerName` (asked on the first share). A daily shares no link.
+  `PlayerID` and `PlayerName` (asked on the first share). A daily shares no link.
 - **Opening a link** (`ContentView.open`, from `onOpenURL`) goes through
   `RivalStore.receive`, which answers an `Arrival`: `.challenge` (deal it), `.played`
   (one try: show the result), `.reply` (recorded), `.own`, `.needsUpdate`, `.invalid`.
@@ -292,7 +316,7 @@ Challenges between two players, with no server: the link is the state
 - **A reply** is the replier's run with the challenger's under `replyTo` (wire key
   `r`). Matches are keyed by `SharedChain.challengeKey` (sender, start, links), so the
   same run shared twice is one challenge, and a reply opened twice is one match.
-- **One-to-one.** `Rival`s are keyed by sharer id; a name updates whenever a newer
+- **One-to-one.** `Rival`s are keyed by the other player's id; a name updates whenever a newer
   link from that id arrives. A group post comes back as one reply, one match, per
   friend. Persisted as JSON in `UserDefaults` (injected).
 - **Testing without universal links.** Debug builds set `Config.shareBaseURL` to
@@ -719,7 +743,8 @@ is [`ANALYTICS.md`](ANALYTICS.md). In short:
   `finalMisses`, `playTime`, `retries` are plain run facts, timed on an injected clock.
 - **`Analytics.swift`** is the sink and the only PostHog code: `EventName`, the
   `Analytics` protocol (`NoAnalytics` by default; `PostHogAnalytics` at the root, skipped
-  in test hosts and previews), and `DeviceID`, the anonymous id.
+  in test hosts and previews), and `DeviceID`, PostHog's anonymous id. The service's
+  player id rides on every event as `player_id` (shared context).
 
 ## Game loop at a glance
 
@@ -790,8 +815,8 @@ scratch:
 > **Built 2026-10-24: the codec.** `SharedChain.swift` is the payload + codec below,
 > generalized beyond Pass & Play: one versioned format for every chain that travels
 > (game-over share, challenge links, daily results). Version 1 carries the start (kind,
-> id, name), the links' TMDB ids, points, a per-device `SharerID` (deliberately *not*
-> the analytics `DeviceID`) and an optional sender name, as base64url JSON under
+> id, name), the links' TMDB ids, points, the sharer's id (a per-device `SharerID` then;
+> the service's `PlayerID` since 2026-10-31) and an optional sender name, as base64url JSON under
 > `<base>/c?d=…`. Transport is a **universal link** on our own domain rather than a
 > custom scheme (`Config.shareBaseURL`, `nil` until the domain exists): a custom scheme
 > is dead for anyone without the app. `open` answers `.chain` / `.needsUpdate` /

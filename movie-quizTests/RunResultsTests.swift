@@ -14,8 +14,6 @@ import Testing
 @MainActor
 struct RunResultsTests {
 
-    private let device = UUID(uuidString: "6F9619FF-8B86-D011-B42D-00C04FC964FF")!
-
     private static func actor(_ id: Int) -> ChainNode { .actor(Person(id: id, name: "A\(id)")) }
     private static func movie(_ id: Int) -> ChainNode { .movie(Movie(id: id, title: "M\(id)", year: 2000)) }
 
@@ -33,7 +31,7 @@ struct RunResultsTests {
     // MARK: The payload
 
     @Test func aRunIsItsIdsAndTimes() {
-        let result = RunResult(summary: Self.run, deviceID: device, appVersion: "0.7.0")
+        let result = RunResult(summary: Self.run, appVersion: "0.7.0")
         #expect(result.mode == "endless")
         #expect(result.number == nil)
         #expect(result.chain == [
@@ -49,17 +47,17 @@ struct RunResultsTests {
     @Test func aDailyCarriesItsNumber() {
         var daily = Self.run
         daily.daily = 4
-        let result = RunResult(summary: daily, deviceID: device, appVersion: "0.7.0")
+        let result = RunResult(summary: daily, appVersion: "0.7.0")
         #expect(result.mode == "daily_start")
         #expect(result.number == 4)
     }
 
-    /// The keys the Edge Function reads, `number` as an explicit null, and no
-    /// typed text anywhere.
+    /// The keys the Edge Function reads, `number` as an explicit null, no
+    /// player id (the service takes it from the token), and no typed text anywhere.
     @Test func theJSONIsWhatTheServiceTakes() throws {
-        let data = try JSONEncoder().encode(RunResult(summary: Self.run, deviceID: device, appVersion: "0.7.0"))
+        let data = try JSONEncoder().encode(RunResult(summary: Self.run, appVersion: "0.7.0"))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(Set(json.keys) == ["device_id", "mode", "number", "chain", "links", "points",
+        #expect(Set(json.keys) == ["mode", "number", "chain", "links", "points",
                                    "ended_by_quit", "app_version"])
         #expect(json["number"] is NSNull)
         let text = String(decoding: data, as: UTF8.self)
@@ -90,7 +88,7 @@ struct RunResultsTests {
     }
 
     private func makeOutbox(_ service: Service, defaults: UserDefaults) -> ResultsOutbox {
-        ResultsOutbox(defaults: defaults, deviceID: device, appVersion: "0.7.0", send: service.send)
+        ResultsOutbox(defaults: defaults, appVersion: "0.7.0", send: service.send)
     }
 
     private func freshDefaults() -> UserDefaults {

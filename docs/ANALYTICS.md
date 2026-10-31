@@ -16,7 +16,7 @@ stats and answer data, not analytics; nothing in it is sent to PostHog or from i
 
 | File | Job |
 |---|---|
-| `Analytics.swift` | The sink: `EventName`, the `Analytics` protocol, `NoAnalytics`, `PostHogAnalytics`, `DeviceID`. **The only file that may import PostHog.** |
+| `Analytics.swift` | The sink: `EventName`, the `Analytics` protocol, `NoAnalytics`, `PostHogAnalytics`, `DeviceID` (PostHog's anonymous id; the service's player id is `PlayerID` in `PlayerSession.swift`). **The only file that may import PostHog.** |
 | `Telemetry.swift` | The core views call: sink, clock, shared context, screens (incl. `deal_failed`), identity, `send`. |
 | `Telemetry+Runs.swift` | `run_started`, `link_landed`, `turn_load_failed`, `run_ended`. |
 | `Telemetry+Reel.swift` | `card_viewed`, `reel_closed`. |
@@ -34,7 +34,7 @@ stats and answer data, not analytics; nothing in it is sent to PostHog or from i
    Home time is on `run_started`, play time on `run_ended`, game-over time on the next
    `run_started`, Reel time on `reel_closed`.
 3. **Settings and setup are context, not events.** `Telemetry.Context` is added to every
-   event (`mode`, `signed_in`, `sound_on`, `schema`). A new setting adds a field there.
+   event (`mode`, `signed_in`, `sound_on`, `schema`, `player_id`). A new setting adds a field there.
 4. **A new mode reuses the run events** and sets `context.mode`. Its own events, if it
    needs any, go in `Telemetry+<Mode>.swift` with its own state struct.
 5. **Ids, not names.** Actors and movies are TMDB ids. Typed text is the one free text
@@ -66,6 +66,7 @@ stats and answer data, not analytics; nothing in it is sent to PostHog or from i
 | `mode` | Which game: `endless` (the Daily Chain adds `daily`) |
 | `signed_in` | Whether the player is signed in (always `false` before 0.9.0) |
 | `sound_on` | The sound setting |
+| `player_id` | The service's anonymous player id (`PlayerID`), once the install has one; matches `results.player_id`. Not an account |
 | `schema` | The tracking plan's version (`Telemetry.schema`) |
 | `debug_build` | Present and `true` on development builds; filter it out of charts |
 
@@ -187,8 +188,11 @@ A visit to the Reel ended.
 
 ## Identity
 
-Before an account, the anonymous id is the **device id** (`DeviceID`, made on first
-launch). From 0.9.0, `Telemetry.signedIn(accountID:)` ties events to the account (and
+Before an account, PostHog's anonymous id is the **device id** (`DeviceID`, made on
+first launch). Every event also carries **`player_id`**, the anonymous Supabase user
+every install becomes on first use (`PlayerSession`, 2026-10-31), so an event can be
+matched to that player's `results` rows. PostHog's own id stays the device id: switching
+it would split every existing install's history in two. From 0.9.0, `Telemetry.signedIn(accountID:)` ties events to the account (and
 PostHog links the device's earlier events to it); `signedOut()` returns to the device
 id. Person profiles are only created for identified players.
 

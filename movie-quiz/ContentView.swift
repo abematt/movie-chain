@@ -29,6 +29,11 @@ struct ContentView: View {
     /// The home → play handoff (see `Handoff.swift`): both screens report into
     /// it, and the flight above them reads it.
     @State private var handoff = HandoffStage()
+    /// The anonymous service player (`PlayerSession`); `nil` with no service, in
+    /// the test host, previews and demo launches.
+    @State private var session: PlayerSession?
+    /// Watched so a new name reaches the profile (`PlayerSession.syncProfile`).
+    @AppStorage(PlayerName.key) private var playerName = ""
     @AppStorage("soundEnabled") private var soundEnabled = true
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -57,7 +62,9 @@ struct ContentView: View {
         let poolCache = Config.hasTMDB
             ? SeedPoolCache.defaultFileURL.map { SeedPoolCache(fileURL: $0) } : nil
         let dailyFeed: (any DailyStartFeed)? = Config.hasService ? ServiceDailyStartFeed() : nil
-        let results = Self.makeResultsOutbox()
+        let session = Self.makeSession()
+        _session = State(initialValue: session)
+        let results = session.flatMap(Self.makeResultsOutbox)
         #if DEBUG
         // QA hook: every request fails and nothing saved is read, to see the
         // home's "No connection." state.
@@ -75,21 +82,28 @@ struct ContentView: View {
         _engine = State(initialValue: engine)
     }
 
-    /// Finished runs go to the service, when there is one. Demo launches send
-    /// nothing (their chains are made up), and debug builds mark their runs so
-    /// development play can be told apart from players'.
-    private static func makeResultsOutbox() -> ResultsOutbox? {
-        guard Config.hasService else { return nil }
+    /// The service player. Demo launches never reach the service as a player
+    /// (their chains are made up), nor does `-uiOffline`.
+    private static func makeSession() -> PlayerSession? {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         if args.contains(where: { $0.hasPrefix("-uiDemo") }) || args.contains("-uiOffline") { return nil }
+        #endif
+        return PlayerSession.live()
+    }
+
+    /// Finished runs go to the service as the session's player. Debug builds
+    /// mark their runs so development play can be told apart from players'.
+    private static func makeResultsOutbox(session: PlayerSession) -> ResultsOutbox {
+        #if DEBUG
         let version = Config.appVersion + "-debug"
         #else
         let version = Config.appVersion
         #endif
-        let transport = ServiceResultsTransport()
-        return ResultsOutbox(defaults: .standard, deviceID: DeviceID.current(in: .standard),
-                             appVersion: version, send: transport.send)
+        let transport = ServiceResultsTransport { forceRefresh in
+            await session.accessToken(forceRefresh: forceRefresh)
+        }
+        return ResultsOutbox(defaults: .standard, appVersion: version, send: transport.send)
     }
 
     var body: some View {
@@ -121,6 +135,17 @@ struct ContentView: View {
         // Chain links: universal links in Release (once the domain serves the
         // file), the private `unspool-debug://` scheme in Debug.
         .onOpenURL { open($0) }
+        // Become the service player now rather than at the first game over, and
+        // write the name once it settles (a second after the last keystroke).
+        .task(id: playerName) {
+            guard let session else { return }
+            telemetry?.context.playerID = PlayerID.current(in: .standard)
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            _ = await session.accessToken()
+            telemetry?.context.playerID = session.userID ?? PlayerID.current(in: .standard)
+            await session.syncProfile(name: PlayerName.current(in: .standard))
+        }
         .sheet(item: $openedMatch) { opened in
             MatchSheet(match: opened.match, rival: opened.rival)
         }
@@ -195,7 +220,7 @@ extension ContentView {
     private func open(_ url: URL) {
         guard let base = Config.shareBaseURL else { return }
         let arrival = rivals.receive(SharedChain.open(url, base: base),
-                                     me: SharerID.current(in: .standard), at: .now)
+                                     me: PlayerID.all(in: .standard), at: .now)
         telemetry?.challengeOpened(arrival)
         switch arrival {
         case .challenge(let challenge):

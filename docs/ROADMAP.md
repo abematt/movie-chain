@@ -134,7 +134,8 @@ these together in one pass:
   room"; New best wins if both). Hidden until a day has 5+ results. Needs a
   `daily_stats(number)` function returning only the count and the figure, so `results`
   stays unreadable to the app's key. Undecided: that figure, or "you beat N%".
-  **Anyone can post forged runs** under invented device ids (accepted for now;
+  **Anyone can post forged runs**, one anonymous session per fake player since
+  2026-10-31 (sign-ins are rate limited per IP; accepted for now;
   `/supabase-audit` → *Accepted*), so the figure has to hold up to that, in order of cost:
   1. **The median, not the mean**, without `-debug` runs: a flood has to outnumber real
      players to move it. Nearly free.
@@ -763,6 +764,8 @@ prerequisite for friend groups (0.11.0).
      storage, resets or breach exposure.
 
 You can play forever without an account; signing in is a migration, never a gate.
+**Built 2026-10-31** (`PlayerSession.swift`, migration `players`): every install is an
+anonymous user; the rest of this paragraph is the design it follows.
 **Preferred shape (2026-10-28): Supabase anonymous sign-in at first launch**, so every
 player has an `auth.users` id from day one (it replaces the local sharer id and
 `results.device_id`) and signing in *links* a provider to that same user instead of

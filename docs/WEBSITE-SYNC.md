@@ -19,6 +19,12 @@ drift item is fixed on the site, delete it here.
   uses, is: "This website uses TMDB and the TMDB APIs but is not endorsed, certified,
   or otherwise approved by TMDB." §3 covers websites too.
 
+- **The privacy draft's app section** (unspool-site PR #1) *(2026-10-31)*. The service
+  now holds an anonymous account per install (a Supabase user id, no email or name
+  until 0.9.0), the display name a player chooses on their first share (`profiles`), and
+  results under that id instead of a device id. The id also rides on analytics events
+  (`player_id`). The draft should say all four before the beta.
+
 ## Will need the site when it lands
 
 - **Challenge links and the head-to-head** ([ROADMAP](ROADMAP.md#head-to-head--same-start-both-sides-see-the-score)),

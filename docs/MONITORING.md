@@ -69,11 +69,26 @@ that day can then only reach players through a new row.
   `results` function's logs; a run of `422`s (an app/function mismatch after a change to
   either, or someone hand-making requests). `app_version` ending `-debug` is development
   play: leave it out of any stat.
-- **If forged runs appear:** the function checks shape only. Re-check links against the
-  TMDB cache before storing, or drop the device's rows.
+- **If forged runs appear:** the function checks shape only, but every row needs a real
+  session, so a flood is a flood of anonymous users. Re-check links against the TMDB
+  cache before storing, or drop the player's rows.
+
+### Anonymous players piling up, or not being made
+- **Watch:** new anonymous users a day (Authentication → Users, or `auth.users` where
+  `is_anonymous`) against installs in PostHog (`Application Installed`). Far more users
+  than installs is a script minting sessions (the limit is 30 an hour per IP,
+  `[auth.rate_limit] anonymous_users`). Far fewer, or `player_id` missing from most
+  events, means sign-in is failing: results pile up in phones' outboxes until it works.
+  A results function answering mostly `401 Not signed in` is the same problem seen from
+  the other side.
+  Anonymous users count as monthly active users on Supabase's plan (50,000 free), so a
+  minting script also spends that.
+- **If it happens:** a flood → lower the rate limit, and turn on CAPTCHA for anonymous
+  sign-ins if it continues (Supabase supports it; the app would need to send a token).
+  Failing sign-ins → check the dashboard still has anonymous sign-ins on.
 
 ### A schema change opened something
 - **Watch:** `scripts/supabase-check.py` (the advisors and the access table), before and
   after every schema change ships ([`ROADMAP.md`](ROADMAP.md) 0.8.0's safety rules).
   Clean as of 2026-10-27, with two auth warnings (signups on before accounts; 6-character
-  passwords).
+  passwords); both cleared 2026-10-31 by turning email signup off and the minimum to 8.

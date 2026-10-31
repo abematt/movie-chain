@@ -278,7 +278,7 @@ struct GameOverView: View {
     private var shareLink: URL? {
         guard let base = Config.shareBaseURL, summary.daily == nil,
               let shared = SharedChain(chain: summary.chain, points: summary.points,
-                                       sharer: SharerID.current(in: .standard),
+                                       sharer: PlayerID.current(in: .standard),
                                        senderName: PlayerName.current(in: .standard),
                                        replyTo: summary.challenge?.asOriginal)
         else { return nil }

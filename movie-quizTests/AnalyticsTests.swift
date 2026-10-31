@@ -220,6 +220,15 @@ struct AnalyticsTests {
         #expect(shared["from"] == AnyHashable("reel"), "an event's own properties survive the merge")
     }
 
+    @Test mutating func thePlayerIDRidesOnEveryEventOnceKnown() throws {
+        telemetry.shared(from: .reel)
+        #expect(try recorder.last("share_tapped")["player_id"] == nil)
+        let player = UUID(uuidString: "0B5E52B8-3A0C-4E0E-9B0B-6F2F7C1D2E3A")!
+        telemetry.context.playerID = player
+        telemetry.shared(from: .reel)
+        #expect(try recorder.last("share_tapped")["player_id"] == AnyHashable("0b5e52b8-3a0c-4e0e-9b0b-6f2f7c1d2e3a"))
+    }
+
     @Test mutating func signingInTiesEventsToTheAccountUntilSignOut() throws {
         telemetry.signedIn(accountID: "acct-1")
         #expect(recorder.account == "acct-1")

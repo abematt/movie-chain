@@ -35,6 +35,9 @@ final class Telemetry {
         var mode: Mode = .endless
         var signedIn = false
         var soundOn = true
+        /// The service's anonymous player id (`PlayerID`), once known, so an
+        /// event can be matched to that player's results. Not an account.
+        var playerID: UUID?
     }
 
     /// Bump when an existing property changes meaning, so charts can split old
@@ -129,12 +132,13 @@ final class Telemetry {
 
     /// Sends an event with the shared context added. Every event goes through here.
     func send(_ name: EventName, _ properties: [String: AnyHashable]) {
-        let shared: [String: AnyHashable] = [
+        var shared: [String: AnyHashable] = [
             "mode": context.mode.rawValue,
             "signed_in": context.signedIn,
             "sound_on": context.soundOn,
             "schema": Self.schema,
         ]
+        if let player = context.playerID { shared["player_id"] = player.uuidString.lowercased() }
         sink.capture(AnalyticsEvent(name: name.rawValue,
                                     properties: properties.merging(shared) { own, _ in own }))
     }
