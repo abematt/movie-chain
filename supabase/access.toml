@@ -3,8 +3,10 @@
 # file, and fails on any difference: more access is a leak, less is a broken app.
 #
 # The publishable key ships in the app, so treat `anon` as "anyone on the internet".
-# While signups are on, anyone can also get an `authenticated` session, so until
-# accounts land (0.9.0) give `authenticated` nothing `anon` doesn't have.
+# Anonymous sign-ins are on (every install is an anonymous user), so anyone can
+# also get an `authenticated` session: treat `authenticated` as "anyone, with an
+# id". Give it nothing beyond `anon` except a player's own rows, through policies
+# keyed on `auth.uid()` (the check fails a write policy that isn't).
 #
 # Access is a list of privileges per role: "select", "insert", "update", "delete",
 # or a column-scoped "insert(a, b)" / "update(a, b)". A table-wide "update" lets a
@@ -18,7 +20,14 @@ anon = ["select"]
 authenticated = ["select"]
 
 [tables.results]
-# Written by the `results` Edge Function with the service role. No public access.
+# Written by the `results` Edge Function with the service role, under the player
+# id it reads from the caller's token. No public access.
+
+[tables.profiles]
+# A player's display name. Each player reads and writes only their own row (the
+# policies); nobody reads anyone else's yet. Insert names the row's id, which the
+# insert policy holds to auth.uid().
+authenticated = ["select", "insert(id, display_name)", "update(display_name)"]
 
 [tables.tmdb_cache]
 # Read and written by the `tmdb` Edge Function with the service role. No public access.
@@ -33,7 +42,8 @@ callable = ["graphql_public.graphql"]
 # Storage buckets, name = "public" or "private". None yet.
 
 [auth]
-# The app has no sign-in before 0.9.0; flip this then, along with the checklist in
-# .claude/skills/supabase-audit/SKILL.md.
+# Anonymous sign-ins carry every player from first launch (PlayerSession.swift);
+# email and provider sign-up stay off until 0.9.0. Flip `accounts` then, along
+# with the checklist in .claude/skills/supabase-audit/SKILL.md.
 accounts = false
-anonymous_sign_ins = false
+anonymous_sign_ins = true

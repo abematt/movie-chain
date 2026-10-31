@@ -118,8 +118,8 @@ final class RivalStore {
     // MARK: Opening a link
 
     /// Decide what `opened` is, recording a reply and refreshing a known name.
-    /// `me` is this phone's sharer id.
-    func receive(_ opened: SharedChain.Opened, me: UUID, at date: Date) -> Arrival {
+    /// `me` is every id this phone has shared under (`PlayerID.all`).
+    func receive(_ opened: SharedChain.Opened, me: Set<UUID>, at date: Date) -> Arrival {
         let chain: SharedChain
         switch opened {
         case .needsUpdate: return .needsUpdate
@@ -128,9 +128,9 @@ final class RivalStore {
         }
         // A challenge needs someone to answer to.
         guard let sender = chain.sharer else { return .invalid }
-        if sender == me { return .own }
+        if me.contains(sender) { return .own }
 
-        if let original = chain.originalChallenge, original.sharer == me {
+        if let original = chain.originalChallenge, let mine = original.sharer, me.contains(mine) {
             let id = Self.sentID(original)
             let match = Match(id: id, direction: .sent, startKind: chain.start.kind,
                               startID: chain.start.id, startName: chain.start.name,

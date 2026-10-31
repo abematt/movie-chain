@@ -40,8 +40,8 @@ nonisolated struct SharedChain: Equatable, Sendable {
     /// start's, so they aren't stored.
     var links: [Int]
     var points: Int
-    /// Who shared it: a random id made once per device (`SharerID`), never the
-    /// device id analytics uses. A future account claims it like the device id.
+    /// Who shared it: the sharer's player id (`PlayerID`), the anonymous service
+    /// user that an account (0.9.0) is linked to, so it never changes.
     var sharer: UUID?
     /// The name the sender goes by, when there is one.
     var senderName: String?
@@ -230,9 +230,9 @@ nonisolated struct SharedChain: Equatable, Sendable {
 
 // MARK: - Sharer id
 
-/// A random id made the first time this device shares, kept here and sent in
-/// links. Separate from `DeviceID` on purpose: that one is the anonymous id in
-/// analytics, and a link anyone can read shouldn't carry it.
+/// The local id a phone shares under before it has reached the service. Once
+/// it has, links carry the service's player id (`PlayerID`) instead, and this
+/// one stays among `PlayerID.all` so replies to older challenges still land.
 enum SharerID {
     static let key = "sharerID"
 

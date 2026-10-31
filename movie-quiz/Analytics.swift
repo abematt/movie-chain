@@ -103,9 +103,10 @@ struct PostHogAnalytics: Analytics {
     func reset() { PostHogSDK.shared.reset() }
 }
 
-/// A random identifier made on first launch and kept on this device. Owns no
-/// personal data; it's what local records and analytics are stamped with until
-/// an account (0.9.0) claims them. A reinstall starts a new one.
+/// A random identifier made on first launch and kept on this device: PostHog's
+/// anonymous id, and nothing else. The service knows the player by `PlayerID`
+/// instead, which every event also carries as `player_id`; this stays so an
+/// install's analytics history isn't split. A reinstall starts a new one.
 enum DeviceID {
     static let key = "deviceID"
 

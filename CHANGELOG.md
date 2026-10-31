@@ -49,8 +49,8 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
 
 - **Every finished run is sent to Unspool's service** (a `results` table, through a
   `results` function that checks each run's shape). It sends the chain as TMDB ids with
-  the time each link took, the links, the points and the daily's number, under the device
-  id. Typed text is never sent. This is the data for per-day stats ("today's average")
+  the time each link took, the links, the points and the daily's number, under the
+  player's anonymous account (see *Changed*). Typed text is never sent. This is the data for per-day stats ("today's average")
   and for scoring obscurity by what players actually remember rather than TMDB's
   popularity. A run that ends without signal waits on the phone and goes on a later
   visit home. Nothing on screen uses it yet.
@@ -70,6 +70,15 @@ Unspool rebrand was inserted as 0.6.0, and Ground & Object shipped in 0.7.0 alon
   serves universal links.
 
 ### Changed
+- **Every player is an anonymous account on the service.** The first time the app needs
+  the service it signs in as a new anonymous Supabase user, with no screen and nothing
+  asked. That user's id is now who you are everywhere: in challenge links, on every
+  result (taken from the session, so a run can no longer be sent under an invented id),
+  on a profile that holds the name you go by, and on analytics events as `player_id`.
+  The session sits in the Keychain, so a reinstall is still you. Until now the app had
+  two ids it made up itself and the service trusted whatever it was sent; accounts
+  (0.9.0) can now be a sign-in button that links to the player you already are, with
+  nothing to migrate. Challenges sent under the old id still come home.
 - **The daily start comes from Unspool's service**, from a `puzzles` table, so a day can
   be published, or a bad one fixed, without an app release. The phone fetches the week
   ahead and keeps it, so the daily still works without signal. A day it hasn't been

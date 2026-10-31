@@ -2,12 +2,18 @@
 // resends any it couldn't deliver), so this must be safe to receive twice.
 //
 //   POST /functions/v1/results     body: see `Run` below
+//   Authorization: Bearer <the player's access token>
+//
+// The run belongs to the user in the token (an anonymous user until 0.9.0),
+// never to an id in the body: a forged run needs a real session per player,
+// and anonymous sign-ins are rate limited per IP.
 //
 // Checks the run's shape — not its truth: links aren't re-checked against TMDB,
 // and points can't be (speed is measured on the phone). A daily's start must
 // match the published one when the day is published.
 //
-//   201 stored · 200 a daily already stored for this device · 422 not a valid run
+//   201 stored · 200 a daily already stored for this player · 401 no app key or
+//   no valid session · 422 not a valid run
 //
 // Secrets: APP_KEY (the app's publishable key, checked against `apikey`).
 
@@ -25,7 +31,6 @@ const MAX_BODY = 64 * 1024;
 type Kind = "actor" | "movie";
 type Node = { kind: Kind; id: number; seconds?: number };
 type Run = {
-  device_id: string;
   mode: "endless" | "daily_start";
   number: number | null;
   chain: Node[];
@@ -45,6 +50,8 @@ const db = createClient(
 Deno.serve(async (req) => {
   if (req.method !== "POST") return text(405, "POST only");
   if (!appKey || req.headers.get("apikey") !== appKey) return text(401, "Unknown app");
+  const player = await caller(req);
+  if (!player) return text(401, "Not signed in");
 
   const raw = await req.text();
   if (raw.length > MAX_BODY) return text(413, "Too large");
@@ -65,7 +72,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { error } = await db.from("results").insert(run);
+  const { error } = await db.from("results").insert({ player_id: player, ...run });
   if (error?.code === "23505") return text(200, "Already stored");
   if (error) {
     console.error("insert failed", error.message);
@@ -77,11 +84,9 @@ Deno.serve(async (req) => {
 /** The run, normalised, or why it isn't one. */
 function check(body: unknown): Run | string {
   if (!isObject(body)) return "Not an object";
-  const { device_id, mode, number, chain, links, points, ended_by_quit, app_version } = body;
+  // Older apps also send a `device_id`; it's ignored.
+  const { mode, number, chain, links, points, ended_by_quit, app_version } = body;
 
-  if (typeof device_id !== "string" || !/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(device_id)) {
-    return "Bad device_id";
-  }
   if (mode !== "endless" && mode !== "daily_start") return "Bad mode";
   if (mode === "endless" && number !== null && number !== undefined) return "Number on an endless run";
   if (mode === "daily_start") {
@@ -119,7 +124,6 @@ function check(body: unknown): Run | string {
   }
 
   return {
-    device_id: device_id.toLowerCase(),
     mode,
     number: mode === "daily_start" ? number as number : null,
     chain: nodes,
@@ -128,6 +132,14 @@ function check(body: unknown): Run | string {
     ended_by_quit,
     app_version,
   };
+}
+
+/** The user id in the request's bearer token, when the token is a live session. */
+async function caller(req: Request): Promise<string | null> {
+  const token = req.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
+  if (!token) return null;
+  const { data, error } = await db.auth.getUser(token);
+  return error ? null : data.user?.id ?? null;
 }
 
 /** The day's start as published (highest revision), or null when it isn't. */

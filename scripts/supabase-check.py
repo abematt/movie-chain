@@ -208,6 +208,10 @@ def check_policy_sql(report, file, low):
     if "user_metadata" in low or "raw_user_meta_data" in low:
         report.fail("policy-user-metadata", f"{file}: policy {name} trusts user_metadata, "
                     "which the user can edit")
+    if command != "select" and re.search(r"\bto\b[^()]*\bauthenticated\b", low) and "auth.uid()" not in low:
+        report.fail("policy-not-own-row", f"{file}: policy {name} lets signed-in players "
+                    f"{command} rows not keyed on auth.uid(); anyone can be signed in "
+                    "(anonymous sign-ins), so a write must be their own row")
 
 
 # ---------------------------------------------------------------- secrets
@@ -330,7 +334,7 @@ def json_from(output):
     return json.loads(output[start:])
 
 
-def check_advisors(report, tables):
+def check_advisors(report, tables, auth):
     report.section("advisors")
     issues = json_from(supabase("db", "advisors", "--linked", "--type", "all",
                                 "--level", "info", "--output-format", "json")).get("results", [])
@@ -344,6 +348,11 @@ def check_advisors(report, tables):
         detail = re.sub(r"\s+", " ", str(issue.get("detail", "")).replace("\\`", "`"))[:200]
         rule = issue.get("name", "advisor")
         if rule == "rls_enabled_no_policy" and any(f"`{t}`" in detail for t in service_only):
+            continue
+        # Every player is an anonymous user, so a declared table's policies admit
+        # anonymous users on purpose; the own-row rule (policy-not-own-row) holds them.
+        if rule == "auth_allow_anonymous_sign_ins" and auth.get("anonymous_sign_ins") \
+                and any(t in detail for t, roles in tables.items() if roles.get("authenticated")):
             continue
         if level == "INFO" and not security:
             continue
@@ -480,6 +489,10 @@ def check_catalog(report, catalog, tables, callable_, buckets):
                             f"{', '.join(sorted(roles))}, beyond what access.toml declares")
         if any("user_metadata" in c or "raw_user_meta_data" in c for c in conditions):
             report.fail("policy-user-metadata", f"{where} trusts user_metadata, which users can edit")
+        if policy["cmd"] != "SELECT" and "authenticated" in roles \
+                and not any("auth.uid()" in c for c in conditions):
+            report.fail("policy-not-own-row", f"{where} lets signed-in players "
+                        f"{policy['cmd'].lower()} rows not keyed on auth.uid()")
 
     for function in catalog["functions"]:
         reachable = function["anon"] or function["authenticated"]
@@ -597,7 +610,7 @@ def main(argv):
     else:
         check_secrets(report, history=True, app=app)
         try:
-            check_advisors(report, tables)
+            check_advisors(report, tables, auth)
             config = resolved_config()
             schemas = config.get("api", {}).get("schemas", ["public", "graphql_public"])
             catalog = live_catalog(schemas)

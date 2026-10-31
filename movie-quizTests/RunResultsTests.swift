@@ -14,8 +14,6 @@ import Testing
 @MainActor
 struct RunResultsTests {
 
-    private let device = UUID(uuidString: "6F9619FF-8B86-D011-B42D-00C04FC964FF")!
-
     private static func actor(_ id: Int) -> ChainNode { .actor(Person(id: id, name: "A\(id)")) }
     private static func movie(_ id: Int) -> ChainNode { .movie(Movie(id: id, title: "M\(id)", year: 2000)) }
 
@@ -33,7 +31,7 @@ struct RunResultsTests {
     // MARK: The payload
 
     @Test func aRunIsItsIdsAndTimes() {
-        let result = RunResult(summary: Self.run, deviceID: device, appVersion: "0.7.0")
+        let result = RunResult(summary: Self.run, appVersion: "0.7.0")
         #expect(result.mode == "endless")
         #expect(result.number == nil)
         #expect(result.chain == [
@@ -49,17 +47,17 @@ struct RunResultsTests {
     @Test func aDailyCarriesItsNumber() {
         var daily = Self.run
         daily.daily = 4
-        let result = RunResult(summary: daily, deviceID: device, appVersion: "0.7.0")
+        let result = RunResult(summary: daily, appVersion: "0.7.0")
         #expect(result.mode == "daily_start")
         #expect(result.number == 4)
     }
 
-    /// The keys the Edge Function reads, `number` as an explicit null, and no
-    /// typed text anywhere.
+    /// The keys the Edge Function reads, `number` as an explicit null, no
+    /// player id (the service takes it from the token), and no typed text anywhere.
     @Test func theJSONIsWhatTheServiceTakes() throws {
-        let data = try JSONEncoder().encode(RunResult(summary: Self.run, deviceID: device, appVersion: "0.7.0"))
+        let data = try JSONEncoder().encode(RunResult(summary: Self.run, appVersion: "0.7.0"))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(Set(json.keys) == ["device_id", "mode", "number", "chain", "links", "points",
+        #expect(Set(json.keys) == ["mode", "number", "chain", "links", "points",
                                    "ended_by_quit", "app_version"])
         #expect(json["number"] is NSNull)
         let text = String(decoding: data, as: UTF8.self)
@@ -90,7 +88,7 @@ struct RunResultsTests {
     }
 
     private func makeOutbox(_ service: Service, defaults: UserDefaults) -> ResultsOutbox {
-        ResultsOutbox(defaults: defaults, deviceID: device, appVersion: "0.7.0", send: service.send)
+        ResultsOutbox(defaults: defaults, appVersion: "0.7.0", send: service.send)
     }
 
     private func freshDefaults() -> UserDefaults {
@@ -121,6 +119,24 @@ struct RunResultsTests {
         await relaunched.flush()
         #expect(online.sent.count == 1)
         #expect(relaunched.pending.isEmpty)
+    }
+
+    /// Runs saved by the build before player ids carried a `device_id`; they load
+    /// and send without it (the service takes the player from the token).
+    @Test func runsSavedWithADeviceIDStillLoad() throws {
+        let defaults = freshDefaults()
+        let legacy = """
+        [{"device_id":"6f9619ff-8b86-d011-b42d-00c04fc964ff","mode":"daily_start","number":4,\
+        "chain":[{"kind":"actor","id":31},{"kind":"movie","id":13,"seconds":4.2}],\
+        "links":1,"points":30,"ended_by_quit":false,"app_version":"0.7.0"}]
+        """
+        defaults.set(Data(legacy.utf8), forKey: "pendingResults")
+        let outbox = makeOutbox(Service([]), defaults: defaults)
+        let run = try #require(outbox.pending.first)
+        #expect(run.number == 4)
+        #expect(run.chain.count == 2)
+        let resent = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(run)) as? [String: Any])
+        #expect(resent["device_id"] == nil)
     }
 
     @Test func aRejectedRunIsDropped() async {
@@ -156,5 +172,63 @@ struct RunResultsTests {
         #expect(service.sent.count == 1)
         #expect(service.sent.first?.chain.first?.id == 31)
         #expect(service.sent.first?.links == 0)
+    }
+
+    // MARK: The transport
+
+    /// Answers each post with a status, recording the bearer token it carried.
+    final class Endpoint {
+        var statuses: [Int]
+        private(set) var bearers: [String?] = []
+        init(_ statuses: [Int]) { self.statuses = statuses }
+        func handle(_ request: URLRequest) async throws -> (Data, URLResponse) {
+            bearers.append(request.value(forHTTPHeaderField: "Authorization"))
+            let status = statuses.isEmpty ? 500 : statuses.removeFirst()
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// Hands out "stale" first and "fresh" on a forced refresh, counting each.
+    final class Tokens {
+        private(set) var refreshes = 0
+        let available: Bool
+        init(available: Bool = true) { self.available = available }
+        func token(_ forceRefresh: Bool) async -> String? {
+            guard available else { return nil }
+            if forceRefresh { refreshes += 1 }
+            return forceRefresh ? "fresh" : "stale"
+        }
+    }
+
+    private static let result = RunResult(summary: run, appVersion: "0.7.0")
+
+    @Test func anExpiredTokenIsRefreshedOnceAndTheRunSent() async {
+        let endpoint = Endpoint([401, 201])
+        let tokens = Tokens()
+        let transport = ServiceResultsTransport(token: tokens.token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .delivered)
+        #expect(endpoint.bearers == ["Bearer stale", "Bearer fresh"])
+        #expect(tokens.refreshes == 1)
+    }
+
+    @Test func aSecondRefusalWaitsForLater() async {
+        let endpoint = Endpoint([401, 401])
+        let transport = ServiceResultsTransport(token: Tokens().token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .failed)
+        #expect(endpoint.bearers.count == 2, "one retry, not a loop")
+    }
+
+    @Test func noTokenSendsNothing() async {
+        let endpoint = Endpoint([])
+        let transport = ServiceResultsTransport(token: Tokens(available: false).token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .failed)
+        #expect(endpoint.bearers.isEmpty)
+    }
+
+    @Test func aRefusedRunIsNotRetried() async {
+        let endpoint = Endpoint([422])
+        let transport = ServiceResultsTransport(token: Tokens().token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .rejected)
+        #expect(endpoint.bearers.count == 1)
     }
 }

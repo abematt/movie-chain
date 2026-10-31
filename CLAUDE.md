@@ -407,8 +407,9 @@ keeps the record per sharer id. Debug-only until universal links exist — links
 
 Remaining fan-out modes (the Daily Chain, friend groups, genre locks, memory-recall
 every Nth link) all layer on this same engine — keep the engine/provider split clean.
-Accounts arrive at 0.9.0 (Apple, Google or email one-time code via Supabase, over a
-device id); the local
+Every install is already an anonymous Supabase user (`PlayerSession.swift`): its id is
+the player id in links, results, the profile and analytics. Accounts arrive at 0.9.0
+(Apple, Google or email one-time code) by linking to that same user, so the local
 collection/session data is forward-compatible with that sync. There will be no global
 leaderboard.
 
