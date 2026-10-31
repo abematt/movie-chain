@@ -1,13 +1,13 @@
 ---
 id: website
 label: Site, money & service
-span: Oct 25 15:41 – Oct 28 20:20
+span: Oct 25 15:41 – Oct 31 19:14
 versions: after 0.7.0 (unreleased)
 accent: blue
 order: 7
-sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc 466221d3 034f113f
+sessions: 4f948fc0 be4a0e49 716720e0 875718fd b738c613 e81853bc 466221d3 034f113f 87a895a8
 start: 2026-10-25
-end: 2026-10-28T20:20
+end: 2026-10-31T19:14
 ---
 
 ## Era: 0.7.0 is tagged, and the website talks back (2026-10-26)
@@ -778,6 +778,181 @@ functionality working".
   associated-domains setting, and the site's file and `/c` fallback page. A line in the
   privacy draft about the display name. The real daily starts before Nov 4.
 
+## Era: "I dont like a lot of it", and a player behind every install (2026-10-28 – 10-31)
+
+The plan was a day of tweaking the head-to-head and daily screens. It started with a
+question about which screens were new, and the answer turned into "I think i dont like a
+lot of it". Before any screen changed, the talk went to identity: should sending a
+challenge need an account? A gate went into the roadmap and came out again within ten
+minutes. A forwarding column for the two-phone case was proposed, explained twice and
+dropped as overthinking. What was left was the standard pattern, anonymous sign-in from
+first launch, and three days later it was built. A review found five things, and live
+testing found one more: the profile upsert the unit tests couldn't see. The night
+ended with every install a player on the service, and the screens still untouched.
+
+### 2026-10-28 ~20:29 — "what are the screens we just introduced" (87a895a8)
+
+- **Ask (verbatim):** "Alright so what are the screens we just introduced rencetly …
+  first time head to head challenge recieved end prompt … and also a challenge finishes
+  and you get a reply when its done? is that right"
+- Checked against the code. Mostly right. The "first time received" prompt doesn't
+  exist: the challenge line on the home is the only introduction. The name prompt is
+  an alert on game over, not a screen. Two states were missing from the list: the link
+  notice alert (already played, your own, broken, needs an update), and the Today pill.
+- "Daily challenge" in the code and docs is the **daily start**. The Daily Chain is a
+  different, unbuilt mode.
+
+### ~20:32 — "I think i dont like a lot of it"
+
+**Abraham (verbatim):** "Few things. I think i dont like a lot of it. I think even though
+its further down the line, i think the addition of login/username gets rid of the ask
+your name prompt, i think some element of that will be gated by a login … maybe sending
+a challenge rquires a login but reeiveing one doesn't … also i think the daily challenge
+should not just be a pill also the daily challenge end should not just be a normal
+screen with a random text , same goes for the head to head, i think we need to add some
+more flair there and distinguish them"
+
+- **Decision:** *Mode identity* goes into the Tweak run. The daily and a challenge each
+  get their own home state and their own game over, settled on the design canvas first.
+  It absorbs the Today pill, the four-pill header overflow and the blank share image.
+- **Decision (reversed ten minutes later):** gate sending a challenge on an account, so
+  receiving and playing stay free. The concern written down with it was that this puts
+  the wall at the viral moment. PR #54 (`b9f5d47`).
+
+### ~20:43 — "sharing is the tihng that gets people into playing it"
+
+**Abraham (verbatim):** "you raise a good point, sharing is the tihng that gets people
+into playing it so gating that is bad, so then maybe then we do go back to the pattern we
+established, and if either of those users … then creates an account , we want to update
+their usernames or track that uid back to their username right , i guess thats the part
+im a little unclear about"
+
+- **Decision:** no gate on challenging. The name prompt stays. It writes a profile that
+  anonymous players have too, so it isn't scaffolding. The first answer had called it
+  interim, which was wrong.
+- **The model proposed:** one id from day one (Supabase anonymous sign-in), a `profiles`
+  table for the display name, and a `merged_into` column for one person on two phones.
+  PR #55 (`905b843`).
+
+### ~20:48–21:04 — "Explain this to me again", and "we're overthinking it"
+
+- Abraham pasted the two-phones paragraph back: "Explain this to me again". The
+  rewrite told it as a story (old phone A1, new phone A2, signing in with an Apple id
+  that already belongs to A1) and called `merged_into` a forwarding address.
+- **Abraham (verbatim), 21:03**, on the "ignore it" option: "i don't understand how this
+  would be, B's phone has A1 and A2 and now A2 is what that email/usrname is attached
+  to , and so B has A1 with the same email/usrname and A2 is also has that, so then B just
+  combines that ? is tthat what it is?"
+- **Correction:** B's phone never sees an email or an account, only an id and a name per
+  link. The earlier wording, "until a fresh link arrives", was sloppy: B would keep two
+  Abrahams forever.
+- **Abraham (verbatim), 21:04:** "I feel like this is a normal pattern most games have and
+  that we're overthinking it?"
+- **Decision:** yes. Anonymous id at first launch; sign-in links to it; a second device
+  signs in and discards its own anonymous id. `merged_into` is parked as a later fix if
+  stale rival rows ever matter. **Why:** the window is new phone → play → challenge →
+  only then sign in, and the cost is a stale entry in a friend's list. PR #56 (`b9ddcb4`).
+
+### ~21:08–21:12 — "So what do we touch"
+
+- The list: the dashboard and config settings, `profiles`, the results function reading
+  the player from the token, a session object, collapsing the app's two local ids
+  (`DeviceID` and `SharerID`) into the new one, and tests.
+- **Abraham (verbatim):** "So this is basically bringina a anon auth layer to the app".
+  Yes: invisible now, the floor that credits, server-side head-to-head and accounts
+  stand on.
+
+### 2026-10-31 17:59 — three days later: "what does this mean for all the features"
+
+- Head-to-head: the link's id becomes the server's, which is what a server-side reply
+  and push ("Joe beat your chain") would need. Analytics: a join between PostHog and
+  results. Credits, the next mechanic, need it most: a balance needs an owner the phone
+  can't rewrite.
+- "where we at now": nothing had moved since the 28th. The suggested order was the real
+  daily starts first (the 4 November deadline), then anon auth, then the screens.
+- The model was switched to Opus for the build.
+
+### 18:10–18:22 — "lets get the anon auth done" (PR #57, `e6813d9`)
+
+- **Abraham (verbatim):** "alright lets get the anon auth done and we'll move to the
+  design pass"
+- **Built:** `PlayerSession.swift`. It signs in over plain `URLSession` (no Supabase SDK),
+  refreshes a token within a minute of expiry, and joins a second caller onto a sign-in
+  already running: a refresh token spent twice would revoke the session. The session
+  lives in the Keychain (`ThisDeviceOnly`), so a reinstall is the same player.
+  `PlayerID` gives views the id synchronously, and `PlayerID.all` keeps every id the
+  install has gone by, so a reply to a challenge sent under the old local id comes home.
+- **Service:** anonymous sign-ins on, email sign-up off until 0.9.0; `results.device_id`
+  renamed `player_id` and filled from the token, never the body; `profiles` with
+  own-row policies. The check script gained a rule that a signed-in player's write
+  policy must be keyed on `auth.uid()`.
+- **Two deviations from what was promised:**
+  - **PostHog's own id stays the device id.** Switching it would split every existing
+    install's history. `player_id` rides on every event as a property instead (a
+    property before an event).
+  - **The TMDB proxy and the daily feed send no token.** They don't need to know who's
+    asking, and an expired token would have broken them.
+- 182 tests green, 11 new.
+
+### 18:22–18:41 — the review, and "lets do al l5" (`ddc8e4a`)
+
+`/swift-review` on code the same session had written, and it said so. Two to fix, three
+worth doing:
+1. The Keychain save deleted, then added. A kill in between, and the next launch is a new
+   player.
+2. `player_id` could briefly carry the local fallback id, which matches no results row.
+3. The results transport's retry after a 401 couldn't be tested.
+4. Nothing guarded loading runs saved with the old `device_id`.
+5. Nothing tested a reply to a challenge sent under an older id.
+
+**Abraham (verbatim):** "lets do al l5". All five fixed, plus a test of the real Keychain
+on the simulator under a throwaway account, since the in-memory tests couldn't reach
+fix 1. 189 tests green. PR #57 merged (`902a636`).
+
+### 18:45–18:57 — the rollout, and "you'll have to be more specific"
+
+- The order mattered. Abraham ran `db push`. Deploying the results function from here
+  was **blocked by the auto-mode classifier** as a production deploy, so Abraham ran it
+  himself. If anonymous sign-ins had come on before that deploy, the old function would
+  have refused the new runs as invalid, and the app drops refused runs.
+- **Abraham (verbatim):** "tell me what to do in supabase agian, i ran the command", then
+  "you'll have to be more specific". The first instructions named toggles from memory.
+  The second pass read the live settings first (`config diff`: anonymous off, email
+  sign-up on, password minimum 6) and gave the page URL and each switch.
+- "done both". The live check failed once: the advisor exception matched the finding's
+  detail text, which turned out to be a docs URL. The table is in its metadata.
+  PR #58 (`e54ac63`).
+
+### 18:59–19:12 — the simulator signs in, and the name doesn't arrive
+
+- A fresh build on the iPhone 16 became an anonymous user two seconds after launch, and
+  its stored player id matched the service's. The simulator also kept its hand-set id
+  from the 27th's head-to-head test, which is what `PlayerID.all` is for.
+- **Gotcha:** `simctl spawn defaults read` couldn't see the app's preferences. Reading the
+  container's plist with `plutil` could, the same trap as on the 27th.
+- **Bug:** the name "Joe" never reached `profiles`. Reproduced as the player in a
+  transaction that was rolled back: `42501 permission denied`. PostgREST's upsert updates
+  every column it was sent, `id` included, and players may only update
+  `display_name`. Unit tests couldn't see it; it only happens on the real database.
+- **Fix:** `profiles.id` defaults to `auth.uid()`, and the app sends only the name. A
+  player can't even say which row they mean. Rehearsed against the live database in a
+  rolled-back transaction before Abraham pushed it. The offline check learned to track
+  grants net of later revokes. PR #59 (`1c309f9`).
+- After the push: "Joe" in `profiles` under the simulator's player id. One new advisor
+  failure: leaked-password protection off, likely from turning email sign-up off. It
+  matters only when someone can set a password, and the free plan can't enable it, so
+  the check accepts it while email and phone sign-up are off. PR #60 (`62a0da9`). Live
+  check: 0 failures, 0 warnings.
+
+### Where things stand (2026-10-31 ~19:14)
+
+- `main` at `504859d`, clean. Every install is an anonymous player; the name syncs to
+  the profile; the live service check is green.
+- **Not tested live:** a run's result arriving under the player id. It needs a played
+  game.
+- **Next:** the design pass on the daily and head-to-head screens (Mode identity), from
+  the screen-flow canvas. Real daily starts are still owed before 4 November.
+
 ### Decision log
 
 | Time (local) | Decision | Rationale | Source |
@@ -877,6 +1052,19 @@ functionality working".
 | Oct 27 23:36 | Merge PR #51; the review's seven findings go into the Tweak run | Nothing blocking; finding #1 is a UX fix anyway | 466221d3 |
 | Oct 27 23:42 | Screen flow as a wireflow canvas on the personal account | Real screenshots per state are the base for the design pass | 466221d3 |
 | Oct 27 23:46 | Keep the overflowing header in the screenshot | It's a real bug the design pass should see | 466221d3 |
+| Oct 28 20:32 | Mode identity: the daily and a challenge get their own home state and game over | "the daily challenge should not just be a pill … same goes for the head to head"; design on the canvas first | 87a895a8 |
+| Oct 28 20:32 | Gate sending a challenge on an account (reversed at 20:43) | Highest intent at the first share; it put the wall at the viral moment | 87a895a8 |
+| Oct 28 20:43 | No gate on challenging; the name prompt stays and writes a profile | "sharing is the tihng that gets people into playing it" | 87a895a8 |
+| Oct 28 21:04 | Identity is the standard pattern: anonymous id, sign-in links to it; no `merged_into` | "we're overthinking it"; the two-phone case is rare and cosmetic | 87a895a8 |
+| Oct 31 18:10 | Build anon auth before the design pass | Cheapest while `results` is small; the floor for credits and accounts | 87a895a8 |
+| Oct 31 18:15 | Plain `URLSession` against Supabase Auth, no SDK | Two endpoints; nothing else in the app needs the SDK | 87a895a8 |
+| Oct 31 18:15 | PostHog keeps the device id; `player_id` is a shared property | Switching the distinct id would split every install's history | 87a895a8 |
+| Oct 31 18:15 | The TMDB proxy and daily feed send no token | They don't need the player, and an expired token would break them | 87a895a8 |
+| Oct 31 18:15 | Email sign-up off until 0.9.0 | Every player is anonymous until then; clears both auth warnings | 87a895a8 |
+| Oct 31 18:39 | Fix all five review findings | "lets do al l5" | 87a895a8 |
+| Oct 31 18:45 | Deploy the function before turning anonymous sign-ins on | The old function would refuse token runs as invalid, and the app drops them | 87a895a8 |
+| Oct 31 19:03 | `profiles.id` defaults to `auth.uid()`; the app sends only the name | The upsert updates every sent column, and players can't update `id` | 87a895a8 |
+| Oct 31 19:12 | Accept the leaked-password advisor while no one can set a password | No passwords exist, and the free plan can't enable it | 87a895a8 |
 
 ### Story material
 
@@ -926,6 +1114,11 @@ functionality working".
 - **The review that graded its own homework.** `/swift-review` ran on code the same session had written, said so, and still found seven things, one of them a forgeable score.
 - **ERD for screens.** The question that led to the wireflow, and the map that showed the four-pill header was already broken on the iPhone 16, not just the SE.
 - **The canvas that vanished.** The next afternoon the canvas was "not found": the session had switched back to the work account. The canvas was fine, but it's the third time the two accounts have tangled around this project.
+- **A gate for ten minutes.** Accounts-to-challenge went into the roadmap at 20:34 and out at 20:44, once the argument against it was said out loud: the first share is how people arrive.
+- **"we're overthinking it".** A forwarding column, explained twice, dropped in favour of what most games do.
+- **The test that couldn't fail.** 189 unit tests passed, and the first real name was still refused by the database. The fix was rehearsed live in a transaction that wrote nothing.
+- **Three days of nothing.** The thread stopped at "So this is basically bringina a anon auth layer to the app" on the 28th and picked up on the 31st with the build.
+- **"you'll have to be more specific".** Dashboard steps from memory didn't land; reading the live settings first did.
 
 ### Media index
 
@@ -952,3 +1145,4 @@ functionality working".
 - `media/466221d3/flow_contact.png`: contact sheet of the 16 screen-flow states. Embedded. ~23:48.
 - `media/466221d3/flow_raw_*.png` (16): the full-size screen-flow screenshots (iPhone 16, 9:41). ~23:47.
 - `media/466221d3/flow_up_*.png` (16): the same downscaled to 1006px for upload to the canvas. ~23:48.
+- Session `87a895a8` captured no screenshots or other media.
