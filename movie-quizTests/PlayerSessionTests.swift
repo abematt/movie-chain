@@ -182,4 +182,23 @@ struct PlayerSessionTests {
         #expect(service.paths.filter { $0 == "/rest/v1/profiles" }.count == 2)
         #expect(defaults.string(forKey: PlayerSession.syncedNameKey) == "Abe")
     }
+
+    // MARK: Keychain
+
+    /// The real Keychain, under a throwaway account: saved, replaced in place,
+    /// and cleared.
+    @Test func theKeychainKeepsReplacesAndClearsTheSession() {
+        let vault = KeychainSessionVault(account: "test-\(UUID().uuidString)")
+        defer { vault.save(nil) }
+        let first = ServiceSession(userID: alice, accessToken: "a1", refreshToken: "r1", expiresAt: clock)
+        let second = ServiceSession(userID: alice, accessToken: "a2", refreshToken: "r2",
+                                    expiresAt: clock.addingTimeInterval(3600))
+        #expect(vault.load() == nil)
+        vault.save(first)
+        #expect(vault.load() == first)
+        vault.save(second)
+        #expect(vault.load() == second, "a refresh replaces the item")
+        vault.save(nil)
+        #expect(vault.load() == nil)
+    }
 }

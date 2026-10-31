@@ -63,6 +63,24 @@ struct RivalsTests {
         #expect(store.receive(.chain(challenge(from: me)), me: [me], at: now) == .own)
     }
 
+    /// A challenge sent before the phone had its service id is answered after:
+    /// the reply still comes home, and a link under either id is your own.
+    @Test func aReplyToAChallengeSentUnderAnOlderIDIsYours() throws {
+        let store = store
+        let older = UUID()
+        let original = challenge(from: older, name: "Abe", links: [8358, 7], points: 90)
+        let answer = reply(to: original, from: sam, links: [8358, 7, 13], points: 120)
+        guard case .reply(let match, let rival) = store.receive(.chain(answer), me: [me, older], at: now) else {
+            Issue.record("expected a reply")
+            return
+        }
+        #expect(match.mine == RunScore(links: 2, points: 90))
+        #expect(rival.id == sam)
+        #expect(store.receive(.chain(challenge(from: older)), me: [me, older], at: now) == .own)
+        // Without the older id it reads as a challenge to you, which is the bug this guards.
+        #expect(store.receive(.chain(answer), me: [me], at: now) != .reply(match, rival))
+    }
+
     @Test func aLinkWithNoSharerIsNoChallenge() {
         #expect(store.receive(.chain(challenge(from: nil)), me: [me], at: now) == .invalid)
     }

@@ -222,8 +222,14 @@ enum PlayerID {
 /// and never synced or restored to another device: a second phone is a second
 /// anonymous player until sign-in (0.9.0) links them.
 struct KeychainSessionVault: SessionVault {
-    private let service = (Bundle.main.bundleIdentifier ?? "abe.movie-quiz") + ".service-session"
-    private let account = "anonymous"
+    private let service: String
+    private let account: String
+
+    /// `account` is injected so tests never touch the app's own session.
+    init(account: String = "anonymous") {
+        service = (Bundle.main.bundleIdentifier ?? "abe.movie-quiz") + ".service-session"
+        self.account = account
+    }
 
     private var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -242,12 +248,20 @@ struct KeychainSessionVault: SessionVault {
         return try? JSONDecoder().decode(ServiceSession.self, from: data)
     }
 
+    /// Replaced in place, never deleted first: a kill between a delete and an
+    /// add would leave no session, and the next launch would be a new player.
     func save(_ session: ServiceSession?) {
-        SecItemDelete(query as CFDictionary)
-        guard let session, let data = try? JSONEncoder().encode(session) else { return }
-        var item = query
-        item[kSecValueData as String] = data
-        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(item as CFDictionary, nil)
+        guard let session else {
+            SecItemDelete(query as CFDictionary)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(session) else { return }
+        let update = [kSecValueData as String: data] as CFDictionary
+        if SecItemUpdate(query as CFDictionary, update) == errSecItemNotFound {
+            var item = query
+            item[kSecValueData as String] = data
+            item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            SecItemAdd(item as CFDictionary, nil)
+        }
     }
 }

@@ -141,13 +141,15 @@ final class ResultsOutbox {
 struct ServiceResultsTransport {
     /// A token for the player; `true` asks for a fresh one after a 401.
     typealias Token = (_ forceRefresh: Bool) async -> String?
+    typealias Transport = (URLRequest) async throws -> (Data, URLResponse)
 
-    private let session: URLSession
+    private let transport: Transport
     private let token: Token
 
-    init(session: URLSession = .shared, token: @escaping Token) {
-        self.session = session
+    init(token: @escaping Token,
+         transport: @escaping Transport = { try await URLSession.shared.data(for: $0) }) {
         self.token = token
+        self.transport = transport
     }
 
     func send(_ result: RunResult) async -> ResultsOutbox.Delivery {
@@ -162,7 +164,7 @@ struct ServiceResultsTransport {
             req.setValue(Config.serviceKey, forHTTPHeaderField: "apikey")
             req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
             req.httpBody = body
-            guard let (_, response) = try? await session.data(for: req),
+            guard let (_, response) = try? await transport(req),
                   let status = (response as? HTTPURLResponse)?.statusCode
             else { return .failed }
             if status != 401 { return Self.delivery(status: status) }

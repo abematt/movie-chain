@@ -121,6 +121,24 @@ struct RunResultsTests {
         #expect(relaunched.pending.isEmpty)
     }
 
+    /// Runs saved by the build before player ids carried a `device_id`; they load
+    /// and send without it (the service takes the player from the token).
+    @Test func runsSavedWithADeviceIDStillLoad() throws {
+        let defaults = freshDefaults()
+        let legacy = """
+        [{"device_id":"6f9619ff-8b86-d011-b42d-00c04fc964ff","mode":"daily_start","number":4,\
+        "chain":[{"kind":"actor","id":31},{"kind":"movie","id":13,"seconds":4.2}],\
+        "links":1,"points":30,"ended_by_quit":false,"app_version":"0.7.0"}]
+        """
+        defaults.set(Data(legacy.utf8), forKey: "pendingResults")
+        let outbox = makeOutbox(Service([]), defaults: defaults)
+        let run = try #require(outbox.pending.first)
+        #expect(run.number == 4)
+        #expect(run.chain.count == 2)
+        let resent = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(run)) as? [String: Any])
+        #expect(resent["device_id"] == nil)
+    }
+
     @Test func aRejectedRunIsDropped() async {
         let service = Service([.rejected])
         let outbox = makeOutbox(service, defaults: freshDefaults())
@@ -154,5 +172,63 @@ struct RunResultsTests {
         #expect(service.sent.count == 1)
         #expect(service.sent.first?.chain.first?.id == 31)
         #expect(service.sent.first?.links == 0)
+    }
+
+    // MARK: The transport
+
+    /// Answers each post with a status, recording the bearer token it carried.
+    final class Endpoint {
+        var statuses: [Int]
+        private(set) var bearers: [String?] = []
+        init(_ statuses: [Int]) { self.statuses = statuses }
+        func handle(_ request: URLRequest) async throws -> (Data, URLResponse) {
+            bearers.append(request.value(forHTTPHeaderField: "Authorization"))
+            let status = statuses.isEmpty ? 500 : statuses.removeFirst()
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// Hands out "stale" first and "fresh" on a forced refresh, counting each.
+    final class Tokens {
+        private(set) var refreshes = 0
+        let available: Bool
+        init(available: Bool = true) { self.available = available }
+        func token(_ forceRefresh: Bool) async -> String? {
+            guard available else { return nil }
+            if forceRefresh { refreshes += 1 }
+            return forceRefresh ? "fresh" : "stale"
+        }
+    }
+
+    private static let result = RunResult(summary: run, appVersion: "0.7.0")
+
+    @Test func anExpiredTokenIsRefreshedOnceAndTheRunSent() async {
+        let endpoint = Endpoint([401, 201])
+        let tokens = Tokens()
+        let transport = ServiceResultsTransport(token: tokens.token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .delivered)
+        #expect(endpoint.bearers == ["Bearer stale", "Bearer fresh"])
+        #expect(tokens.refreshes == 1)
+    }
+
+    @Test func aSecondRefusalWaitsForLater() async {
+        let endpoint = Endpoint([401, 401])
+        let transport = ServiceResultsTransport(token: Tokens().token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .failed)
+        #expect(endpoint.bearers.count == 2, "one retry, not a loop")
+    }
+
+    @Test func noTokenSendsNothing() async {
+        let endpoint = Endpoint([])
+        let transport = ServiceResultsTransport(token: Tokens(available: false).token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .failed)
+        #expect(endpoint.bearers.isEmpty)
+    }
+
+    @Test func aRefusedRunIsNotRetried() async {
+        let endpoint = Endpoint([422])
+        let transport = ServiceResultsTransport(token: Tokens().token, transport: endpoint.handle)
+        #expect(await transport.send(Self.result) == .rejected)
+        #expect(endpoint.bearers.count == 1)
     }
 }

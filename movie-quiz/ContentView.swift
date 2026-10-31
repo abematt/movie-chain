@@ -139,11 +139,12 @@ struct ContentView: View {
         // write the name once it settles (a second after the last keystroke).
         .task(id: playerName) {
             guard let session else { return }
-            telemetry?.context.playerID = PlayerID.current(in: .standard)
+            // Only an id the service issued, so `player_id` always matches `results`.
+            telemetry?.context.playerID = session.userID
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
             _ = await session.accessToken()
-            telemetry?.context.playerID = session.userID ?? PlayerID.current(in: .standard)
+            telemetry?.context.playerID = session.userID
             await session.syncProfile(name: PlayerName.current(in: .standard))
         }
         .sheet(item: $openedMatch) { opened in
