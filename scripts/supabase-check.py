@@ -348,7 +348,7 @@ def json_from(output):
     return json.loads(output[start:])
 
 
-def check_advisors(report, tables, auth):
+def check_advisors(report, tables, auth, config):
     report.section("advisors")
     issues = json_from(supabase("db", "advisors", "--linked", "--type", "all",
                                 "--level", "info", "--output-format", "json")).get("results", [])
@@ -365,6 +365,10 @@ def check_advisors(report, tables, auth):
             continue
         # Every player is an anonymous user, so a declared table's policies admit
         # anonymous users on purpose; the own-row rule (policy-not-own-row) holds them.
+        # Leaked-password checks only matter when someone can set a password; with
+        # email and phone sign-up off there are none (and the free plan can't enable it).
+        if rule == "auth_leaked_password_protection" and not passwords_possible(config):
+            continue
         meta = issue.get("metadata") or {}
         flagged = f"{meta.get('schema', 'public')}.{meta.get('name', '')}"
         if rule == "auth_allow_anonymous_sign_ins" and auth.get("anonymous_sign_ins") \
@@ -380,6 +384,12 @@ def check_advisors(report, tables, auth):
     if not shown:
         report.ok(f"no issues ({len(issues)} expected or informational notices skipped)"
                   if issues else "no issues")
+
+
+def passwords_possible(config):
+    auth = config.get("auth", {})
+    return auth.get("enable_signup", False) and (auth.get("email", {}).get("enable_signup", False)
+                                                 or auth.get("sms", {}).get("enable_signup", False))
 
 
 def resolved_config():
@@ -626,8 +636,8 @@ def main(argv):
     else:
         check_secrets(report, history=True, app=app)
         try:
-            check_advisors(report, tables, auth)
             config = resolved_config()
+            check_advisors(report, tables, auth, config)
             schemas = config.get("api", {}).get("schemas", ["public", "graphql_public"])
             catalog = live_catalog(schemas)
             check_catalog(report, catalog, tables, callable_, buckets)
