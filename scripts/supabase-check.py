@@ -351,8 +351,10 @@ def check_advisors(report, tables, auth):
             continue
         # Every player is an anonymous user, so a declared table's policies admit
         # anonymous users on purpose; the own-row rule (policy-not-own-row) holds them.
+        meta = issue.get("metadata") or {}
+        flagged = f"{meta.get('schema', 'public')}.{meta.get('name', '')}"
         if rule == "auth_allow_anonymous_sign_ins" and auth.get("anonymous_sign_ins") \
-                and any(t in detail for t, roles in tables.items() if roles.get("authenticated")):
+                and tables.get(flagged, {}).get("authenticated"):
             continue
         if level == "INFO" and not security:
             continue
